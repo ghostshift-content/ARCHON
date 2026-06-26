@@ -1,0 +1,178 @@
+{
+  "target": "gitlab",
+  "note": "GitLab CE/EE feature queue (43). Source-parsed white-box review per the phase1-maps methodology.",
+  "features": [
+    {
+      "slug": "admin-settings",
+      "name": "Admin Settings"
+    },
+    {
+      "slug": "ai-duo",
+      "name": "AI / Duo"
+    },
+    {
+      "slug": "analytics-observability",
+      "name": "Analytics & Observability"
+    },
+    {
+      "slug": "anti-abuse",
+      "name": "Anti-Abuse"
+    },
+    {
+      "slug": "authentication-sso",
+      "name": "Authentication / SSO"
+    },
+    {
+      "slug": "boards-milestones-labels",
+      "name": "Boards / Milestones / Labels"
+    },
+    {
+      "slug": "cells",
+      "name": "Cells"
+    },
+    {
+      "slug": "ci-cd-pipelines",
+      "name": "CI/CD Pipelines"
+    },
+    {
+      "slug": "clusters-infra",
+      "name": "Clusters / Infra"
+    },
+    {
+      "slug": "compliance-audit",
+      "name": "Compliance & Audit"
+    },
+    {
+      "slug": "container-registry",
+      "name": "Container Registry"
+    },
+    {
+      "slug": "crm-contacts",
+      "name": "CRM / Contacts"
+    },
+    {
+      "slug": "dependency-sbom",
+      "name": "Dependencies / SBOM"
+    },
+    {
+      "slug": "design-management",
+      "name": "Design Management"
+    },
+    {
+      "slug": "epics-portfolio",
+      "name": "Epics & Portfolio"
+    },
+    {
+      "slug": "feature-flags",
+      "name": "Feature Flags"
+    },
+    {
+      "slug": "geo",
+      "name": "Geo"
+    },
+    {
+      "slug": "groups-namespaces",
+      "name": "Groups / Namespaces"
+    },
+    {
+      "slug": "import-export",
+      "name": "Import / Export"
+    },
+    {
+      "slug": "integrations-webhooks",
+      "name": "Integrations / Webhooks"
+    },
+    {
+      "slug": "issues-work-items",
+      "name": "Issues & Work Items"
+    },
+    {
+      "slug": "members-access",
+      "name": "Members & Access Tokens"
+    },
+    {
+      "slug": "merge-requests",
+      "name": "Merge Requests"
+    },
+    {
+      "slug": "ml",
+      "name": "ML / Model Registry"
+    },
+    {
+      "slug": "monitor-incidents",
+      "name": "Monitor / Incidents"
+    },
+    {
+      "slug": "notes-discussions",
+      "name": "Notes / Discussions"
+    },
+    {
+      "slug": "packages",
+      "name": "Packages"
+    },
+    {
+      "slug": "pages",
+      "name": "Pages"
+    },
+    {
+      "slug": "projects",
+      "name": "Projects"
+    },
+    {
+      "slug": "protected-branch-rules",
+      "name": "Protected Branch Rules"
+    },
+    {
+      "slug": "releases-environments",
+      "name": "Releases / Environments"
+    },
+    {
+      "slug": "repositories-git",
+      "name": "Repositories & Git"
+    },
+    {
+      "slug": "runners",
+      "name": "CI Runners"
+    },
+    {
+      "slug": "search",
+      "name": "Search"
+    },
+    {
+      "slug": "security-policies",
+      "name": "Security Policies"
+    },
+    {
+      "slug": "service-desk",
+      "name": "Service Desk"
+    },
+    {
+      "slug": "snippets",
+      "name": "Snippets"
+    },
+    {
+      "slug": "subscriptions-billing",
+      "name": "Subscriptions / Billing"
+    },
+    {
+      "slug": "uploads-files",
+      "name": "Uploads / LFS"
+    },
+    {
+      "slug": "users-profile",
+      "name": "Users / Profile"
+    },
+    {
+      "slug": "vulnerabilities",
+      "name": "Vulnerabilities"
+    },
+    {
+      "slug": "wikis",
+      "name": "Wikis"
+    },
+    {
+      "slug": "workspaces-remote-dev",
+      "name": "Workspaces / Remote Dev"
+    }
+  ]
+}

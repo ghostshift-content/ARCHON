@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Security Finding",
+  "description": "Standardized finding format for AI Security Arsenal",
+  "type": "object",
+  "required": ["id", "title", "severity", "skill", "description"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique finding identifier (e.g., API-2024-001)"
+    },
+    "title": {
+      "type": "string",
+      "description": "Short descriptive title"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low", "info"],
+      "description": "Finding severity"
+    },
+    "cvss_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "CVSS v3.1 base score"
+    },
+    "cvss_vector": {
+      "type": "string",
+      "description": "CVSS v3.1 vector string"
+    },
+    "skill": {
+      "type": "string",
+      "description": "Source skill (e.g., api-security, network-pentest)"
+    },
+    "category": {
+      "type": "string",
+      "description": "Vulnerability category (e.g., Injection, Auth Bypass)"
+    },
+    "owasp_id": {
+      "type": "string",
+      "description": "OWASP reference (e.g., API1:2023, LLM01)"
+    },
+    "cwe_id": {
+      "type": "string",
+      "description": "CWE identifier (e.g., CWE-89)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed finding description"
+    },
+    "affected_component": {
+      "type": "string",
+      "description": "Target endpoint, file, resource affected"
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "request": { "type": "string" },
+        "response": { "type": "string" },
+        "screenshot": { "type": "string" },
+        "tool_output": { "type": "string" },
+        "reproduction_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "impact": {
+      "type": "string",
+      "description": "Business and technical impact"
+    },
+    "remediation": {
+      "type": "string",
+      "description": "Fix guidance"
+    },
+    "references": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "confirmed", "false_positive", "accepted_risk", "remediated"],
+      "default": "open"
+    },
+    "found_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "tool": {
+      "type": "string",
+      "description": "Tool that identified the finding"
+    }
+  }
+}

@@ -1,0 +1,554 @@
+remediations:
+  - vulnerability: GraphQL Security Misconfiguration
+    description: >
+      GraphQL APIs are vulnerable to several attacks if not properly secured:
+      deeply nested queries can cause denial of service, introspection in
+      production exposes the entire schema to attackers, batched queries can
+      bypass rate limiting, and overly permissive resolvers can leak sensitive
+      data. Without query cost analysis, a single request can consume excessive
+      server resources.
+    fix: >
+      Implement query depth limiting and query cost/complexity analysis. Disable
+      introspection in production. Apply field-level authorization in resolvers.
+      Limit batch query sizes. Use persisted queries (allowlisted queries) for
+      public-facing APIs. Set request timeouts and resource limits.
+    severity: high
+    cwe_ids:
+      - CWE-400
+      - CWE-200
+    code_examples:
+      - language: python
+        description: "Graphene (Python) with depth limiting and introspection control"
+        code: |
+          import graphene
+          from graphql import parse, validate
+          from graphql.validation import ASTValidationRule
+          from graphql.language import ast as gql_ast
+
+          # Custom depth limit validation rule
+          class DepthLimitRule(ASTValidationRule):
+              def __init__(self, context, max_depth=10):
+                  super().__init__(context)
+                  self.max_depth = max_depth
+
+              def _check_depth(self, node, depth=0):
+                  if depth > self.max_depth:
+                      self.report_error(
+                          graphene.GraphQLError(
+                              f"Query depth {depth} exceeds maximum of {self.max_depth}"
+                          )
+                      )
+                      return
+                  if hasattr(node, 'selection_set') and node.selection_set:
+                      for selection in node.selection_set.selections:
+                          self._check_depth(selection, depth + 1)
+
+              def enter_operation_definition(self, node, *args):
+                  self._check_depth(node)
+
+          # Disable introspection in production
+          class DisableIntrospection(ASTValidationRule):
+              def enter_field(self, node, *args):
+                  if node.name.value in ('__schema', '__type'):
+                      self.report_error(
+                          graphene.GraphQLError(
+                              "Introspection is disabled"
+                          )
+                      )
+
+          # Apply rules in your schema execution
+          import os
+
+          def get_validation_rules():
+              rules = [DepthLimitRule]
+              if os.getenv('ENVIRONMENT') == 'production':
+                  rules.append(DisableIntrospection)
+              return rules
+
+          schema = graphene.Schema(query=Query, mutation=Mutation)
+
+          # In your view/endpoint:
+          # result = schema.execute(
+          #     query,
+          #     validation_rules=get_validation_rules(),
+          #     context_value={'user': current_user}
+          # )
+
+      - language: java
+        description: "Spring GraphQL with query complexity and depth analysis"
+        code: |
+          import graphql.analysis.MaxQueryComplexityInstrumentation;
+          import graphql.analysis.MaxQueryDepthInstrumentation;
+          import graphql.execution.instrumentation.ChainedInstrumentation;
+          import graphql.GraphQL;
+
+          import org.springframework.context.annotation.Bean;
+          import org.springframework.context.annotation.Configuration;
+
+          @Configuration
+          public class GraphQLSecurityConfig {
+
+              @Bean
+              public GraphQL graphQL(GraphQLSchema schema) {
+                  // Limit query depth to 10 levels
+                  MaxQueryDepthInstrumentation depthLimit =
+                      new MaxQueryDepthInstrumentation(10);
+
+                  // Limit query complexity score to 200
+                  MaxQueryComplexityInstrumentation complexityLimit =
+                      new MaxQueryComplexityInstrumentation(200);
+
+                  return GraphQL.newGraphQL(schema)
+                      .instrumentation(new ChainedInstrumentation(
+                          depthLimit,
+                          complexityLimit
+                      ))
+                      .build();
+              }
+
+              // Disable introspection in production
+              @Bean
+              @Profile("production")
+              public GraphQLSchema securedSchema(GraphQLSchema schema) {
+                  return GraphQLSchema.newSchema(schema)
+                      .additionalDirectives(Set.of())
+                      // Remove __schema and __type from production
+                      .build();
+              }
+          }
+
+          // Field-level authorization in resolvers:
+          @Component
+          public class UserResolver implements GraphQLResolver<User> {
+              public String email(User user, DataFetchingEnvironment env) {
+                  AuthContext auth = env.getContext();
+                  // Only return email to the user themselves or admins
+                  if (auth.getUserId().equals(user.getId())
+                          || auth.hasRole("ADMIN")) {
+                      return user.getEmail();
+                  }
+                  return null;  // Or throw unauthorized
+              }
+          }
+
+      - language: javascript
+        description: "Apollo Server with depth limiting and complexity analysis"
+        code: |
+          const { ApolloServer } = require('@apollo/server');
+          const depthLimit = require('graphql-depth-limit');
+          const {
+            createComplexityLimitRule,
+          } = require('graphql-validation-complexity');
+
+          // Disable introspection in production
+          const introspectionPlugin = {
+            async requestDidStart() {
+              return {
+                async didResolveOperation(requestContext) {
+                  if (process.env.NODE_ENV === 'production') {
+                    const query = requestContext.request.query || '';
+                    if (query.includes('__schema') || query.includes('__type')) {
+                      throw new Error('Introspection is disabled in production');
+                    }
+                  }
+                },
+              };
+            },
+          };
+
+          const server = new ApolloServer({
+            typeDefs,
+            resolvers,
+            validationRules: [
+              depthLimit(10),                    // Max depth of 10
+              createComplexityLimitRule(1000, {   // Max complexity of 1000
+                scalarCost: 1,
+                objectCost: 2,
+                listFactor: 10,
+              }),
+            ],
+            plugins: [introspectionPlugin],
+            // Limit request size
+            parseOptions: {
+              maxTokens: 1000,
+            },
+          });
+
+          // Field-level auth in resolvers
+          const resolvers = {
+            User: {
+              email: (parent, args, context) => {
+                // Only return email to the owner or admins
+                if (context.user.id === parent.id
+                    || context.user.roles.includes('admin')) {
+                  return parent.email;
+                }
+                return null;
+              },
+            },
+          };
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html"
+      - "https://www.apollographql.com/blog/graphql/security/securing-your-graphql-api-from-malicious-queries/"
+      - "https://cwe.mitre.org/data/definitions/400.html"
+
+  - vulnerability: Missing or Inadequate Rate Limiting
+    description: >
+      Without rate limiting, APIs are vulnerable to brute-force attacks,
+      credential stuffing, denial of service, data scraping, and resource
+      exhaustion. Attackers can send unlimited requests to overwhelm the server
+      or systematically abuse business logic.
+    fix: >
+      Implement rate limiting using token bucket or sliding window algorithms.
+      Apply different rate limits per endpoint sensitivity (stricter for login,
+      password reset). Use HTTP 429 status codes with Retry-After headers.
+      Consider rate limiting by user, IP, API key, or a combination.
+    severity: medium
+    cwe_ids:
+      - CWE-770
+      - CWE-307
+    code_examples:
+      - language: python
+        description: "Flask rate limiting with flask-limiter and Redis backend"
+        code: |
+          from flask import Flask, request, jsonify
+          from flask_limiter import Limiter
+          from flask_limiter.util import get_remote_address
+
+          app = Flask(__name__)
+
+          # Use Redis for distributed rate limiting across instances
+          limiter = Limiter(
+              app=app,
+              key_func=get_remote_address,
+              storage_uri="redis://localhost:6379/0",
+              default_limits=["100 per minute"],  # Global default
+              headers_enabled=True,               # Add rate limit headers
+          )
+
+          # General API endpoints: 100 requests/minute
+          @app.route('/api/data')
+          @limiter.limit("100 per minute")
+          def get_data():
+              return jsonify({"data": "example"})
+
+          # Login: much stricter - 5 attempts per 15 minutes per IP
+          @app.route('/api/login', methods=['POST'])
+          @limiter.limit("5 per 15 minutes")
+          def login():
+              # ... authentication logic
+              return jsonify({"status": "ok"})
+
+          # Password reset: very strict
+          @app.route('/api/password-reset', methods=['POST'])
+          @limiter.limit("3 per hour")
+          def password_reset():
+              # ... password reset logic
+              return jsonify({"status": "email sent"})
+
+          # Custom key function: rate limit by authenticated user
+          @app.route('/api/expensive-operation', methods=['POST'])
+          @limiter.limit("10 per hour", key_func=lambda: request.headers.get('X-API-Key', get_remote_address()))
+          def expensive_operation():
+              return jsonify({"result": "done"})
+
+      - language: java
+        description: "Spring Boot rate limiting with Bucket4j"
+        code: |
+          import io.github.bucket4j.*;
+          import jakarta.servlet.*;
+          import jakarta.servlet.http.*;
+          import org.springframework.stereotype.Component;
+
+          import java.io.IOException;
+          import java.time.Duration;
+          import java.util.Map;
+          import java.util.concurrent.ConcurrentHashMap;
+
+          @Component
+          public class RateLimitFilter implements Filter {
+
+              // Per-IP rate limit buckets (use Redis for distributed)
+              private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+
+              private Bucket createBucket() {
+                  return Bucket.builder()
+                      // Token bucket: 100 tokens, refill 100 per minute
+                      .addLimit(Bandwidth.classic(
+                          100, Refill.intervally(100, Duration.ofMinutes(1))
+                      ))
+                      .build();
+              }
+
+              @Override
+              public void doFilter(ServletRequest request, ServletResponse response,
+                      FilterChain chain) throws IOException, ServletException {
+
+                  HttpServletRequest httpReq = (HttpServletRequest) request;
+                  HttpServletResponse httpRes = (HttpServletResponse) response;
+                  String clientIp = httpReq.getRemoteAddr();
+
+                  Bucket bucket = buckets.computeIfAbsent(clientIp,
+                      k -> createBucket());
+
+                  ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+
+                  if (probe.isConsumed()) {
+                      httpRes.setHeader("X-Rate-Limit-Remaining",
+                          String.valueOf(probe.getRemainingTokens()));
+                      chain.doFilter(request, response);
+                  } else {
+                      httpRes.setStatus(429);
+                      httpRes.setHeader("Retry-After",
+                          String.valueOf(probe.getNanosToWaitForRefill() / 1_000_000_000));
+                      httpRes.getWriter().write(
+                          "{\"error\": \"Rate limit exceeded\"}");
+                  }
+              }
+          }
+
+      - language: javascript
+        description: "Express rate limiting with sliding window (Redis-backed)"
+        code: |
+          const rateLimit = require('express-rate-limit');
+          const RedisStore = require('rate-limit-redis');
+          const Redis = require('ioredis');
+
+          const redisClient = new Redis(process.env.REDIS_URL);
+
+          // General API rate limiter
+          const apiLimiter = rateLimit({
+            store: new RedisStore({ sendCommand: (...args) => redisClient.call(...args) }),
+            windowMs: 60 * 1000,    // 1 minute window
+            max: 100,                // 100 requests per window
+            standardHeaders: true,   // Return rate limit info in headers
+            legacyHeaders: false,
+            message: { error: 'Too many requests, please try again later' },
+            keyGenerator: (req) => req.ip,
+          });
+
+          // Strict limiter for authentication endpoints
+          const authLimiter = rateLimit({
+            store: new RedisStore({ sendCommand: (...args) => redisClient.call(...args) }),
+            windowMs: 15 * 60 * 1000,  // 15 minute window
+            max: 5,                      // 5 attempts
+            message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+            skipSuccessfulRequests: true, // Don't count successful logins
+          });
+
+          // Apply limiters
+          app.use('/api/', apiLimiter);
+          app.use('/api/login', authLimiter);
+          app.use('/api/password-reset', rateLimit({
+            windowMs: 60 * 60 * 1000,  // 1 hour
+            max: 3,
+          }));
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html"
+      - "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/"
+      - "https://cwe.mitre.org/data/definitions/770.html"
+
+  - vulnerability: Mass Assignment
+    description: >
+      Mass assignment occurs when an API automatically binds client-provided data
+      to internal data models without filtering. Attackers can add unexpected
+      fields to requests (e.g., "role": "admin", "isVerified": true) to modify
+      properties they should not have access to, leading to privilege escalation,
+      data manipulation, or bypassing business logic.
+    fix: >
+      Never bind request data directly to database models. Use explicit field
+      allowlists (Data Transfer Objects / input schemas) that specify exactly
+      which fields can be set by the client. Reject or ignore unexpected fields.
+      Apply different DTOs for create vs. update operations.
+    severity: high
+    cwe_ids:
+      - CWE-915
+    code_examples:
+      - language: python
+        description: "Pydantic DTOs with explicit field allowlists (FastAPI)"
+        code: |
+          from pydantic import BaseModel
+          from typing import Optional
+
+          # DTO for user creation - only allow safe fields
+          class UserCreateDTO(BaseModel):
+              username: str
+              email: str
+              password: str
+              # Note: 'role' and 'is_admin' are NOT included here
+
+          # DTO for user update - different allowed fields
+          class UserUpdateDTO(BaseModel):
+              email: Optional[str] = None
+              display_name: Optional[str] = None
+              # Still no 'role' or 'is_admin'
+
+          # Internal model has all fields including privileged ones
+          class UserInDB:
+              username: str
+              email: str
+              password_hash: str
+              role: str = "user"       # Server-controlled, never from client
+              is_admin: bool = False   # Server-controlled, never from client
+
+          # FastAPI endpoint
+          from fastapi import FastAPI, Depends
+          app = FastAPI()
+
+          @app.post("/api/users")
+          async def create_user(user_data: UserCreateDTO):
+              # Only fields defined in UserCreateDTO are accepted
+              # Even if client sends {"role": "admin"}, it is ignored
+              user = UserInDB(
+                  username=user_data.username,
+                  email=user_data.email,
+                  password_hash=hash_password(user_data.password),
+                  role="user",          # Explicitly set server-side
+                  is_admin=False,       # Explicitly set server-side
+              )
+              db.users.save(user)
+              return {"id": user.id, "username": user.username}
+
+          @app.put("/api/users/{user_id}")
+          async def update_user(user_id: str, updates: UserUpdateDTO):
+              # Only email and display_name can be updated
+              update_dict = updates.dict(exclude_unset=True)
+              db.users.update(user_id, update_dict)
+              return {"status": "updated"}
+
+      - language: java
+        description: "Spring Boot DTOs to prevent mass assignment"
+        code: |
+          // Request DTO - only fields the client is allowed to set
+          public record CreateUserRequest(
+              @NotBlank String username,
+              @Email String email,
+              @Size(min = 12) String password
+              // No 'role', 'isAdmin', or 'isVerified' fields
+          ) {}
+
+          public record UpdateUserRequest(
+              @Email String email,
+              String displayName
+              // Restricted field set for updates
+          ) {}
+
+          // Entity has all fields including privileged ones
+          @Entity
+          public class User {
+              @Id @GeneratedValue
+              private Long id;
+              private String username;
+              private String email;
+              private String passwordHash;
+              private String role = "user";         // Server-controlled
+              private boolean isAdmin = false;       // Server-controlled
+              private boolean isVerified = false;    // Server-controlled
+              // getters/setters...
+          }
+
+          @RestController
+          @RequestMapping("/api/users")
+          public class UserController {
+
+              @PostMapping
+              public ResponseEntity<UserResponse> createUser(
+                      @Valid @RequestBody CreateUserRequest request) {
+                  User user = new User();
+                  // Map only the allowed fields explicitly
+                  user.setUsername(request.username());
+                  user.setEmail(request.email());
+                  user.setPasswordHash(passwordEncoder.encode(request.password()));
+                  user.setRole("user");           // Always set server-side
+                  user.setAdmin(false);           // Always set server-side
+                  userRepository.save(user);
+                  return ResponseEntity.status(201).body(UserResponse.from(user));
+              }
+
+              @PutMapping("/{id}")
+              public ResponseEntity<UserResponse> updateUser(
+                      @PathVariable Long id,
+                      @Valid @RequestBody UpdateUserRequest request) {
+                  User user = userRepository.findById(id).orElseThrow();
+                  // Only update allowed fields
+                  if (request.email() != null) user.setEmail(request.email());
+                  if (request.displayName() != null)
+                      user.setDisplayName(request.displayName());
+                  // role, isAdmin, isVerified are NEVER updated from request
+                  userRepository.save(user);
+                  return ResponseEntity.ok(UserResponse.from(user));
+              }
+          }
+
+      - language: javascript
+        description: "Express with explicit field picking (Mongoose/Sequelize)"
+        code: |
+          const Joi = require('joi');
+
+          // Schema defines ONLY the fields clients can set
+          const createUserSchema = Joi.object({
+            username: Joi.string().alphanum().min(3).max(30).required(),
+            email: Joi.string().email().required(),
+            password: Joi.string().min(12).required(),
+            // 'role', 'isAdmin', 'isVerified' are intentionally absent
+          });
+
+          const updateUserSchema = Joi.object({
+            email: Joi.string().email(),
+            displayName: Joi.string().max(100),
+            // Only these two fields are allowed in updates
+          });
+
+          // Utility: pick only allowed fields from an object
+          function pickFields(obj, allowedFields) {
+            const result = {};
+            for (const field of allowedFields) {
+              if (obj[field] !== undefined) {
+                result[field] = obj[field];
+              }
+            }
+            return result;
+          }
+
+          app.post('/api/users', async (req, res) => {
+            // Validate - strips unknown fields via Joi
+            const { error, value } = createUserSchema.validate(req.body, {
+              stripUnknown: true,  // Remove any fields not in schema
+            });
+            if (error) {
+              return res.status(400).json({ error: error.message });
+            }
+
+            const user = await User.create({
+              username: value.username,
+              email: value.email,
+              passwordHash: await bcrypt.hash(value.password, 12),
+              role: 'user',          // Server-controlled
+              isAdmin: false,        // Server-controlled
+              isVerified: false,     // Server-controlled
+            });
+
+            res.status(201).json({
+              id: user.id,
+              username: user.username,
+              email: user.email
+            });
+          });
+
+          app.put('/api/users/:id', authenticate, async (req, res) => {
+            const { error, value } = updateUserSchema.validate(req.body, {
+              stripUnknown: true,
+            });
+            if (error) {
+              return res.status(400).json({ error: error.message });
+            }
+
+            // Only update explicitly allowed fields
+            const updates = pickFields(value, ['email', 'displayName']);
+            await User.update(updates, { where: { id: req.params.id } });
+            res.json({ status: 'updated' });
+          });
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html"
+      - "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/"
+      - "https://cwe.mitre.org/data/definitions/915.html"

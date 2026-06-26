@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head><title>dom-xss-blocked</title></head>
+<body>
+<div id="sink"></div>
+<script>
+var raw = decodeURIComponent(location.hash.slice(1));
+document.getElementById('sink').textContent = raw;
+</script>
+</body>
+</html>

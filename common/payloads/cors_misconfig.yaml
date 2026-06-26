@@ -1,0 +1,93 @@
+# CORS Misconfiguration Payloads with Metadata
+# Usage: Filter by type and context for targeted testing
+
+payloads:
+  # Origin reflection — server reflects arbitrary Origin
+  - payload: "Origin: https://evil.com"
+    type: origin-reflection
+    context: [API-endpoint, authentication-endpoint]
+    detection: reflected-origin
+    bypass_type: arbitrary-origin
+    note: "Check if Access-Control-Allow-Origin echoes the supplied Origin"
+
+  - payload: "Origin: https://attacker.example.com"
+    type: origin-reflection
+    context: [API-endpoint, static-asset]
+    detection: reflected-origin
+    bypass_type: arbitrary-origin
+
+  # Null origin — exploitable via sandboxed iframe or data URI
+  - payload: "Origin: null"
+    type: null-origin
+    context: [API-endpoint, authentication-endpoint]
+    detection: reflected-origin
+    bypass_type: null-origin
+    note: "Trigger with sandboxed iframe: <iframe sandbox='allow-scripts' src='data:text/html,...'>"
+
+  # Subdomain wildcard / regex bypass — suffix matching
+  - payload: "Origin: https://target.com.evil.com"
+    type: subdomain-wildcard
+    context: [API-endpoint, authentication-endpoint]
+    detection: reflected-origin
+    bypass_type: suffix-match
+    note: "Exploits regex that checks if Origin ends with target.com"
+
+  - payload: "Origin: https://eviltarget.com"
+    type: subdomain-wildcard
+    context: [API-endpoint, static-asset]
+    detection: reflected-origin
+    bypass_type: suffix-match
+    note: "Exploits regex without proper anchor: /target\\.com$/"
+
+  - payload: "Origin: https://subdomain.target.com"
+    type: subdomain-wildcard
+    context: [API-endpoint, authentication-endpoint]
+    detection: reflected-origin
+    bypass_type: subdomain-trust
+    note: "Tests if all subdomains are trusted — XSS on any subdomain escalates to CORS bypass"
+
+  - payload: "Origin: https://target.com.attacker.com"
+    type: subdomain-wildcard
+    context: [API-endpoint, static-asset]
+    detection: reflected-origin
+    bypass_type: domain-prefix
+    note: "Exploits loose prefix/contains matching on domain"
+
+  # Wildcard with credentials
+  - payload: "Origin: https://evil.com"
+    type: credential-leak
+    context: [API-endpoint, authentication-endpoint]
+    detection: reflected-origin
+    bypass_type: wildcard-credentials
+    note: "Check if response includes both Access-Control-Allow-Origin: * and Access-Control-Allow-Credentials: true"
+
+  # Protocol downgrade
+  - payload: "Origin: http://target.com"
+    type: origin-reflection
+    context: [API-endpoint, authentication-endpoint]
+    detection: reflected-origin
+    bypass_type: protocol-downgrade
+    note: "Tests if HTTPS endpoint accepts HTTP origin — enables MitM attacks"
+
+  # Special characters in origin
+  - payload: "Origin: https://target.com%60.evil.com"
+    type: subdomain-wildcard
+    context: [API-endpoint]
+    detection: reflected-origin
+    bypass_type: special-char-bypass
+    note: "Backtick encoding may bypass origin validation in some parsers"
+
+  - payload: "Origin: https://target.com_.evil.com"
+    type: subdomain-wildcard
+    context: [API-endpoint]
+    detection: reflected-origin
+    bypass_type: underscore-bypass
+    note: "Underscore in domain may confuse origin validation"
+
+  # Pre-flight bypass
+  - payload: "Origin: https://evil.com"
+    type: credential-leak
+    context: [API-endpoint, authentication-endpoint]
+    detection: reflected-origin
+    bypass_type: preflight-bypass
+    note: "Send as simple request (GET with no custom headers) to skip OPTIONS preflight"

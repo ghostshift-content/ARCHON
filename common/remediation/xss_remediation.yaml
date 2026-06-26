@@ -1,0 +1,339 @@
+remediations:
+  - vulnerability: Reflected XSS
+    description: >
+      Reflected XSS occurs when user-supplied data in an HTTP request is
+      immediately included in the response without proper encoding. The payload
+      executes in the victim's browser when they click a crafted link. It is the
+      most common XSS variant found in search forms, error messages, and URL
+      parameters rendered on-page.
+    fix: >
+      Encode all dynamic output based on the rendering context (HTML body, HTML
+      attribute, JavaScript, URL, CSS). Use framework auto-escaping features.
+      Deploy a strict Content Security Policy. Validate and reject unexpected
+      input patterns on the server side.
+    severity: high
+    cwe_ids:
+      - CWE-79
+    code_examples:
+      - language: python
+        description: "Django template auto-escaping (enabled by default)"
+        code: |
+          # Django auto-escapes variables in templates by default.
+          # In views.py:
+          from django.shortcuts import render
+
+          def search(request):
+              query = request.GET.get('q', '')
+              results = perform_search(query)
+              # 'query' is auto-escaped in the template
+              return render(request, 'search.html', {
+                  'query': query,
+                  'results': results
+              })
+
+          # In search.html - auto-escaped:
+          # <p>Results for: {{ query }}</p>
+          #
+          # NEVER use the |safe filter on user input:
+          # <p>{{ query|safe }}</p>  <!-- DANGEROUS -->
+
+      - language: python
+        description: "Flask with Jinja2 auto-escaping and manual escaping"
+        code: |
+          from flask import Flask, request, render_template
+          from markupsafe import escape
+
+          app = Flask(__name__)
+
+          @app.route('/search')
+          def search():
+              query = request.args.get('q', '')
+              # Jinja2 auto-escapes in templates when using {{ }}
+              return render_template('search.html', query=query)
+
+          @app.route('/api/echo')
+          def echo():
+              user_input = request.args.get('msg', '')
+              # When building HTML outside templates, escape manually
+              return f"<p>You said: {escape(user_input)}</p>"
+
+      - language: java
+        description: "Spring MVC with Thymeleaf (auto-escaping)"
+        code: |
+          // Controller
+          @Controller
+          public class SearchController {
+              @GetMapping("/search")
+              public String search(@RequestParam(defaultValue = "") String q,
+                                   Model model) {
+                  model.addAttribute("query", q);
+                  model.addAttribute("results", searchService.search(q));
+                  return "search";
+              }
+          }
+
+          // search.html (Thymeleaf) - th:text auto-escapes:
+          // <p>Results for: <span th:text="${query}"></span></p>
+          //
+          // NEVER use th:utext with user input (unescaped):
+          // <span th:utext="${query}"></span>  <!-- DANGEROUS -->
+
+      - language: javascript
+        description: "React auto-escaping and dangerous patterns to avoid"
+        code: |
+          // React auto-escapes JSX expressions by default
+          function SearchResults({ query, results }) {
+            return (
+              <div>
+                {/* SAFE: React escapes this automatically */}
+                <p>Results for: {query}</p>
+                <ul>
+                  {results.map(r => <li key={r.id}>{r.title}</li>)}
+                </ul>
+              </div>
+            );
+          }
+
+          // NEVER use dangerouslySetInnerHTML with user input:
+          // <div dangerouslySetInnerHTML={{ __html: userInput }} />
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/79.html"
+
+  - vulnerability: Stored XSS
+    description: >
+      Stored XSS occurs when malicious input is persisted (in a database, file,
+      or cache) and later rendered to other users without encoding. This is more
+      severe than reflected XSS because the payload fires for every user who
+      views the affected page, without requiring them to click a malicious link.
+    fix: >
+      Sanitize and validate input on ingestion. Encode output on rendering based
+      on context. Use an HTML sanitizer (like Bleach or DOMPurify) if you must
+      accept rich text. Set HttpOnly and Secure cookie flags to limit the impact
+      of successful exploitation.
+    severity: critical
+    cwe_ids:
+      - CWE-79
+    code_examples:
+      - language: python
+        description: "Server-side HTML sanitization with Bleach"
+        code: |
+          import bleach
+
+          # Define strict allowlists for permitted HTML
+          ALLOWED_TAGS = ['b', 'i', 'u', 'a', 'p', 'br', 'ul', 'ol', 'li']
+          ALLOWED_ATTRS = {'a': ['href', 'title']}
+          ALLOWED_PROTOCOLS = ['https']
+
+          def sanitize_user_html(raw_html):
+              """Sanitize user-submitted rich text before storing."""
+              return bleach.clean(
+                  raw_html,
+                  tags=ALLOWED_TAGS,
+                  attributes=ALLOWED_ATTRS,
+                  protocols=ALLOWED_PROTOCOLS,
+                  strip=True
+              )
+
+          # Usage in a view:
+          def create_comment(request):
+              raw_body = request.POST.get('body', '')
+              safe_body = sanitize_user_html(raw_body)
+              Comment.objects.create(author=request.user, body=safe_body)
+
+      - language: java
+        description: "OWASP Java HTML Sanitizer for stored content"
+        code: |
+          import org.owasp.html.HtmlPolicyBuilder;
+          import org.owasp.html.PolicyFactory;
+
+          public class HtmlSanitizer {
+              private static final PolicyFactory POLICY = new HtmlPolicyBuilder()
+                  .allowElements("b", "i", "u", "a", "p", "br", "ul", "ol", "li")
+                  .allowUrlProtocols("https")
+                  .allowAttributes("href").onElements("a")
+                  .requireRelNofollowOnLinks()
+                  .toFactory();
+
+              public static String sanitize(String untrustedHtml) {
+                  return POLICY.sanitize(untrustedHtml);
+              }
+          }
+
+          // In a Spring controller:
+          @PostMapping("/comments")
+          public String createComment(@RequestParam String body) {
+              String safeBody = HtmlSanitizer.sanitize(body);
+              commentService.save(new Comment(safeBody));
+              return "redirect:/comments";
+          }
+
+      - language: javascript
+        description: "Setting HttpOnly and Secure cookie flags (Express)"
+        code: |
+          const express = require('express');
+          const session = require('express-session');
+
+          const app = express();
+
+          app.use(session({
+            secret: process.env.SESSION_SECRET,
+            cookie: {
+              httpOnly: true,   // Prevents JavaScript access to session cookie
+              secure: true,     // Only sent over HTTPS
+              sameSite: 'lax',  // CSRF protection
+              maxAge: 3600000   // 1 hour
+            },
+            resave: false,
+            saveUninitialized: false
+          }));
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+      - "https://github.com/mozilla/bleach"
+      - "https://github.com/OWASP/java-html-sanitizer"
+
+  - vulnerability: DOM-based XSS
+    description: >
+      DOM-based XSS occurs entirely in the browser when client-side JavaScript
+      reads data from an attacker-controllable source (URL fragment, document
+      referrer, postMessage) and writes it to a dangerous sink (innerHTML,
+      document.write, eval). The malicious payload never reaches the server,
+      making it invisible to server-side defenses.
+    fix: >
+      Avoid dangerous DOM sinks (innerHTML, document.write, eval). Use
+      textContent or innerText for inserting text. Sanitize HTML client-side with
+      DOMPurify before rendering. Deploy a strict Content Security Policy with
+      nonces or strict-dynamic to block inline script execution.
+    severity: high
+    cwe_ids:
+      - CWE-79
+    code_examples:
+      - language: javascript
+        description: "Safe DOM manipulation - textContent instead of innerHTML"
+        code: |
+          // UNSAFE - innerHTML interprets HTML/script tags:
+          // document.getElementById('output').innerHTML = location.hash.slice(1);
+
+          // SAFE - textContent treats everything as plain text:
+          const userInput = decodeURIComponent(location.hash.slice(1));
+          document.getElementById('output').textContent = userInput;
+
+          // SAFE - createElement + textContent for structured output:
+          function displayMessage(message) {
+            const el = document.createElement('p');
+            el.textContent = message;  // No HTML interpretation
+            document.getElementById('messages').appendChild(el);
+          }
+
+      - language: javascript
+        description: "DOMPurify for sanitizing HTML when rich content is needed"
+        code: |
+          import DOMPurify from 'dompurify';
+
+          // When you genuinely need to render user-supplied HTML
+          function renderRichContent(untrustedHtml) {
+            const clean = DOMPurify.sanitize(untrustedHtml, {
+              ALLOWED_TAGS: ['b', 'i', 'u', 'a', 'p', 'br', 'ul', 'ol', 'li'],
+              ALLOWED_ATTR: ['href', 'title'],
+              ALLOW_DATA_ATTR: false,
+              ADD_ATTR: ['target'],
+              FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed'],
+            });
+            document.getElementById('content').innerHTML = clean;
+          }
+
+          // Hook to force all links to open in a new tab safely
+          DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+            if (node.tagName === 'A') {
+              node.setAttribute('target', '_blank');
+              node.setAttribute('rel', 'noopener noreferrer');
+            }
+          });
+
+      - language: javascript
+        description: "Strict Content Security Policy with nonces"
+        code: |
+          // Express middleware to set CSP with per-request nonce
+          const crypto = require('crypto');
+
+          function cspMiddleware(req, res, next) {
+            const nonce = crypto.randomBytes(16).toString('base64');
+            res.locals.cspNonce = nonce;
+
+            res.setHeader('Content-Security-Policy', [
+              `default-src 'self'`,
+              `script-src 'nonce-${nonce}' 'strict-dynamic'`,
+              `style-src 'self' 'nonce-${nonce}'`,
+              `img-src 'self' data: https:`,
+              `object-src 'none'`,
+              `base-uri 'self'`,
+              `frame-ancestors 'none'`,
+            ].join('; '));
+
+            next();
+          }
+
+          app.use(cspMiddleware);
+
+          // In your template (EJS example):
+          // <script nonce="<%= cspNonce %>">
+          //   // Only scripts with the correct nonce will execute
+          //   console.log('This is allowed');
+          // </script>
+
+      - language: python
+        description: "Django CSP middleware using django-csp"
+        code: |
+          # settings.py - install django-csp: pip install django-csp
+          MIDDLEWARE = [
+              'csp.middleware.CSPMiddleware',
+              # ... other middleware
+          ]
+
+          # CSP configuration
+          CSP_DEFAULT_SRC = ("'self'",)
+          CSP_SCRIPT_SRC = ("'self'",)
+          CSP_STYLE_SRC = ("'self'",)
+          CSP_IMG_SRC = ("'self'", "data:", "https:")
+          CSP_OBJECT_SRC = ("'none'",)
+          CSP_BASE_URI = ("'self'",)
+          CSP_FRAME_ANCESTORS = ("'none'",)
+          CSP_INCLUDE_NONCE_IN = ['script-src', 'style-src']
+
+          # In templates, use the nonce:
+          # {% load csp %}
+          # <script nonce="{% csp_nonce %}">
+          #   console.log('Allowed by CSP');
+          # </script>
+
+      - language: java
+        description: "Spring Security CSP header configuration"
+        code: |
+          import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+          import org.springframework.context.annotation.Bean;
+          import org.springframework.security.web.SecurityFilterChain;
+
+          @Bean
+          public SecurityFilterChain securityFilterChain(HttpSecurity http)
+                  throws Exception {
+              http.headers(headers -> headers
+                  .contentSecurityPolicy(csp -> csp
+                      .policyDirectives(
+                          "default-src 'self'; " +
+                          "script-src 'self' 'strict-dynamic'; " +
+                          "style-src 'self'; " +
+                          "object-src 'none'; " +
+                          "base-uri 'self'; " +
+                          "frame-ancestors 'none'"
+                      )
+                  )
+                  .frameOptions(frame -> frame.deny())
+                  .xssProtection(xss -> xss.disable())
+              );
+              return http.build();
+          }
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html"
+      - "https://github.com/cure53/DOMPurify"
+      - "https://content-security-policy.com/"
+      - "https://web.dev/strict-csp/"

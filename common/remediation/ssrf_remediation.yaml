@@ -1,0 +1,367 @@
+remediations:
+  - vulnerability: Server-Side Request Forgery (SSRF)
+    description: >
+      SSRF occurs when an application fetches a remote resource using a
+      user-supplied URL without proper validation. Attackers can abuse this to
+      access internal services (metadata endpoints, databases, admin panels),
+      scan internal networks, read local files via file:// URIs, or pivot to
+      other attacks such as remote code execution.
+    fix: >
+      Validate and sanitize all user-supplied URLs against a strict allowlist of
+      permitted hosts and schemes. Resolve DNS and verify the resolved IP is not
+      in private ranges before making the request. Disable HTTP redirects or
+      re-validate after each redirect. Use network segmentation so the
+      application server cannot reach sensitive internal services.
+    severity: critical
+    cwe_ids:
+      - CWE-918
+    code_examples:
+      - language: python
+        description: "URL validation with allowlist and private IP blocking"
+        code: |
+          import ipaddress
+          import socket
+          from urllib.parse import urlparse
+          import requests
+
+          ALLOWED_SCHEMES = {'https'}
+          ALLOWED_HOSTS = {'api.example.com', 'cdn.example.com'}
+
+          PRIVATE_NETWORKS = [
+              ipaddress.ip_network('10.0.0.0/8'),
+              ipaddress.ip_network('172.16.0.0/12'),
+              ipaddress.ip_network('192.168.0.0/16'),
+              ipaddress.ip_network('127.0.0.0/8'),
+              ipaddress.ip_network('169.254.0.0/16'),  # link-local / IMDS
+              ipaddress.ip_network('::1/128'),
+              ipaddress.ip_network('fc00::/7'),
+          ]
+
+          def is_private_ip(ip_str):
+              ip = ipaddress.ip_address(ip_str)
+              return any(ip in net for net in PRIVATE_NETWORKS)
+
+          def safe_fetch(url, timeout=5):
+              parsed = urlparse(url)
+
+              # 1. Validate scheme
+              if parsed.scheme not in ALLOWED_SCHEMES:
+                  raise ValueError(f"Scheme '{parsed.scheme}' not allowed")
+
+              # 2. Validate host against allowlist
+              if parsed.hostname not in ALLOWED_HOSTS:
+                  raise ValueError(f"Host '{parsed.hostname}' not allowed")
+
+              # 3. Resolve DNS and check for private IPs
+              resolved_ips = socket.getaddrinfo(parsed.hostname, parsed.port or 443)
+              for family, _, _, _, sockaddr in resolved_ips:
+                  if is_private_ip(sockaddr[0]):
+                      raise ValueError("Resolved to private IP - blocked")
+
+              # 4. Disable redirects to prevent redirect-based bypass
+              response = requests.get(url, allow_redirects=False, timeout=timeout)
+
+              # 5. If redirect, validate the Location header too
+              if response.is_redirect:
+                  raise ValueError("Redirects are not allowed")
+
+              return response
+
+      - language: java
+        description: "SSRF-safe HTTP client with redirect validation"
+        code: |
+          import java.net.*;
+          import java.net.http.*;
+          import java.util.Set;
+
+          public class SafeHttpClient {
+              private static final Set<String> ALLOWED_HOSTS =
+                  Set.of("api.example.com", "cdn.example.com");
+
+              private static final HttpClient CLIENT = HttpClient.newBuilder()
+                  .followRedirects(HttpClient.Redirect.NEVER)  // No auto-redirect
+                  .connectTimeout(java.time.Duration.ofSeconds(5))
+                  .build();
+
+              public static HttpResponse<String> safeFetch(String url)
+                      throws Exception {
+                  URI uri = new URI(url);
+
+                  // Validate scheme
+                  if (!"https".equals(uri.getScheme())) {
+                      throw new SecurityException("Only HTTPS is allowed");
+                  }
+
+                  // Validate host
+                  if (!ALLOWED_HOSTS.contains(uri.getHost())) {
+                      throw new SecurityException("Host not in allowlist");
+                  }
+
+                  // Resolve and check IP
+                  InetAddress addr = InetAddress.getByName(uri.getHost());
+                  if (addr.isLoopbackAddress()
+                          || addr.isSiteLocalAddress()
+                          || addr.isLinkLocalAddress()
+                          || addr.isAnyLocalAddress()) {
+                      throw new SecurityException("Private IP detected");
+                  }
+
+                  HttpRequest request = HttpRequest.newBuilder()
+                      .uri(uri)
+                      .timeout(java.time.Duration.ofSeconds(10))
+                      .GET()
+                      .build();
+
+                  return CLIENT.send(request,
+                      HttpResponse.BodyHandlers.ofString());
+              }
+          }
+
+      - language: javascript
+        description: "Node.js SSRF protection with DNS resolution check"
+        code: |
+          const dns = require('dns').promises;
+          const { URL } = require('url');
+          const net = require('net');
+
+          const ALLOWED_HOSTS = new Set(['api.example.com', 'cdn.example.com']);
+
+          const PRIVATE_RANGES = [
+            /^10\./,
+            /^172\.(1[6-9]|2\d|3[01])\./,
+            /^192\.168\./,
+            /^127\./,
+            /^169\.254\./,
+            /^0\./,
+          ];
+
+          function isPrivateIP(ip) {
+            if (net.isIPv4(ip)) {
+              return PRIVATE_RANGES.some(re => re.test(ip));
+            }
+            return ip === '::1' || ip.startsWith('fc') || ip.startsWith('fd');
+          }
+
+          async function safeFetch(urlString) {
+            const url = new URL(urlString);
+
+            // 1. Validate scheme
+            if (url.protocol !== 'https:') {
+              throw new Error('Only HTTPS is allowed');
+            }
+
+            // 2. Validate host
+            if (!ALLOWED_HOSTS.has(url.hostname)) {
+              throw new Error(`Host '${url.hostname}' not in allowlist`);
+            }
+
+            // 3. Resolve DNS and verify IP
+            const addresses = await dns.resolve4(url.hostname);
+            for (const addr of addresses) {
+              if (isPrivateIP(addr)) {
+                throw new Error(`Resolved to private IP: ${addr}`);
+              }
+            }
+
+            // 4. Fetch with redirect disabled
+            const response = await fetch(urlString, { redirect: 'error' });
+            return response;
+          }
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/918.html"
+      - "https://portswigger.net/web-security/ssrf"
+
+  - vulnerability: DNS Rebinding
+    description: >
+      DNS rebinding is a technique that bypasses SSRF protections by initially
+      resolving a domain to a safe external IP (passing validation), then quickly
+      changing the DNS record to point to an internal IP (e.g., 127.0.0.1). The
+      application's second resolution (when it actually makes the connection)
+      uses the attacker-controlled internal address. This defeats hostname-based
+      allowlists and IP validation performed at DNS resolution time.
+    fix: >
+      Pin DNS resolution results and use the resolved IP directly for the
+      connection. Validate the IP address at connection time, not just at
+      resolution time. Set low DNS TTLs on internal resolvers and disable DNS
+      caching when possible. Use IMDSv2 with token-based access on cloud
+      instances to protect metadata endpoints.
+    severity: high
+    cwe_ids:
+      - CWE-918
+      - CWE-350
+    code_examples:
+      - language: python
+        description: "Pin DNS resolution and connect using resolved IP"
+        code: |
+          import ipaddress
+          import socket
+          import requests
+          from urllib.parse import urlparse
+
+          def is_safe_ip(ip_str):
+              ip = ipaddress.ip_address(ip_str)
+              return ip.is_global and not ip.is_private
+
+          def fetch_with_pinned_dns(url, timeout=5):
+              parsed = urlparse(url)
+              hostname = parsed.hostname
+              port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+
+              # Resolve DNS once and pin the result
+              addr_info = socket.getaddrinfo(hostname, port)
+              resolved_ip = addr_info[0][4][0]
+
+              # Validate the resolved IP
+              if not is_safe_ip(resolved_ip):
+                  raise ValueError(f"Blocked: {hostname} resolved to {resolved_ip}")
+
+              # Connect directly to the resolved IP, set Host header
+              target_url = url.replace(hostname, resolved_ip)
+              response = requests.get(
+                  target_url,
+                  headers={'Host': hostname},
+                  allow_redirects=False,
+                  timeout=timeout,
+                  verify=True  # still validate TLS
+              )
+              return response
+
+      - language: python
+        description: "AWS IMDSv2 token-based access (protect against SSRF to IMDS)"
+        code: |
+          import requests
+
+          def get_imds_token(ttl_seconds=21600):
+              """Get an IMDSv2 session token. SSRF attacks using GET
+              requests cannot obtain this token because it requires PUT."""
+              response = requests.put(
+                  'http://169.254.169.254/latest/api/token',
+                  headers={'X-aws-ec2-metadata-token-ttl-seconds': str(ttl_seconds)},
+                  timeout=2
+              )
+              response.raise_for_status()
+              return response.text
+
+          def get_instance_metadata(path):
+              """Fetch metadata using IMDSv2 token."""
+              token = get_imds_token()
+              response = requests.get(
+                  f'http://169.254.169.254/latest/meta-data/{path}',
+                  headers={'X-aws-ec2-metadata-token': token},
+                  timeout=2
+              )
+              response.raise_for_status()
+              return response.text
+
+          # Enforce IMDSv2 via AWS CLI (disable IMDSv1):
+          # aws ec2 modify-instance-metadata-options \
+          #   --instance-id i-1234567890abcdef0 \
+          #   --http-tokens required \
+          #   --http-endpoint enabled
+
+      - language: java
+        description: "Custom DNS resolver that pins results for connection"
+        code: |
+          import java.net.*;
+          import java.net.http.*;
+          import javax.net.ssl.SSLContext;
+
+          public class PinnedDnsHttpClient {
+
+              public static boolean isSafeAddress(InetAddress addr) {
+                  return !addr.isLoopbackAddress()
+                      && !addr.isSiteLocalAddress()
+                      && !addr.isLinkLocalAddress()
+                      && !addr.isAnyLocalAddress()
+                      && !addr.isMulticastAddress();
+              }
+
+              public static HttpResponse<String> pinnedFetch(String urlStr)
+                      throws Exception {
+                  URI uri = new URI(urlStr);
+                  String host = uri.getHost();
+
+                  // Resolve and validate
+                  InetAddress resolved = InetAddress.getByName(host);
+                  if (!isSafeAddress(resolved)) {
+                      throw new SecurityException(
+                          host + " resolved to unsafe IP: " + resolved
+                      );
+                  }
+
+                  // Use the resolved IP directly
+                  URI pinnedUri = new URI(
+                      uri.getScheme(),
+                      uri.getUserInfo(),
+                      resolved.getHostAddress(),
+                      uri.getPort(),
+                      uri.getPath(),
+                      uri.getQuery(),
+                      uri.getFragment()
+                  );
+
+                  HttpRequest request = HttpRequest.newBuilder()
+                      .uri(pinnedUri)
+                      .header("Host", host)
+                      .GET()
+                      .build();
+
+                  return HttpClient.newBuilder()
+                      .followRedirects(HttpClient.Redirect.NEVER)
+                      .build()
+                      .send(request, HttpResponse.BodyHandlers.ofString());
+              }
+          }
+
+      - language: javascript
+        description: "Node.js DNS pinning with custom lookup"
+        code: |
+          const dns = require('dns');
+          const http = require('https');
+          const net = require('net');
+
+          const PRIVATE_RANGES = [
+            /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./,
+            /^127\./, /^169\.254\./, /^0\./,
+          ];
+
+          function isPrivateIP(ip) {
+            return PRIVATE_RANGES.some(re => re.test(ip));
+          }
+
+          function fetchWithPinnedDns(urlStr) {
+            return new Promise((resolve, reject) => {
+              const url = new URL(urlStr);
+
+              // Custom lookup that validates resolved IP
+              const lookup = (hostname, options, callback) => {
+                dns.lookup(hostname, options, (err, address, family) => {
+                  if (err) return callback(err);
+                  if (isPrivateIP(address)) {
+                    return callback(
+                      new Error(`DNS rebinding blocked: ${hostname} -> ${address}`)
+                    );
+                  }
+                  // Pin this address for the actual connection
+                  callback(null, address, family);
+                });
+              };
+
+              const req = http.get(urlStr, { lookup }, (res) => {
+                let data = '';
+                res.on('data', (chunk) => { data += chunk; });
+                res.on('end', () => resolve({ status: res.statusCode, body: data }));
+              });
+
+              req.on('error', reject);
+              req.setTimeout(5000, () => {
+                req.destroy(new Error('Request timeout'));
+              });
+            });
+          }
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html"
+      - "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html"
+      - "https://cwe.mitre.org/data/definitions/350.html"
+      - "https://portswigger.net/web-security/ssrf"

@@ -1,0 +1,537 @@
+remediations:
+  - vulnerability: CORS Misconfiguration
+    description: >
+      Cross-Origin Resource Sharing (CORS) misconfiguration occurs when a server
+      sets overly permissive Access-Control-Allow-Origin headers, such as
+      reflecting any origin or using a wildcard with credentials. Attackers can
+      exploit this to make cross-origin requests from malicious sites that read
+      authenticated responses, leading to data theft.
+    fix: >
+      Maintain a strict allowlist of trusted origins. Never reflect the Origin
+      header blindly. Never use Access-Control-Allow-Origin: * with
+      Access-Control-Allow-Credentials: true. Validate the Origin header against
+      your allowlist on every CORS preflight and actual request.
+    severity: high
+    cwe_ids:
+      - CWE-942
+      - CWE-346
+    code_examples:
+      - language: python
+        description: "Flask CORS with explicit origin allowlist"
+        code: |
+          from flask import Flask, request, jsonify
+
+          app = Flask(__name__)
+
+          ALLOWED_ORIGINS = {
+              'https://app.example.com',
+              'https://admin.example.com',
+          }
+
+          @app.after_request
+          def add_cors_headers(response):
+              origin = request.headers.get('Origin', '')
+              if origin in ALLOWED_ORIGINS:
+                  response.headers['Access-Control-Allow-Origin'] = origin
+                  response.headers['Access-Control-Allow-Credentials'] = 'true'
+                  response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE'
+                  response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+                  response.headers['Access-Control-Max-Age'] = '3600'
+              # If origin not in allowlist, no CORS headers are set (request is blocked)
+              return response
+
+          # UNSAFE patterns - never do these:
+          # response.headers['Access-Control-Allow-Origin'] = '*'
+          # response.headers['Access-Control-Allow-Origin'] = request.headers['Origin']
+
+      - language: java
+        description: "Spring Boot CORS configuration with origin allowlist"
+        code: |
+          import org.springframework.context.annotation.Bean;
+          import org.springframework.context.annotation.Configuration;
+          import org.springframework.web.servlet.config.annotation.*;
+
+          @Configuration
+          public class CorsConfig implements WebMvcConfigurer {
+
+              @Override
+              public void addCorsMappings(CorsRegistry registry) {
+                  registry.addMapping("/api/**")
+                      // Explicit list of allowed origins
+                      .allowedOrigins(
+                          "https://app.example.com",
+                          "https://admin.example.com"
+                      )
+                      .allowedMethods("GET", "POST", "PUT", "DELETE")
+                      .allowedHeaders("Content-Type", "Authorization")
+                      .allowCredentials(true)
+                      .maxAge(3600);
+              }
+          }
+
+      - language: javascript
+        description: "Express CORS middleware with validation"
+        code: |
+          const cors = require('cors');
+
+          const ALLOWED_ORIGINS = new Set([
+            'https://app.example.com',
+            'https://admin.example.com',
+          ]);
+
+          const corsOptions = {
+            origin: (origin, callback) => {
+              // Allow requests with no origin (server-to-server, curl)
+              // only if your API does not rely on cookies for those
+              if (!origin || ALLOWED_ORIGINS.has(origin)) {
+                callback(null, true);
+              } else {
+                callback(new Error('Not allowed by CORS'));
+              }
+            },
+            credentials: true,
+            methods: ['GET', 'POST', 'PUT', 'DELETE'],
+            allowedHeaders: ['Content-Type', 'Authorization'],
+            maxAge: 3600,
+          };
+
+          app.use(cors(corsOptions));
+
+      - language: nginx
+        description: "Nginx CORS configuration with origin validation"
+        code: |
+          # /etc/nginx/conf.d/cors.conf
+          map $http_origin $cors_origin {
+              default "";
+              "https://app.example.com"   $http_origin;
+              "https://admin.example.com"  $http_origin;
+          }
+
+          server {
+              listen 443 ssl;
+              server_name api.example.com;
+
+              location /api/ {
+                  if ($cors_origin = "") {
+                      # Origin not in allowlist - no CORS headers
+                  }
+
+                  add_header 'Access-Control-Allow-Origin' $cors_origin always;
+                  add_header 'Access-Control-Allow-Credentials' 'true' always;
+                  add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE' always;
+                  add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+
+                  if ($request_method = 'OPTIONS') {
+                      add_header 'Access-Control-Max-Age' 3600;
+                      add_header 'Content-Length' 0;
+                      return 204;
+                  }
+
+                  proxy_pass http://backend;
+              }
+          }
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html#cross-origin-resource-sharing"
+      - "https://portswigger.net/web-security/cors"
+      - "https://cwe.mitre.org/data/definitions/942.html"
+
+  - vulnerability: Missing or Weak Content Security Policy (CSP)
+    description: >
+      Without a Content Security Policy, browsers will execute any inline scripts,
+      load resources from any origin, and allow other dangerous behaviors. A weak
+      or misconfigured CSP (e.g., using unsafe-inline or unsafe-eval) provides
+      minimal protection against XSS and data injection attacks.
+    fix: >
+      Deploy a strict CSP using nonce-based or hash-based script loading with
+      strict-dynamic. Avoid unsafe-inline and unsafe-eval. Start in report-only
+      mode to identify issues before enforcement. Use CSP reporting to monitor
+      violations.
+    severity: medium
+    cwe_ids:
+      - CWE-693
+    code_examples:
+      - language: python
+        description: "Django CSP with nonces using django-csp"
+        code: |
+          # settings.py
+          MIDDLEWARE = [
+              'csp.middleware.CSPMiddleware',
+              # ... other middleware
+          ]
+
+          # Strict CSP configuration
+          CSP_DEFAULT_SRC = ("'none'",)
+          CSP_SCRIPT_SRC = ("'self'", "'strict-dynamic'")
+          CSP_STYLE_SRC = ("'self'",)
+          CSP_IMG_SRC = ("'self'", "data:", "https:")
+          CSP_FONT_SRC = ("'self'",)
+          CSP_CONNECT_SRC = ("'self'",)
+          CSP_OBJECT_SRC = ("'none'",)
+          CSP_BASE_URI = ("'self'",)
+          CSP_FRAME_ANCESTORS = ("'none'",)
+          CSP_FORM_ACTION = ("'self'",)
+          CSP_INCLUDE_NONCE_IN = ['script-src']
+
+          # Enable reporting (start with report-only in production)
+          CSP_REPORT_URI = '/csp-report/'
+          # CSP_REPORT_ONLY = True  # Uncomment to test without enforcement
+
+      - language: java
+        description: "Spring Security CSP with nonce support"
+        code: |
+          import org.springframework.security.web.header.writers.*;
+          import jakarta.servlet.*;
+          import java.security.SecureRandom;
+          import java.util.Base64;
+
+          // Filter to generate per-request nonce
+          @Component
+          public class CspNonceFilter extends OncePerRequestFilter {
+              private final SecureRandom random = new SecureRandom();
+
+              @Override
+              protected void doFilterInternal(HttpServletRequest request,
+                      HttpServletResponse response, FilterChain chain)
+                      throws ServletException, IOException {
+                  byte[] nonceBytes = new byte[16];
+                  random.nextBytes(nonceBytes);
+                  String nonce = Base64.getEncoder().encodeToString(nonceBytes);
+                  request.setAttribute("cspNonce", nonce);
+
+                  String csp = String.join("; ",
+                      "default-src 'none'",
+                      "script-src 'nonce-" + nonce + "' 'strict-dynamic'",
+                      "style-src 'self' 'nonce-" + nonce + "'",
+                      "img-src 'self' data: https:",
+                      "font-src 'self'",
+                      "connect-src 'self'",
+                      "object-src 'none'",
+                      "base-uri 'self'",
+                      "frame-ancestors 'none'",
+                      "form-action 'self'"
+                  );
+                  response.setHeader("Content-Security-Policy", csp);
+                  chain.doFilter(request, response);
+              }
+          }
+
+      - language: javascript
+        description: "Express CSP middleware with helmet"
+        code: |
+          const helmet = require('helmet');
+          const crypto = require('crypto');
+
+          app.use((req, res, next) => {
+            res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+            next();
+          });
+
+          app.use(
+            helmet.contentSecurityPolicy({
+              directives: {
+                defaultSrc: ["'none'"],
+                scriptSrc: [
+                  (req, res) => `'nonce-${res.locals.cspNonce}'`,
+                  "'strict-dynamic'",
+                ],
+                styleSrc: ["'self'"],
+                imgSrc: ["'self'", "data:", "https:"],
+                fontSrc: ["'self'"],
+                connectSrc: ["'self'"],
+                objectSrc: ["'none'"],
+                baseUri: ["'self'"],
+                frameAncestors: ["'none'"],
+                formAction: ["'self'"],
+              },
+              reportOnly: false,
+            })
+          );
+    references:
+      - "https://content-security-policy.com/"
+      - "https://web.dev/strict-csp/"
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html"
+
+  - vulnerability: Missing Security Headers
+    description: >
+      Missing HTTP security headers leave applications vulnerable to
+      clickjacking (no X-Frame-Options), MIME-type sniffing attacks (no
+      X-Content-Type-Options), protocol downgrade attacks (no HSTS), and
+      information leakage (no Referrer-Policy or Permissions-Policy).
+    fix: >
+      Set all recommended security headers: Strict-Transport-Security,
+      X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
+      Permissions-Policy. Use a security headers middleware or configure them
+      at the reverse proxy layer.
+    severity: medium
+    cwe_ids:
+      - CWE-693
+      - CWE-1021
+      - CWE-16
+    code_examples:
+      - language: python
+        description: "Django security settings and middleware"
+        code: |
+          # settings.py
+
+          # HSTS - enforce HTTPS for 1 year, include subdomains
+          SECURE_HSTS_SECONDS = 31536000
+          SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+          SECURE_HSTS_PRELOAD = True
+
+          # Redirect HTTP to HTTPS
+          SECURE_SSL_REDIRECT = True
+
+          # Clickjacking protection
+          X_FRAME_OPTIONS = 'DENY'
+
+          # Prevent MIME type sniffing
+          SECURE_CONTENT_TYPE_NOSNIFF = True
+
+          # Referrer policy
+          SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+          # Cookie security
+          SESSION_COOKIE_SECURE = True
+          SESSION_COOKIE_HTTPONLY = True
+          SESSION_COOKIE_SAMESITE = 'Lax'
+          CSRF_COOKIE_SECURE = True
+          CSRF_COOKIE_HTTPONLY = True
+
+      - language: java
+        description: "Spring Security headers configuration"
+        code: |
+          @Bean
+          public SecurityFilterChain filterChain(HttpSecurity http)
+                  throws Exception {
+              http.headers(headers -> headers
+                  // HSTS: 1 year, include subdomains, preload
+                  .httpStrictTransportSecurity(hsts -> hsts
+                      .includeSubDomains(true)
+                      .maxAgeInSeconds(31536000)
+                      .preload(true)
+                  )
+                  // Clickjacking protection
+                  .frameOptions(frame -> frame.deny())
+                  // MIME type sniffing protection
+                  .contentTypeOptions(ct -> {})
+                  // Referrer policy
+                  .referrerPolicy(ref -> ref
+                      .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy
+                          .STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
+                  )
+                  // Permissions policy
+                  .permissionsPolicy(perm -> perm
+                      .policy("camera=(), microphone=(), geolocation=()")
+                  )
+              );
+              return http.build();
+          }
+
+      - language: javascript
+        description: "Express with helmet for comprehensive security headers"
+        code: |
+          const helmet = require('helmet');
+
+          // helmet() applies sensible defaults for many headers
+          app.use(helmet());
+
+          // Or configure individually for more control:
+          app.use(helmet.hsts({
+            maxAge: 31536000,       // 1 year
+            includeSubDomains: true,
+            preload: true,
+          }));
+
+          app.use(helmet.frameguard({ action: 'deny' }));
+          app.use(helmet.noSniff());                        // X-Content-Type-Options
+          app.use(helmet.referrerPolicy({
+            policy: 'strict-origin-when-cross-origin',
+          }));
+          app.use(helmet.permittedCrossDomainPolicies());
+          app.use(helmet.dnsPrefetchControl());
+          app.use(helmet.ieNoOpen());
+
+      - language: nginx
+        description: "Nginx security headers configuration"
+        code: |
+          # /etc/nginx/conf.d/security-headers.conf
+
+          # HSTS - force HTTPS for 1 year
+          add_header Strict-Transport-Security
+              "max-age=31536000; includeSubDomains; preload" always;
+
+          # Prevent clickjacking
+          add_header X-Frame-Options "DENY" always;
+
+          # Prevent MIME type sniffing
+          add_header X-Content-Type-Options "nosniff" always;
+
+          # Referrer policy
+          add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+          # Permissions policy (restrict browser features)
+          add_header Permissions-Policy
+              "camera=(), microphone=(), geolocation=(), payment=()" always;
+
+          # Prevent caching of sensitive pages
+          # (apply selectively to authenticated endpoints)
+          # add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+
+      - language: apache
+        description: "Apache security headers configuration"
+        code: |
+          # /etc/apache2/conf-available/security-headers.conf
+          # Enable with: a2enconf security-headers
+
+          <IfModule mod_headers.c>
+              Header always set Strict-Transport-Security \
+                  "max-age=31536000; includeSubDomains; preload"
+              Header always set X-Frame-Options "DENY"
+              Header always set X-Content-Type-Options "nosniff"
+              Header always set Referrer-Policy "strict-origin-when-cross-origin"
+              Header always set Permissions-Policy \
+                  "camera=(), microphone=(), geolocation=()"
+
+              # Remove server version info
+              Header always unset X-Powered-By
+              ServerTokens Prod
+              ServerSignature Off
+          </IfModule>
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/HTTP_Headers_Cheat_Sheet.html"
+      - "https://securityheaders.com/"
+      - "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security"
+
+  - vulnerability: Insecure Deserialization
+    description: >
+      Insecure deserialization occurs when an application deserializes untrusted
+      data without validation. In languages like Java and Python, deserializing
+      malicious payloads can lead to remote code execution, privilege escalation,
+      or denial of service. Attackers craft serialized objects that trigger
+      dangerous operations during the deserialization process.
+    fix: >
+      Avoid deserializing data from untrusted sources. Use safe data formats
+      (JSON, Protocol Buffers) instead of native serialization. If native
+      deserialization is required, implement strict type allowlists and integrity
+      checks (HMAC signatures) on serialized data.
+    severity: critical
+    cwe_ids:
+      - CWE-502
+    code_examples:
+      - language: python
+        description: "Avoid pickle; use JSON with schema validation"
+        code: |
+          import json
+          from pydantic import BaseModel, validator
+          from typing import List
+
+          # UNSAFE - never deserialize untrusted data with pickle:
+          # import pickle
+          # data = pickle.loads(untrusted_bytes)  # RCE risk!
+
+          # SAFE - use JSON with strict schema validation
+          class UserProfile(BaseModel):
+              username: str
+              email: str
+              roles: List[str]
+
+              @validator('username')
+              def validate_username(cls, v):
+                  if not v.isalnum():
+                      raise ValueError('Username must be alphanumeric')
+                  return v
+
+              @validator('roles', each_item=True)
+              def validate_roles(cls, v):
+                  allowed = {'viewer', 'editor', 'admin'}
+                  if v not in allowed:
+                      raise ValueError(f'Invalid role: {v}')
+                  return v
+
+          def deserialize_profile(raw_json: str) -> UserProfile:
+              """Safely deserialize a user profile from JSON."""
+              data = json.loads(raw_json)
+              return UserProfile(**data)  # Pydantic validates all fields
+
+      - language: java
+        description: "ObjectInputFilter to restrict deserialization classes"
+        code: |
+          import java.io.*;
+
+          public class SafeDeserialization {
+
+              // Java 9+ ObjectInputFilter to allowlist classes
+              public static Object safeDeserialize(byte[] data) throws Exception {
+                  ByteArrayInputStream bais = new ByteArrayInputStream(data);
+                  ObjectInputStream ois = new ObjectInputStream(bais);
+
+                  // Only allow specific safe classes
+                  ois.setObjectInputFilter(filterInfo -> {
+                      Class<?> clazz = filterInfo.serialClass();
+                      if (clazz == null) {
+                          return ObjectInputFilter.Status.UNDECIDED;
+                      }
+
+                      // Allowlist of permitted classes
+                      if (clazz == String.class
+                              || clazz == Integer.class
+                              || clazz == java.util.ArrayList.class
+                              || clazz.getName().startsWith("com.myapp.dto.")) {
+                          return ObjectInputFilter.Status.ALLOWED;
+                      }
+
+                      // Reject everything else
+                      return ObjectInputFilter.Status.REJECTED;
+                  });
+
+                  return ois.readObject();
+              }
+
+              // PREFERRED: Use JSON with Jackson and type validation
+              // ObjectMapper mapper = new ObjectMapper();
+              // mapper.activateDefaultTyping(
+              //     BasicPolymorphicTypeValidator.builder()
+              //         .allowIfSubType("com.myapp.dto.")
+              //         .build(),
+              //     ObjectMapper.DefaultTyping.NON_FINAL
+              // );
+          }
+
+      - language: javascript
+        description: "Safe JSON parsing with schema validation using Joi"
+        code: |
+          const Joi = require('joi');
+
+          // Define a strict schema for expected data
+          const userProfileSchema = Joi.object({
+            username: Joi.string().alphanum().min(3).max(30).required(),
+            email: Joi.string().email().required(),
+            roles: Joi.array().items(
+              Joi.string().valid('viewer', 'editor', 'admin')
+            ).required(),
+            // Explicitly list all expected fields - anything else is stripped
+          }).options({ stripUnknown: true });
+
+          function deserializeProfile(jsonString) {
+            let parsed;
+            try {
+              parsed = JSON.parse(jsonString);
+            } catch (e) {
+              throw new Error('Invalid JSON');
+            }
+
+            const { error, value } = userProfileSchema.validate(parsed);
+            if (error) {
+              throw new Error(`Validation failed: ${error.message}`);
+            }
+            return value;
+          }
+
+          // UNSAFE patterns to avoid:
+          // - eval('(' + userInput + ')')
+          // - new Function('return ' + userInput)()
+          // - node-serialize (known RCE vulnerability)
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/502.html"
+      - "https://portswigger.net/web-security/deserialization"

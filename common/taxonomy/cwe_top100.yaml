@@ -1,0 +1,1521 @@
+# CWE Top 100 Most Critical Common Weakness Enumerations
+# Reference: https://cwe.mitre.org/
+# This taxonomy covers the 100 most critical software weakness types
+
+items:
+  - id: "CWE-20"
+    name: "Improper Input Validation"
+    description: "The product receives input or data, but it does not validate or incorrectly validates that the input has the properties required to process the data safely and correctly."
+    severity: "high"
+    category: "Input Validation"
+    examples:
+      - "Accepting negative values for quantity fields in e-commerce applications"
+      - "Failing to validate email format before processing"
+      - "Not checking length of user-supplied buffer sizes"
+    mitigations:
+      - "Validate all input against expected formats using allowlists"
+      - "Implement server-side validation regardless of client-side checks"
+      - "Use strong typing and parameterized interfaces"
+    related_cwes: ["CWE-79", "CWE-89", "CWE-120"]
+
+  - id: "CWE-22"
+    name: "Improper Limitation of a Pathname to a Restricted Directory (Path Traversal)"
+    description: "The product uses external input to construct a pathname intended to identify a file or directory within a restricted parent directory, but does not properly neutralize special elements that can cause the pathname to resolve outside of that directory."
+    severity: "high"
+    category: "File Handling"
+    examples:
+      - "Using ../../../etc/passwd in file download parameter"
+      - "Manipulating ZIP file entries to write outside intended directory"
+      - "Exploiting path traversal in file upload functionality"
+    mitigations:
+      - "Canonicalize paths before validation"
+      - "Use chroot jails or similar sandboxing mechanisms"
+      - "Validate that resolved paths remain within expected directories"
+    related_cwes: ["CWE-23", "CWE-36", "CWE-73"]
+
+  - id: "CWE-77"
+    name: "Improper Neutralization of Special Elements used in a Command (Command Injection)"
+    description: "The product constructs all or part of a command using externally-influenced input but does not neutralize or incorrectly neutralizes special elements that could modify the intended command."
+    severity: "critical"
+    category: "Injection"
+    examples:
+      - "Injecting shell metacharacters into system() calls"
+      - "Manipulating command arguments through unsanitized user input"
+      - "Chaining commands using semicolons or pipes in input fields"
+    mitigations:
+      - "Avoid calling OS commands directly; use library functions instead"
+      - "Use parameterized command interfaces where available"
+      - "Apply strict allowlist input validation"
+    related_cwes: ["CWE-78", "CWE-88", "CWE-94"]
+
+  - id: "CWE-78"
+    name: "Improper Neutralization of Special Elements used in an OS Command (OS Command Injection)"
+    description: "The product constructs all or part of an OS command using externally-influenced input but does not neutralize or incorrectly neutralizes special elements that could modify the intended OS command."
+    severity: "critical"
+    category: "Injection"
+    examples:
+      - "Passing user input directly to Runtime.exec() or os.system()"
+      - "Injecting commands via filename parameters in image processing"
+      - "Exploiting ping or traceroute utilities with injected arguments"
+    mitigations:
+      - "Use built-in library functions instead of OS commands"
+      - "Escape all shell metacharacters in user-controlled input"
+      - "Run commands with least-privilege accounts"
+      - "Implement allowlist validation for command arguments"
+    related_cwes: ["CWE-77", "CWE-88", "CWE-94"]
+
+  - id: "CWE-79"
+    name: "Cross-Site Scripting (XSS)"
+    description: "The product does not neutralize or incorrectly neutralizes user-controllable input before it is placed in output that is used as a web page served to other users."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "Reflected XSS in search parameter"
+      - "Stored XSS in user profile fields"
+      - "DOM-based XSS through document.location manipulation"
+      - "XSS via SVG file upload with embedded JavaScript"
+    mitigations:
+      - "Use output encoding appropriate for context (HTML, JavaScript, URL, CSS)"
+      - "Implement Content Security Policy (CSP) headers"
+      - "Use modern frameworks with automatic escaping"
+      - "Sanitize HTML input with proven libraries like DOMPurify"
+    related_cwes: ["CWE-80", "CWE-87", "CWE-116"]
+
+  - id: "CWE-89"
+    name: "Improper Neutralization of Special Elements used in an SQL Command (SQL Injection)"
+    description: "The product constructs all or part of an SQL command using externally-influenced input but does not neutralize special elements that could modify the intended SQL command."
+    severity: "critical"
+    category: "Injection"
+    examples:
+      - "Login bypass using ' OR 1=1-- in username field"
+      - "UNION-based SQL injection to extract database schema"
+      - "Blind SQL injection via time-based or boolean-based techniques"
+      - "Second-order SQL injection through stored data"
+    mitigations:
+      - "Use parameterized queries or prepared statements exclusively"
+      - "Apply the principle of least privilege to database accounts"
+      - "Use stored procedures with parameterized inputs"
+      - "Implement input validation as defense in depth"
+    related_cwes: ["CWE-20", "CWE-77", "CWE-943"]
+
+  - id: "CWE-90"
+    name: "Improper Neutralization of Special Elements used in an LDAP Query (LDAP Injection)"
+    description: "The product constructs all or part of an LDAP query using externally-influenced input but does not neutralize special elements that could modify the intended LDAP query."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "Injecting LDAP filter metacharacters to bypass authentication"
+      - "Modifying LDAP search queries to enumerate directory entries"
+      - "Extracting sensitive attributes through crafted LDAP filters"
+    mitigations:
+      - "Use parameterized LDAP query interfaces"
+      - "Escape special LDAP characters in user input"
+      - "Validate input against strict allowlist patterns"
+    related_cwes: ["CWE-77", "CWE-89", "CWE-116"]
+
+  - id: "CWE-94"
+    name: "Improper Control of Generation of Code (Code Injection)"
+    description: "The product constructs all or part of a code segment using externally-influenced input but does not neutralize or incorrectly neutralizes special elements that could modify the syntax or behavior of the intended code."
+    severity: "critical"
+    category: "Injection"
+    examples:
+      - "Server-side template injection leading to remote code execution"
+      - "Eval injection in dynamic language interpreters"
+      - "Expression language injection in Java EE applications"
+    mitigations:
+      - "Avoid dynamically generating and executing code from user input"
+      - "Use sandboxed execution environments"
+      - "Apply strict input validation and output encoding"
+      - "Use safe APIs that do not involve code generation"
+    related_cwes: ["CWE-77", "CWE-78", "CWE-95", "CWE-96"]
+
+  - id: "CWE-116"
+    name: "Improper Encoding or Escaping of Output"
+    description: "The product prepares a structured message for communication with another component but encoding or escaping of the data is either missing or done incorrectly, resulting in the message being interpreted differently than intended."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "Missing HTML entity encoding leading to XSS"
+      - "Incorrect URL encoding causing injection in redirect targets"
+      - "Failure to escape special characters in CSV export leading to formula injection"
+    mitigations:
+      - "Apply context-aware output encoding consistently"
+      - "Use established encoding libraries rather than custom implementations"
+      - "Encode data as late as possible before output"
+    related_cwes: ["CWE-79", "CWE-89", "CWE-838"]
+
+  - id: "CWE-119"
+    name: "Improper Restriction of Operations within the Bounds of a Memory Buffer"
+    description: "The product performs operations on a memory buffer but can read from or write to a memory location outside the intended boundary of the buffer, leading to potential code execution or crashes."
+    severity: "critical"
+    category: "Memory Safety"
+    examples:
+      - "Buffer overflow in C string handling functions"
+      - "Heap overflow through oversized input in network protocol parsing"
+      - "Stack buffer overflow leading to return address overwrite"
+    mitigations:
+      - "Use memory-safe languages where possible"
+      - "Enable compiler protections (ASLR, stack canaries, DEP)"
+      - "Use safe string and buffer handling functions"
+      - "Implement bounds checking on all buffer operations"
+    related_cwes: ["CWE-120", "CWE-125", "CWE-787"]
+
+  - id: "CWE-120"
+    name: "Buffer Copy without Checking Size of Input (Classic Buffer Overflow)"
+    description: "The product copies an input buffer to an output buffer without verifying that the size of the input buffer is less than the size of the output buffer, leading to a buffer overflow."
+    severity: "critical"
+    category: "Memory Safety"
+    examples:
+      - "Using strcpy() without checking source string length"
+      - "Memcpy with user-controlled length parameter"
+      - "Sprintf into fixed-size buffer without length checks"
+    mitigations:
+      - "Use length-limited buffer copy functions (strncpy, snprintf)"
+      - "Validate input length before copying"
+      - "Use dynamic memory allocation sized to input"
+      - "Adopt memory-safe languages for new development"
+    related_cwes: ["CWE-119", "CWE-125", "CWE-787"]
+
+  - id: "CWE-125"
+    name: "Out-of-bounds Read"
+    description: "The product reads data past the end, or before the beginning, of the intended buffer, potentially exposing sensitive information from adjacent memory."
+    severity: "high"
+    category: "Memory Safety"
+    examples:
+      - "Heartbleed vulnerability reading past TLS heartbeat buffer"
+      - "Array index out of bounds in image parsing library"
+      - "Reading uninitialized memory due to incorrect length calculations"
+    mitigations:
+      - "Perform bounds checking before all read operations"
+      - "Use safe array access methods with bounds enforcement"
+      - "Enable address sanitizers during development and testing"
+    related_cwes: ["CWE-119", "CWE-120", "CWE-787"]
+
+  - id: "CWE-134"
+    name: "Use of Externally-Controlled Format String"
+    description: "The product uses a function that accepts a format string as an argument, but the format string originates from an external source, allowing attackers to read or write memory."
+    severity: "high"
+    category: "Memory Safety"
+    examples:
+      - "Passing user input directly to printf() as the format string"
+      - "Using syslog() with user-controlled format argument"
+      - "Format string attacks through logging functions"
+    mitigations:
+      - "Never pass externally-controlled data as format strings"
+      - "Always use constant format strings with variable arguments"
+      - "Use compiler warnings for format string vulnerabilities (-Wformat-security)"
+    related_cwes: ["CWE-119", "CWE-120", "CWE-787"]
+
+  - id: "CWE-190"
+    name: "Integer Overflow or Wraparound"
+    description: "The product performs a calculation that can produce an integer overflow or wraparound, when the logic assumes that the resulting value will always be larger than the original value."
+    severity: "high"
+    category: "Numeric Errors"
+    examples:
+      - "Multiplying allocation size by element count causing integer overflow"
+      - "Adding two large positive integers resulting in negative value"
+      - "Integer overflow in financial transaction calculations"
+    mitigations:
+      - "Use safe integer arithmetic libraries with overflow checking"
+      - "Validate numeric inputs against expected ranges before operations"
+      - "Use larger integer types where overflow is possible"
+      - "Enable compiler overflow detection flags"
+    related_cwes: ["CWE-119", "CWE-681", "CWE-787"]
+
+  - id: "CWE-200"
+    name: "Exposure of Sensitive Information to an Unauthorized Actor"
+    description: "The product exposes sensitive information to an actor that is not explicitly authorized to have access to that information, potentially through error messages, logs, or other channels."
+    severity: "medium"
+    category: "Information Disclosure"
+    examples:
+      - "Detailed error messages revealing database schema"
+      - "Stack traces exposed in production web application responses"
+      - "API responses including internal system paths"
+      - "Source code comments containing credentials"
+    mitigations:
+      - "Implement generic error messages for end users"
+      - "Log detailed errors server-side only"
+      - "Review all output channels for sensitive data leakage"
+      - "Strip debug information from production builds"
+    related_cwes: ["CWE-209", "CWE-532", "CWE-538"]
+
+  - id: "CWE-209"
+    name: "Generation of Error Message Containing Sensitive Information"
+    description: "The product generates an error message that includes sensitive information about its environment, users, or associated data, which could help an attacker craft further attacks."
+    severity: "medium"
+    category: "Information Disclosure"
+    examples:
+      - "SQL error messages revealing table and column names"
+      - "Authentication errors disclosing whether a username exists"
+      - "Path disclosure in file not found error messages"
+    mitigations:
+      - "Use generic error messages for all user-facing output"
+      - "Map internal exceptions to safe external error codes"
+      - "Implement centralized error handling with information filtering"
+    related_cwes: ["CWE-200", "CWE-532", "CWE-538"]
+
+  - id: "CWE-250"
+    name: "Execution with Unnecessary Privileges"
+    description: "The product performs operations using higher privileges than are necessary, which could allow an attacker who exploits a vulnerability to perform actions with those elevated privileges."
+    severity: "high"
+    category: "Privilege Management"
+    examples:
+      - "Web application running as root on the server"
+      - "Service accounts with database admin privileges for basic read operations"
+      - "Mobile application requesting unnecessary system permissions"
+    mitigations:
+      - "Apply the principle of least privilege to all processes and accounts"
+      - "Drop privileges after initialization when elevated access is needed temporarily"
+      - "Use separate accounts for different privilege levels"
+    related_cwes: ["CWE-269", "CWE-272", "CWE-284"]
+
+  - id: "CWE-269"
+    name: "Improper Privilege Management"
+    description: "The product does not properly assign, modify, track, or check privileges for an actor, creating an unintended sphere of control for that actor."
+    severity: "high"
+    category: "Privilege Management"
+    examples:
+      - "Privilege escalation through insecure sudo configuration"
+      - "Role-based access control with overly permissive default roles"
+      - "Failure to revoke privileges when user role changes"
+    mitigations:
+      - "Implement robust role-based access control with least privilege"
+      - "Regularly audit and review privilege assignments"
+      - "Use well-tested authorization frameworks"
+    related_cwes: ["CWE-250", "CWE-284", "CWE-285"]
+
+  - id: "CWE-276"
+    name: "Incorrect Default Permissions"
+    description: "During installation or configuration, the product sets permissions for an object that are more permissive than intended, allowing unintended actors to access or modify the object."
+    severity: "medium"
+    category: "Privilege Management"
+    examples:
+      - "Configuration files created with world-readable permissions containing secrets"
+      - "Log directories with write access for all users"
+      - "Database files with overly permissive filesystem permissions"
+    mitigations:
+      - "Set restrictive default permissions and relax only when necessary"
+      - "Use umask to enforce restrictive file creation permissions"
+      - "Regularly audit file and directory permissions"
+    related_cwes: ["CWE-269", "CWE-284", "CWE-732"]
+
+  - id: "CWE-284"
+    name: "Improper Access Control"
+    description: "The product does not restrict or incorrectly restricts access to a resource from an unauthorized actor, allowing unintended interactions with the system."
+    severity: "high"
+    category: "Access Control"
+    examples:
+      - "Direct object reference allowing access to other users' records"
+      - "Missing access control checks on administrative API endpoints"
+      - "Bypassing access controls through parameter manipulation"
+    mitigations:
+      - "Implement centralized access control mechanisms"
+      - "Apply deny-by-default access control policies"
+      - "Enforce access controls on every request server-side"
+      - "Use indirect object references instead of direct database IDs"
+    related_cwes: ["CWE-285", "CWE-862", "CWE-863"]
+
+  - id: "CWE-285"
+    name: "Improper Authorization"
+    description: "The product does not perform or incorrectly performs an authorization check when an actor attempts to access a resource or perform an action, allowing unauthorized operations."
+    severity: "high"
+    category: "Access Control"
+    examples:
+      - "Missing authorization check on admin-only functionality"
+      - "Client-side authorization enforcement only"
+      - "Horizontal privilege escalation through predictable resource identifiers"
+    mitigations:
+      - "Enforce authorization checks server-side for every action and resource"
+      - "Use a centralized authorization service or middleware"
+      - "Implement and test role-based access control thoroughly"
+    related_cwes: ["CWE-284", "CWE-862", "CWE-863"]
+
+  - id: "CWE-287"
+    name: "Improper Authentication"
+    description: "The product does not properly verify that a claimed identity is genuine, allowing attackers to bypass authentication mechanisms or impersonate legitimate users."
+    severity: "critical"
+    category: "Authentication"
+    examples:
+      - "Authentication bypass through SQL injection in login form"
+      - "Accepting empty or null passwords"
+      - "Broken multi-factor authentication fallback mechanisms"
+      - "Session fixation allowing account takeover"
+    mitigations:
+      - "Use established authentication frameworks and protocols"
+      - "Implement multi-factor authentication"
+      - "Use strong password hashing algorithms (bcrypt, Argon2)"
+      - "Enforce account lockout policies"
+    related_cwes: ["CWE-306", "CWE-307", "CWE-384"]
+
+  - id: "CWE-295"
+    name: "Improper Certificate Validation"
+    description: "The product does not validate or incorrectly validates a certificate, allowing an attacker to intercept or modify encrypted communications through man-in-the-middle attacks."
+    severity: "high"
+    category: "Cryptography"
+    examples:
+      - "Disabling SSL/TLS certificate verification in production code"
+      - "Not checking certificate hostname against expected server"
+      - "Accepting self-signed certificates without user confirmation"
+    mitigations:
+      - "Always validate certificates against trusted certificate authorities"
+      - "Verify certificate hostname matches expected server name"
+      - "Implement certificate pinning for high-security applications"
+      - "Never disable certificate validation in production"
+    related_cwes: ["CWE-296", "CWE-297", "CWE-319"]
+
+  - id: "CWE-306"
+    name: "Missing Authentication for Critical Function"
+    description: "The product does not perform any authentication for functionality that requires a provable user identity or consumes a significant amount of resources."
+    severity: "critical"
+    category: "Authentication"
+    examples:
+      - "Administrative interface accessible without authentication"
+      - "API endpoints for sensitive operations lacking auth checks"
+      - "Password reset functionality without identity verification"
+    mitigations:
+      - "Require authentication for all non-public functionality"
+      - "Implement authentication at the framework or middleware level"
+      - "Conduct thorough access control reviews during design and testing"
+    related_cwes: ["CWE-287", "CWE-862", "CWE-863"]
+
+  - id: "CWE-307"
+    name: "Improper Restriction of Excessive Authentication Attempts"
+    description: "The product does not implement sufficient measures to prevent multiple failed authentication attempts, enabling brute-force credential guessing attacks."
+    severity: "high"
+    category: "Authentication"
+    examples:
+      - "Login form without rate limiting allowing automated brute force"
+      - "API authentication endpoint without lockout mechanism"
+      - "OTP/PIN verification without attempt limits"
+    mitigations:
+      - "Implement progressive account lockout after failed attempts"
+      - "Use rate limiting on authentication endpoints"
+      - "Deploy CAPTCHA after initial failed attempts"
+      - "Implement exponential backoff for repeated failures"
+    related_cwes: ["CWE-287", "CWE-384", "CWE-521"]
+
+  - id: "CWE-311"
+    name: "Missing Encryption of Sensitive Data"
+    description: "The product does not encrypt sensitive or critical information before storage or transmission, leaving it vulnerable to unauthorized access or interception."
+    severity: "high"
+    category: "Cryptography"
+    examples:
+      - "Storing passwords in plaintext in the database"
+      - "Transmitting credit card numbers over unencrypted HTTP"
+      - "Sensitive configuration data stored unencrypted on disk"
+    mitigations:
+      - "Encrypt all sensitive data at rest and in transit"
+      - "Use TLS 1.2 or higher for all network communications"
+      - "Implement proper key management practices"
+      - "Hash passwords with strong algorithms like bcrypt or Argon2"
+    related_cwes: ["CWE-312", "CWE-319", "CWE-326"]
+
+  - id: "CWE-312"
+    name: "Cleartext Storage of Sensitive Information"
+    description: "The product stores sensitive information in cleartext within a resource that might be accessible to another control sphere, including memory, filesystem, or database."
+    severity: "high"
+    category: "Data Protection"
+    examples:
+      - "Passwords stored in plaintext in configuration files"
+      - "Sensitive health data stored unencrypted in mobile app local storage"
+      - "API keys stored in cleartext in environment files committed to source control"
+    mitigations:
+      - "Encrypt sensitive data before storage using strong encryption"
+      - "Use secure credential stores and vaults"
+      - "Hash passwords with salt using approved algorithms"
+      - "Implement data classification and apply encryption accordingly"
+    related_cwes: ["CWE-311", "CWE-319", "CWE-522"]
+
+  - id: "CWE-319"
+    name: "Cleartext Transmission of Sensitive Information"
+    description: "The product transmits sensitive or security-critical data in cleartext in a communication channel that can be sniffed by unauthorized actors."
+    severity: "high"
+    category: "Data Protection"
+    examples:
+      - "Sending login credentials over HTTP instead of HTTPS"
+      - "Transmitting session tokens without TLS encryption"
+      - "Internal microservice communication containing PII without encryption"
+    mitigations:
+      - "Use TLS for all network communications containing sensitive data"
+      - "Enforce HTTPS with HSTS headers"
+      - "Encrypt sensitive fields within messages even over encrypted channels"
+    related_cwes: ["CWE-311", "CWE-312", "CWE-523"]
+
+  - id: "CWE-326"
+    name: "Inadequate Encryption Strength"
+    description: "The product stores or transmits sensitive data using an encryption scheme that is theoretically sound but not strong enough for the level of protection required."
+    severity: "medium"
+    category: "Cryptography"
+    examples:
+      - "Using DES or 3DES instead of AES-256"
+      - "RSA keys shorter than 2048 bits"
+      - "Using 64-bit block ciphers vulnerable to birthday attacks"
+    mitigations:
+      - "Use current recommended key sizes (AES-256, RSA-2048 minimum)"
+      - "Follow NIST or industry guidelines for algorithm and key size selection"
+      - "Plan for crypto agility to upgrade algorithms as needed"
+    related_cwes: ["CWE-327", "CWE-311", "CWE-330"]
+
+  - id: "CWE-327"
+    name: "Use of a Broken or Risky Cryptographic Algorithm"
+    description: "The product uses a broken or risky cryptographic algorithm or protocol that has known weaknesses, making it vulnerable to cryptographic attacks."
+    severity: "high"
+    category: "Cryptography"
+    examples:
+      - "Using MD5 for password hashing"
+      - "Using SHA-1 for digital signatures"
+      - "Using RC4 for stream encryption"
+      - "Using ECB mode for block cipher encryption"
+    mitigations:
+      - "Use only approved cryptographic algorithms (AES, SHA-256+, RSA-2048+)"
+      - "Use established cryptographic libraries rather than custom implementations"
+      - "Regularly review and update cryptographic algorithm choices"
+    related_cwes: ["CWE-326", "CWE-328", "CWE-330"]
+
+  - id: "CWE-330"
+    name: "Use of Insufficiently Random Values"
+    description: "The product uses insufficiently random numbers or values in a security context that depends on unpredictable numbers, such as session tokens or cryptographic keys."
+    severity: "high"
+    category: "Cryptography"
+    examples:
+      - "Using Math.random() for generating session tokens"
+      - "Seeding PRNG with predictable values like current time"
+      - "Using sequential integers for password reset tokens"
+    mitigations:
+      - "Use cryptographically secure random number generators (CSPRNG)"
+      - "Use /dev/urandom or platform-equivalent secure random sources"
+      - "Never use standard pseudo-random generators for security purposes"
+    related_cwes: ["CWE-326", "CWE-327", "CWE-338"]
+
+  - id: "CWE-346"
+    name: "Origin Validation Error"
+    description: "The product does not properly verify that the source of data or communication is valid, allowing spoofed or unauthorized origins to interact with the system."
+    severity: "high"
+    category: "Access Control"
+    examples:
+      - "Missing CORS origin validation allowing cross-origin requests"
+      - "Accepting WebSocket connections without origin checking"
+      - "Processing messages without verifying sender identity"
+    mitigations:
+      - "Validate the origin of all incoming requests"
+      - "Implement strict CORS policies"
+      - "Use anti-CSRF tokens for state-changing operations"
+    related_cwes: ["CWE-352", "CWE-284", "CWE-942"]
+
+  - id: "CWE-352"
+    name: "Cross-Site Request Forgery (CSRF)"
+    description: "The web application does not sufficiently verify that a well-formed, valid, consistent request was intentionally provided by the user who submitted the request, allowing attackers to trick users into performing unintended actions."
+    severity: "high"
+    category: "Session Management"
+    examples:
+      - "Forged form submission changing user email address"
+      - "Image tag triggering GET-based state change"
+      - "CSRF attack on admin panel to create new administrator account"
+    mitigations:
+      - "Implement anti-CSRF tokens (synchronizer token pattern)"
+      - "Use SameSite cookie attribute"
+      - "Verify Origin and Referer headers"
+      - "Require re-authentication for sensitive operations"
+    related_cwes: ["CWE-346", "CWE-284", "CWE-613"]
+
+  - id: "CWE-362"
+    name: "Concurrent Execution Using Shared Resource with Improper Synchronization (Race Condition)"
+    description: "The product contains a code sequence that can run concurrently with other code, and the code sequence requires temporary exclusive access to a shared resource, but a timing window exists where the shared resource can be modified by another code sequence."
+    severity: "medium"
+    category: "Concurrency"
+    examples:
+      - "Time-of-check time-of-use (TOCTOU) in file access"
+      - "Race condition in financial transaction processing"
+      - "Concurrent session manipulation leading to privilege escalation"
+    mitigations:
+      - "Use proper synchronization primitives (mutexes, semaphores)"
+      - "Implement atomic operations for critical sections"
+      - "Use database transactions with appropriate isolation levels"
+    related_cwes: ["CWE-367", "CWE-662", "CWE-366"]
+
+  - id: "CWE-377"
+    name: "Insecure Temporary File"
+    description: "The product creates a temporary file in a directory with insecure permissions or uses predictable names, allowing attackers to exploit race conditions or access sensitive data."
+    severity: "medium"
+    category: "File Handling"
+    examples:
+      - "Creating temp files in /tmp with predictable names"
+      - "Using mktemp without proper flags for secure creation"
+      - "Temporary files containing sensitive data left with world-readable permissions"
+    mitigations:
+      - "Use secure temporary file creation functions (mkstemp)"
+      - "Set restrictive permissions on temporary files immediately"
+      - "Use private temporary directories with proper permissions"
+      - "Delete temporary files as soon as they are no longer needed"
+    related_cwes: ["CWE-276", "CWE-362", "CWE-379"]
+
+  - id: "CWE-384"
+    name: "Session Fixation"
+    description: "The product authenticates a user without properly invalidating any existing session identifier, allowing an attacker to pre-set a session and have the victim authenticate with it."
+    severity: "high"
+    category: "Session Management"
+    examples:
+      - "Attacker setting session cookie before victim logs in"
+      - "Session ID not regenerated after successful authentication"
+      - "Accepting session IDs from URL parameters"
+    mitigations:
+      - "Regenerate session identifiers upon successful authentication"
+      - "Invalidate all previous sessions upon login"
+      - "Never accept session IDs from URL parameters or form fields"
+    related_cwes: ["CWE-287", "CWE-307", "CWE-613"]
+
+  - id: "CWE-400"
+    name: "Uncontrolled Resource Consumption"
+    description: "The product does not properly control the allocation and maintenance of a limited resource, allowing an actor to influence the amount of resources consumed, leading to exhaustion of available resources."
+    severity: "high"
+    category: "Resource Management"
+    examples:
+      - "Denial of service through unbounded memory allocation"
+      - "CPU exhaustion via complex regular expressions (ReDoS)"
+      - "File descriptor exhaustion through unclosed connections"
+      - "Disk space exhaustion through unrestricted file uploads"
+    mitigations:
+      - "Implement resource quotas and limits"
+      - "Set timeouts on all operations that consume resources"
+      - "Monitor resource usage and implement circuit breakers"
+      - "Use rate limiting on resource-intensive operations"
+    related_cwes: ["CWE-770", "CWE-835", "CWE-1333"]
+
+  - id: "CWE-434"
+    name: "Unrestricted Upload of File with Dangerous Type"
+    description: "The product allows the attacker to upload or transfer files of dangerous types that can be automatically processed within the product's environment."
+    severity: "critical"
+    category: "File Handling"
+    examples:
+      - "Uploading PHP web shell disguised as image file"
+      - "Uploading .htaccess file to override server configuration"
+      - "Uploading executable files to web-accessible directories"
+    mitigations:
+      - "Validate file type using content inspection, not just extension"
+      - "Store uploaded files outside the web root"
+      - "Rename uploaded files with random names"
+      - "Set non-executable permissions on upload directories"
+    related_cwes: ["CWE-22", "CWE-79", "CWE-94"]
+
+  - id: "CWE-451"
+    name: "User Interface (UI) Misrepresentation of Critical Information"
+    description: "The user interface does not properly represent critical information to the user, allowing the information to be obscured or spoofed."
+    severity: "medium"
+    category: "UI Security"
+    examples:
+      - "Phishing pages mimicking legitimate login forms"
+      - "IDN homograph attacks in URL display"
+      - "Clickjacking through invisible overlay iframes"
+    mitigations:
+      - "Display security-critical information prominently and clearly"
+      - "Implement anti-clickjacking headers (X-Frame-Options, CSP frame-ancestors)"
+      - "Use visual indicators for security state (HTTPS, certificate info)"
+    related_cwes: ["CWE-346", "CWE-1021", "CWE-357"]
+
+  - id: "CWE-476"
+    name: "NULL Pointer Dereference"
+    description: "The product dereferences a pointer that it expects to be valid but is actually NULL, typically causing a crash or exit, and in some cases allowing code execution."
+    severity: "medium"
+    category: "Memory Safety"
+    examples:
+      - "Dereferencing return value of malloc without NULL check"
+      - "Accessing object pointer after failed initialization"
+      - "NULL dereference in error handling code paths"
+    mitigations:
+      - "Check all pointer values for NULL before dereferencing"
+      - "Use languages or constructs that prevent null pointer issues"
+      - "Initialize all pointers to known valid values or NULL"
+    related_cwes: ["CWE-119", "CWE-252", "CWE-690"]
+
+  - id: "CWE-494"
+    name: "Download of Code Without Integrity Check"
+    description: "The product downloads source code or an executable from a remote location and executes it without sufficiently verifying the origin and integrity of the code."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Auto-update mechanism without signature verification"
+      - "Downloading scripts over HTTP and executing them"
+      - "Package installation without checksum verification"
+    mitigations:
+      - "Verify digital signatures on all downloaded code"
+      - "Use HTTPS for all code downloads"
+      - "Implement hash verification for downloaded packages"
+      - "Use code signing certificates from trusted authorities"
+    related_cwes: ["CWE-295", "CWE-829", "CWE-353"]
+
+  - id: "CWE-502"
+    name: "Deserialization of Untrusted Data"
+    description: "The product deserializes untrusted data without sufficiently verifying that the resulting data will be valid, allowing an attacker to achieve remote code execution or other attacks."
+    severity: "critical"
+    category: "Injection"
+    examples:
+      - "Java deserialization RCE through crafted serialized objects"
+      - "Python pickle deserialization leading to code execution"
+      - "PHP unserialize vulnerability with object injection"
+      - ".NET BinaryFormatter deserialization attacks"
+    mitigations:
+      - "Avoid deserializing data from untrusted sources"
+      - "Use safe serialization formats like JSON instead of native serialization"
+      - "Implement integrity checks (HMAC) on serialized data"
+      - "Use allowlists of permitted classes for deserialization"
+    related_cwes: ["CWE-94", "CWE-915", "CWE-1321"]
+
+  - id: "CWE-521"
+    name: "Weak Password Requirements"
+    description: "The product does not require users to create passwords that meet minimum strength requirements, making accounts vulnerable to brute-force and dictionary attacks."
+    severity: "medium"
+    category: "Authentication"
+    examples:
+      - "Allowing single-character passwords"
+      - "No minimum password length requirement"
+      - "Not checking passwords against common password lists"
+    mitigations:
+      - "Enforce minimum password length (12+ characters recommended)"
+      - "Check passwords against known breached password databases"
+      - "Implement password complexity requirements"
+      - "Encourage or require use of password managers"
+    related_cwes: ["CWE-287", "CWE-307", "CWE-916"]
+
+  - id: "CWE-522"
+    name: "Insufficiently Protected Credentials"
+    description: "The product transmits or stores authentication credentials, but it uses an insecure method that is susceptible to unauthorized interception or retrieval."
+    severity: "high"
+    category: "Authentication"
+    examples:
+      - "Storing passwords with reversible encryption instead of hashing"
+      - "Transmitting credentials in URL query parameters"
+      - "Caching authentication tokens in browser local storage"
+    mitigations:
+      - "Use one-way cryptographic hashing for password storage"
+      - "Transmit credentials only over encrypted channels"
+      - "Store tokens in secure, HTTP-only cookies"
+      - "Implement proper credential rotation and revocation"
+    related_cwes: ["CWE-287", "CWE-312", "CWE-319"]
+
+  - id: "CWE-532"
+    name: "Insertion of Sensitive Information into Log File"
+    description: "The product writes sensitive information to a log file that is accessible to actors outside of the intended control sphere, potentially exposing passwords, tokens, or personal data."
+    severity: "medium"
+    category: "Information Disclosure"
+    examples:
+      - "Logging user passwords during authentication failures"
+      - "Recording full credit card numbers in transaction logs"
+      - "Including session tokens in access logs"
+    mitigations:
+      - "Sanitize all data before logging"
+      - "Implement log data classification and filtering"
+      - "Restrict access to log files"
+      - "Use structured logging with automatic PII redaction"
+    related_cwes: ["CWE-200", "CWE-209", "CWE-538"]
+
+  - id: "CWE-538"
+    name: "Insertion of Sensitive Information into Externally-Accessible File or Directory"
+    description: "The product places sensitive information into files or directories that are accessible to actors outside of the intended control sphere."
+    severity: "medium"
+    category: "Information Disclosure"
+    examples:
+      - "Debug files left in web-accessible directories"
+      - "Database backups stored in publicly accessible locations"
+      - "Configuration files with secrets in public repositories"
+    mitigations:
+      - "Ensure sensitive files are stored outside web-accessible directories"
+      - "Implement proper access controls on all sensitive files"
+      - "Use automated scanning to detect exposed sensitive files"
+    related_cwes: ["CWE-200", "CWE-209", "CWE-532"]
+
+  - id: "CWE-601"
+    name: "URL Redirection to Untrusted Site (Open Redirect)"
+    description: "The web application accepts a user-controlled input that specifies a link to an external site, and uses that link in a redirect without sufficient validation."
+    severity: "medium"
+    category: "Input Validation"
+    examples:
+      - "Login redirect parameter pointing to phishing site"
+      - "OAuth callback URL manipulation for token theft"
+      - "URL shortener redirecting to malicious destinations"
+    mitigations:
+      - "Validate redirect URLs against an allowlist of permitted domains"
+      - "Use indirect references (mapping IDs) instead of full URLs"
+      - "Display a warning page before redirecting to external sites"
+    related_cwes: ["CWE-20", "CWE-79", "CWE-346"]
+
+  - id: "CWE-611"
+    name: "Improper Restriction of XML External Entity Reference"
+    description: "The product processes an XML document that can contain XML entities with URIs that resolve to documents outside the intended sphere of control, allowing disclosure of confidential data or denial of service."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "XXE attack reading /etc/passwd through DOCTYPE declaration"
+      - "SSRF via XXE to scan internal network"
+      - "Denial of service through billion laughs XML bomb"
+    mitigations:
+      - "Disable external entity and DTD processing in XML parsers"
+      - "Use less complex data formats like JSON where possible"
+      - "Validate and sanitize XML input before parsing"
+      - "Use XML parsers configured securely by default"
+    related_cwes: ["CWE-776", "CWE-918", "CWE-827"]
+
+  - id: "CWE-614"
+    name: "Sensitive Cookie in HTTPS Session Without 'Secure' Attribute"
+    description: "The product creates a sensitive cookie but does not set the Secure flag, allowing the cookie to be transmitted over unencrypted HTTP connections."
+    severity: "medium"
+    category: "Session Management"
+    examples:
+      - "Session cookie without Secure flag on HTTPS site"
+      - "Authentication token cookie transmittable over HTTP"
+      - "Sensitive preference cookies exposed on mixed HTTP/HTTPS pages"
+    mitigations:
+      - "Set the Secure flag on all sensitive cookies"
+      - "Use HSTS to prevent HTTP downgrade attacks"
+      - "Set HttpOnly and SameSite attributes on session cookies"
+    related_cwes: ["CWE-319", "CWE-1004", "CWE-352"]
+
+  - id: "CWE-639"
+    name: "Authorization Bypass Through User-Controlled Key"
+    description: "The system authorization functionality does not prevent one user from gaining access to another user's data by modifying the key value identifying the data, commonly known as Insecure Direct Object Reference (IDOR)."
+    severity: "high"
+    category: "Access Control"
+    examples:
+      - "Changing user ID parameter to access other users' profiles"
+      - "Modifying order number to view other customers' orders"
+      - "Incrementing document ID to access unauthorized files"
+    mitigations:
+      - "Validate that the authenticated user has permission to access the referenced object"
+      - "Use indirect references that map to actual database keys"
+      - "Implement object-level access control checks"
+    related_cwes: ["CWE-284", "CWE-285", "CWE-862"]
+
+  - id: "CWE-640"
+    name: "Weak Password Recovery Mechanism for Forgotten Password"
+    description: "The product contains a mechanism for users to recover or change their passwords without knowing the original password, but the mechanism is weak, allowing unauthorized password changes."
+    severity: "high"
+    category: "Authentication"
+    examples:
+      - "Security questions with easily guessable answers"
+      - "Password reset tokens sent via insecure channels"
+      - "Password reset links that do not expire"
+    mitigations:
+      - "Use time-limited, single-use password reset tokens"
+      - "Send reset links only to pre-verified email addresses"
+      - "Implement multi-step verification for password recovery"
+      - "Notify users of password change attempts"
+    related_cwes: ["CWE-287", "CWE-307", "CWE-521"]
+
+  - id: "CWE-662"
+    name: "Improper Synchronization"
+    description: "The product utilizes multiple threads or processes to allow temporary access to a shared resource that can only be exclusive to one process at a time, but it does not properly synchronize these accesses."
+    severity: "medium"
+    category: "Concurrency"
+    examples:
+      - "Double-checked locking without proper memory barriers"
+      - "Unsynchronized access to shared data structures"
+      - "Missing locks on concurrent database operations"
+    mitigations:
+      - "Use appropriate synchronization primitives for all shared resources"
+      - "Follow established concurrency patterns and best practices"
+      - "Use thread-safe data structures and collections"
+    related_cwes: ["CWE-362", "CWE-366", "CWE-367"]
+
+  - id: "CWE-668"
+    name: "Exposure of Resource to Wrong Sphere"
+    description: "The product exposes a resource to the wrong control sphere, providing unintended actors with inappropriate access to the resource."
+    severity: "medium"
+    category: "Access Control"
+    examples:
+      - "Internal API endpoints exposed to the public internet"
+      - "Debug interfaces accessible in production environments"
+      - "Sensitive data exposed through browser developer tools"
+    mitigations:
+      - "Implement network segmentation for internal resources"
+      - "Disable debug and development features in production"
+      - "Apply access controls appropriate for each resource's sensitivity"
+    related_cwes: ["CWE-200", "CWE-284", "CWE-538"]
+
+  - id: "CWE-672"
+    name: "Operation on a Resource after Expiration or Release"
+    description: "The product uses, accesses, or otherwise operates on a resource after that resource has been expired, released, or revoked, leading to undefined behavior or security issues."
+    severity: "medium"
+    category: "Resource Management"
+    examples:
+      - "Using a database connection after it has been closed"
+      - "Accessing memory after it has been freed (use-after-free)"
+      - "Using an expired authentication token"
+    mitigations:
+      - "Implement proper resource lifecycle management"
+      - "Set resource references to null after release"
+      - "Use garbage-collected languages where possible"
+      - "Validate resource state before each use"
+    related_cwes: ["CWE-416", "CWE-613", "CWE-298"]
+
+  - id: "CWE-676"
+    name: "Use of Potentially Dangerous Function"
+    description: "The product invokes a potentially dangerous function that could introduce a vulnerability if it is used incorrectly, but the function can also be used safely."
+    severity: "medium"
+    category: "Code Quality"
+    examples:
+      - "Using gets() which cannot limit input size"
+      - "Using strcpy() instead of strncpy()"
+      - "Using sprintf() without length limits"
+    mitigations:
+      - "Replace dangerous functions with safer alternatives"
+      - "Use compiler flags to warn about dangerous function usage"
+      - "Implement coding standards that ban known dangerous functions"
+    related_cwes: ["CWE-119", "CWE-120", "CWE-242"]
+
+  - id: "CWE-681"
+    name: "Incorrect Conversion between Numeric Types"
+    description: "When converting one numeric type to another, the product does not properly handle cases where the value is outside the range or precision of the target type."
+    severity: "medium"
+    category: "Numeric Errors"
+    examples:
+      - "Truncation when converting 64-bit integer to 32-bit"
+      - "Sign conversion from unsigned to signed integer"
+      - "Loss of precision in floating-point to integer conversion"
+    mitigations:
+      - "Validate that values fit within target type range before conversion"
+      - "Use explicit type casting with range checks"
+      - "Use consistent numeric types throughout related computations"
+    related_cwes: ["CWE-190", "CWE-704", "CWE-192"]
+
+  - id: "CWE-693"
+    name: "Protection Mechanism Failure"
+    description: "The product does not use or incorrectly uses a protection mechanism that provides sufficient defense against directed attacks against the product."
+    severity: "medium"
+    category: "Security Architecture"
+    examples:
+      - "Missing CSRF protection on state-changing requests"
+      - "Content Security Policy not implemented or too permissive"
+      - "Security headers missing from HTTP responses"
+    mitigations:
+      - "Implement all applicable security mechanisms for the technology stack"
+      - "Use security headers (CSP, HSTS, X-Content-Type-Options)"
+      - "Regularly audit security controls against current best practices"
+    related_cwes: ["CWE-284", "CWE-352", "CWE-346"]
+
+  - id: "CWE-704"
+    name: "Incorrect Type Conversion or Cast"
+    description: "The product does not correctly convert an object, resource, or structure from one type to a different type, leading to unexpected behavior or security issues."
+    severity: "medium"
+    category: "Numeric Errors"
+    examples:
+      - "Type confusion in JavaScript leading to prototype pollution"
+      - "Incorrect casting in C/C++ causing memory corruption"
+      - "Implicit type conversion leading to logic errors"
+    mitigations:
+      - "Use explicit type checking before type conversion"
+      - "Implement strict type systems where possible"
+      - "Validate types at trust boundaries"
+    related_cwes: ["CWE-681", "CWE-843", "CWE-190"]
+
+  - id: "CWE-732"
+    name: "Incorrect Permission Assignment for Critical Resource"
+    description: "The product specifies permissions for a security-critical resource in a way that allows that resource to be read or modified by unintended actors."
+    severity: "high"
+    category: "Privilege Management"
+    examples:
+      - "Private key files with world-readable permissions"
+      - "Configuration files containing credentials accessible to all users"
+      - "Executable files with setuid bit set unnecessarily"
+    mitigations:
+      - "Assign the most restrictive permissions possible for critical resources"
+      - "Implement automated permission auditing"
+      - "Follow the principle of least privilege for file permissions"
+    related_cwes: ["CWE-276", "CWE-269", "CWE-284"]
+
+  - id: "CWE-754"
+    name: "Improper Check for Unusual or Exceptional Conditions"
+    description: "The product does not check or incorrectly checks for unusual or exceptional conditions that are not expected to occur frequently during the normal operation of the product."
+    severity: "medium"
+    category: "Error Handling"
+    examples:
+      - "Not handling out-of-memory conditions"
+      - "Ignoring return values from security-critical functions"
+      - "Missing error handling for network timeouts"
+    mitigations:
+      - "Check return values of all critical function calls"
+      - "Implement comprehensive exception handling"
+      - "Design for failure and handle all edge cases"
+    related_cwes: ["CWE-252", "CWE-391", "CWE-476"]
+
+  - id: "CWE-770"
+    name: "Allocation of Resources Without Limits or Throttling"
+    description: "The product allocates a reusable resource or group of resources on behalf of an actor without imposing any restrictions on the size or number of resources that can be allocated."
+    severity: "high"
+    category: "Resource Management"
+    examples:
+      - "Unlimited file upload size allowing disk exhaustion"
+      - "No connection pool limits causing database exhaustion"
+      - "Unbounded memory allocation based on user input"
+    mitigations:
+      - "Implement resource allocation limits and quotas"
+      - "Use connection pooling with maximum limits"
+      - "Set maximum sizes for user-controlled allocations"
+      - "Implement rate limiting and throttling"
+    related_cwes: ["CWE-400", "CWE-789", "CWE-920"]
+
+  - id: "CWE-772"
+    name: "Missing Release of Resource after Effective Lifetime"
+    description: "The product does not release a resource after its effective lifetime has ended, leading to resource leaks that can cause performance degradation or denial of service."
+    severity: "medium"
+    category: "Resource Management"
+    examples:
+      - "File handles not closed after use"
+      - "Database connections not returned to pool"
+      - "Memory not freed in long-running processes"
+    mitigations:
+      - "Use try-with-resources or RAII patterns"
+      - "Implement proper resource cleanup in finally blocks"
+      - "Use automated resource management tools and linting"
+    related_cwes: ["CWE-401", "CWE-404", "CWE-770"]
+
+  - id: "CWE-776"
+    name: "Improper Restriction of Recursive Entity References in DTDs (XML Entity Expansion)"
+    description: "The product uses XML documents and allows their structure to be defined by DTDs, but does not properly control the number of recursive definitions, enabling exponential resource consumption."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "Billion laughs attack using nested XML entity references"
+      - "Quadratic blowup attack through repeated entity expansion"
+      - "Memory exhaustion through recursive DTD definitions"
+    mitigations:
+      - "Disable DTD processing entirely if not needed"
+      - "Set limits on entity expansion count and depth"
+      - "Use XML parsers that prevent recursive entity expansion by default"
+    related_cwes: ["CWE-400", "CWE-611", "CWE-770"]
+
+  - id: "CWE-787"
+    name: "Out-of-bounds Write"
+    description: "The product writes data past the end, or before the beginning, of the intended buffer, enabling code execution, data corruption, or system crashes."
+    severity: "critical"
+    category: "Memory Safety"
+    examples:
+      - "Heap buffer overflow in image processing library"
+      - "Stack-based buffer overflow in network protocol handler"
+      - "Off-by-one error writing past array boundary"
+    mitigations:
+      - "Use memory-safe languages for new development"
+      - "Perform bounds checking on all write operations"
+      - "Enable memory protection mechanisms (ASLR, DEP, stack canaries)"
+      - "Use address sanitizers during testing"
+    related_cwes: ["CWE-119", "CWE-120", "CWE-125"]
+
+  - id: "CWE-798"
+    name: "Use of Hard-coded Credentials"
+    description: "The product contains hard-coded credentials, such as passwords, cryptographic keys, or API keys, that are used for its own inbound authentication or outbound communication."
+    severity: "critical"
+    category: "Authentication"
+    examples:
+      - "Default admin password embedded in firmware"
+      - "API keys hard-coded in mobile application source code"
+      - "Database credentials in application configuration constants"
+      - "SSH private keys embedded in Docker images"
+    mitigations:
+      - "Store credentials in secure vaults or environment variables"
+      - "Use credential management systems like HashiCorp Vault"
+      - "Implement automated scanning for hard-coded secrets"
+      - "Use service accounts with managed credentials"
+    related_cwes: ["CWE-259", "CWE-321", "CWE-522"]
+
+  - id: "CWE-829"
+    name: "Inclusion of Functionality from Untrusted Control Sphere"
+    description: "The product imports, requires, or includes executable functionality from a source that is outside of the intended control sphere, potentially introducing malicious code."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Loading JavaScript libraries from untrusted CDNs without SRI"
+      - "Including PHP files from user-controllable paths"
+      - "Dynamic library loading from world-writable directories"
+    mitigations:
+      - "Use Subresource Integrity (SRI) for external resources"
+      - "Validate and pin all external dependencies"
+      - "Implement Content Security Policy to restrict script sources"
+      - "Verify integrity of all included code through signatures or hashes"
+    related_cwes: ["CWE-94", "CWE-494", "CWE-502"]
+
+  - id: "CWE-835"
+    name: "Loop with Unreachable Exit Condition (Infinite Loop)"
+    description: "The product contains an iteration or loop with an exit condition that cannot be reached, causing the loop to execute indefinitely and consume resources."
+    severity: "medium"
+    category: "Resource Management"
+    examples:
+      - "While loop dependent on user input that never provides exit value"
+      - "Parser loop that does not advance on malformed input"
+      - "Recursive function without proper base case"
+    mitigations:
+      - "Implement maximum iteration limits on all loops"
+      - "Add timeouts for long-running operations"
+      - "Use watchdog timers to detect and terminate hung processes"
+    related_cwes: ["CWE-400", "CWE-770", "CWE-834"]
+
+  - id: "CWE-843"
+    name: "Access of Resource Using Incompatible Type (Type Confusion)"
+    description: "The product allocates or initializes a resource such as a pointer, object, or variable using one type, but later accesses that resource using a type that is incompatible with the original type."
+    severity: "high"
+    category: "Memory Safety"
+    examples:
+      - "Type confusion in JavaScript engine leading to code execution"
+      - "Casting between incompatible C++ class types"
+      - "Accessing union members with wrong type assumption"
+    mitigations:
+      - "Use type-safe languages and programming practices"
+      - "Implement strict type checking at all type boundaries"
+      - "Avoid unsafe type casts and unions"
+    related_cwes: ["CWE-704", "CWE-119", "CWE-681"]
+
+  - id: "CWE-862"
+    name: "Missing Authorization"
+    description: "The product does not perform an authorization check when an actor attempts to access a resource or perform an action, allowing any authenticated user to perform privileged operations."
+    severity: "critical"
+    category: "Access Control"
+    examples:
+      - "API endpoint for admin actions accessible to regular users"
+      - "Missing authorization check on file deletion functionality"
+      - "Bulk data export available without proper authorization"
+    mitigations:
+      - "Implement authorization checks for every resource and action"
+      - "Use framework-level authorization middleware"
+      - "Apply deny-by-default authorization policies"
+      - "Audit all endpoints for missing authorization checks"
+    related_cwes: ["CWE-284", "CWE-285", "CWE-863"]
+
+  - id: "CWE-863"
+    name: "Incorrect Authorization"
+    description: "The product performs an authorization check when an actor attempts to access a resource but the check does not correctly determine whether the actor is authorized, allowing bypass."
+    severity: "high"
+    category: "Access Control"
+    examples:
+      - "Authorization check comparing wrong user ID field"
+      - "Role check that allows access due to incorrect boolean logic"
+      - "Path-based authorization bypassed through URL encoding"
+    mitigations:
+      - "Use well-tested authorization frameworks"
+      - "Implement comprehensive authorization unit and integration tests"
+      - "Centralize authorization logic to reduce inconsistencies"
+    related_cwes: ["CWE-284", "CWE-285", "CWE-862"]
+
+  - id: "CWE-912"
+    name: "Hidden Functionality"
+    description: "The product contains functionality that is not documented, not part of the specification, or not accessible through the normal user interface, which could be used as a backdoor."
+    severity: "high"
+    category: "Security Architecture"
+    examples:
+      - "Undocumented debug commands in network devices"
+      - "Hidden administrative accounts in embedded systems"
+      - "Easter egg code that bypasses security controls"
+    mitigations:
+      - "Conduct thorough code reviews to identify hidden functionality"
+      - "Remove all debug and test code before production deployment"
+      - "Implement automated scanning for undocumented endpoints"
+    related_cwes: ["CWE-489", "CWE-506", "CWE-798"]
+
+  - id: "CWE-913"
+    name: "Improper Control of Dynamically-Managed Code Resources"
+    description: "The product does not properly restrict reading from or writing to dynamically-managed code resources such as variables, objects, classes, attributes, or functions."
+    severity: "high"
+    category: "Code Quality"
+    examples:
+      - "Prototype pollution in JavaScript applications"
+      - "Mass assignment through uncontrolled parameter binding"
+      - "Dynamic method invocation with user-controlled method names"
+    mitigations:
+      - "Use allowlists for dynamic property or method access"
+      - "Freeze prototypes and objects where appropriate"
+      - "Implement strict property binding controls"
+    related_cwes: ["CWE-915", "CWE-1321", "CWE-502"]
+
+  - id: "CWE-915"
+    name: "Improperly Controlled Modification of Dynamically-Determined Object Attributes"
+    description: "The product receives input from an upstream component that specifies attributes to be initialized or updated in an object, but does not properly control which attributes can be modified."
+    severity: "high"
+    category: "Input Validation"
+    examples:
+      - "Mass assignment allowing modification of isAdmin flag in user model"
+      - "Ruby on Rails mass assignment of role attribute"
+      - "Overwriting internal object attributes through unfiltered parameter binding"
+    mitigations:
+      - "Use allowlists to specify which attributes can be mass-assigned"
+      - "Implement strong parameter filtering"
+      - "Separate data transfer objects from domain models"
+    related_cwes: ["CWE-913", "CWE-502", "CWE-1321"]
+
+  - id: "CWE-916"
+    name: "Use of Password Hash With Insufficient Computational Effort"
+    description: "The product generates a hash for a password but uses a scheme that does not provide a sufficient level of computational effort that would make password cracking attacks infeasible."
+    severity: "high"
+    category: "Cryptography"
+    examples:
+      - "Using plain MD5 or SHA-1 for password hashing"
+      - "Using SHA-256 without salt or key stretching for passwords"
+      - "Insufficient iterations in PBKDF2 password hashing"
+    mitigations:
+      - "Use bcrypt, scrypt, or Argon2 for password hashing"
+      - "Configure sufficient work factor for the chosen algorithm"
+      - "Use unique salts for each password hash"
+      - "Regularly increase work factor as hardware improves"
+    related_cwes: ["CWE-327", "CWE-328", "CWE-521"]
+
+  - id: "CWE-918"
+    name: "Server-Side Request Forgery (SSRF)"
+    description: "The web server receives a URL or similar request from an upstream component and retrieves the contents of this URL, but does not sufficiently ensure that the request is being sent to the expected destination."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "SSRF to access cloud metadata endpoint (169.254.169.254)"
+      - "SSRF through PDF generation with external URL references"
+      - "SSRF via webhook URL to scan internal network"
+      - "SSRF to access internal services through URL parameter"
+    mitigations:
+      - "Validate and sanitize all user-supplied URLs"
+      - "Implement allowlist of permitted domains and IP ranges"
+      - "Block requests to private/internal IP address ranges"
+      - "Use network-level segmentation to limit SSRF impact"
+    related_cwes: ["CWE-20", "CWE-611", "CWE-441"]
+
+  - id: "CWE-920"
+    name: "Improper Restriction of Power Consumption"
+    description: "The product operates in an environment in which power is a limited resource that cannot be automatically replenished, but it does not properly restrict the amount of power consumed."
+    severity: "low"
+    category: "Resource Management"
+    examples:
+      - "Mobile app continuously using GPS draining battery"
+      - "IoT device firmware running CPU at maximum without sleep states"
+      - "Excessive network polling in battery-powered devices"
+    mitigations:
+      - "Implement power-aware scheduling and resource management"
+      - "Use sleep states and low-power modes when idle"
+      - "Optimize network communication patterns for power efficiency"
+    related_cwes: ["CWE-400", "CWE-770", "CWE-835"]
+
+  - id: "CWE-939"
+    name: "Improper Authorization in Handler for Custom URL Scheme"
+    description: "The product uses a handler for a custom URL scheme but does not properly authorize the source of the request, allowing attackers to trigger functionality through malicious links."
+    severity: "medium"
+    category: "Mobile Security"
+    examples:
+      - "Custom URI scheme handler executing actions without origin verification"
+      - "Deep link exploitation to bypass in-app authentication"
+      - "Intent hijacking through exported Android activities"
+    mitigations:
+      - "Validate the origin of custom URL scheme requests"
+      - "Require user confirmation for sensitive actions triggered by custom schemes"
+      - "Use Universal Links or App Links instead of custom URL schemes"
+    related_cwes: ["CWE-284", "CWE-862", "CWE-346"]
+
+  - id: "CWE-943"
+    name: "Improper Neutralization of Special Elements in Data Query Logic"
+    description: "The product generates a query intended to access or manipulate data in a data store such as a database, but does not properly neutralize special elements that can modify the query logic."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "NoSQL injection in MongoDB queries"
+      - "LDAP injection through unfiltered search parameters"
+      - "GraphQL injection through malicious query construction"
+    mitigations:
+      - "Use parameterized queries for all data store interactions"
+      - "Apply strict input validation on all query parameters"
+      - "Use ORM/ODM frameworks with built-in query sanitization"
+    related_cwes: ["CWE-89", "CWE-90", "CWE-77"]
+
+  - id: "CWE-1004"
+    name: "Sensitive Cookie Without 'HttpOnly' Flag"
+    description: "The product sets a sensitive cookie but does not use the HttpOnly flag, making the cookie accessible to client-side scripts and vulnerable to theft through XSS attacks."
+    severity: "medium"
+    category: "Session Management"
+    examples:
+      - "Session cookie accessible via document.cookie in JavaScript"
+      - "Authentication token cookie without HttpOnly attribute"
+      - "CSRF token cookie readable by injected scripts"
+    mitigations:
+      - "Set the HttpOnly flag on all session and authentication cookies"
+      - "Set the Secure and SameSite flags as well"
+      - "Use framework defaults that enable HttpOnly for session cookies"
+    related_cwes: ["CWE-614", "CWE-79", "CWE-352"]
+
+  - id: "CWE-1021"
+    name: "Improper Restriction of Rendered UI Layers or Frames"
+    description: "The product does not restrict or incorrectly restricts frame objects or UI layers that belong to another application or domain, enabling clickjacking attacks."
+    severity: "medium"
+    category: "UI Security"
+    examples:
+      - "Sensitive page embeddable in attacker-controlled iframe"
+      - "Clickjacking to trick user into changing account settings"
+      - "UI redress attack on single sign-on approval page"
+    mitigations:
+      - "Set X-Frame-Options header to DENY or SAMEORIGIN"
+      - "Use Content-Security-Policy frame-ancestors directive"
+      - "Implement JavaScript frame-busting as fallback defense"
+    related_cwes: ["CWE-451", "CWE-346", "CWE-693"]
+
+  - id: "CWE-1032"
+    name: "OWASP Top Ten 2017 Category A6 - Security Misconfiguration"
+    description: "Weaknesses in this category are related to the A6 category in the OWASP Top Ten 2017, covering security misconfiguration issues across the application stack."
+    severity: "medium"
+    category: "Security Configuration"
+    examples:
+      - "Default credentials left unchanged in production"
+      - "Unnecessary services and ports enabled"
+      - "Error handling revealing sensitive stack traces"
+    mitigations:
+      - "Implement automated configuration hardening"
+      - "Use infrastructure as code for consistent deployments"
+      - "Regularly scan for misconfiguration vulnerabilities"
+    related_cwes: ["CWE-16", "CWE-276", "CWE-668"]
+
+  - id: "CWE-1035"
+    name: "OWASP Top Ten 2017 Category A9 - Using Components with Known Vulnerabilities"
+    description: "Weaknesses related to the OWASP Top Ten A9 category, covering the use of components (libraries, frameworks) with known security vulnerabilities."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Using outdated jQuery version with known XSS vulnerabilities"
+      - "Running unpatched Apache Struts with remote code execution flaw"
+      - "Including vulnerable version of Log4j in application dependencies"
+    mitigations:
+      - "Maintain an inventory of all software components and versions"
+      - "Implement automated dependency vulnerability scanning"
+      - "Establish a process for timely patching of vulnerable components"
+    related_cwes: ["CWE-1104", "CWE-829", "CWE-494"]
+
+  - id: "CWE-1036"
+    name: "OWASP Top Ten 2017 Category A9 - Using Components with Known Vulnerabilities (Detailed)"
+    description: "This is a more granular categorization for weaknesses related to the use of third-party components that have known security issues documented in vulnerability databases."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Deploying applications with EOL runtime environments"
+      - "Using deprecated cryptographic libraries"
+      - "Third-party plugins with unpatched vulnerabilities"
+    mitigations:
+      - "Subscribe to security advisories for all dependencies"
+      - "Implement software composition analysis (SCA) in CI/CD pipelines"
+      - "Establish policies for maximum acceptable vulnerability age"
+    related_cwes: ["CWE-1035", "CWE-1104", "CWE-829"]
+
+  - id: "CWE-1104"
+    name: "Use of Unmaintained Third Party Components"
+    description: "The product depends on third-party components that are no longer actively maintained, meaning security vulnerabilities will not be patched by the original developers."
+    severity: "medium"
+    category: "Supply Chain"
+    examples:
+      - "Using abandoned npm packages with known vulnerabilities"
+      - "Depending on archived GitHub projects for critical functionality"
+      - "Using end-of-life operating system or runtime versions"
+    mitigations:
+      - "Monitor the maintenance status of all dependencies"
+      - "Plan for migration when components approach end-of-life"
+      - "Fork and maintain critical abandoned dependencies if necessary"
+      - "Use software composition analysis tools to track component health"
+    related_cwes: ["CWE-1035", "CWE-1036", "CWE-829"]
+
+  - id: "CWE-1236"
+    name: "Improper Neutralization of Formula Elements in a CSV File"
+    description: "The product saves user-provided information into a CSV file, but it does not neutralize or incorrectly neutralizes special elements that could be interpreted as formula commands by spreadsheet applications."
+    severity: "medium"
+    category: "Injection"
+    examples:
+      - "CSV injection with =HYPERLINK() formula to exfiltrate data"
+      - "DDE command injection through CSV export functionality"
+      - "Formula injection in spreadsheet exports leading to command execution"
+    mitigations:
+      - "Prepend single quote to cell values starting with formula characters (=, +, -, @)"
+      - "Sanitize all data before CSV export"
+      - "Use proper CSV libraries that handle formula escaping"
+    related_cwes: ["CWE-74", "CWE-77", "CWE-116"]
+
+  - id: "CWE-1275"
+    name: "Sensitive Cookie with Improper SameSite Attribute"
+    description: "The product sets a sensitive cookie without properly setting the SameSite attribute, potentially allowing the cookie to be sent in cross-site requests and enabling CSRF attacks."
+    severity: "medium"
+    category: "Session Management"
+    examples:
+      - "Session cookie with SameSite=None without Secure flag"
+      - "Authentication cookie without SameSite attribute in older browsers"
+      - "Sensitive cookie with SameSite=Lax for state-changing GET requests"
+    mitigations:
+      - "Set SameSite=Strict or SameSite=Lax on sensitive cookies"
+      - "Use SameSite=None only when cross-site usage is required, with Secure flag"
+      - "Combine SameSite attribute with CSRF tokens for defense in depth"
+    related_cwes: ["CWE-352", "CWE-614", "CWE-1004"]
+
+  - id: "CWE-1321"
+    name: "Improperly Controlled Modification of Object Prototype Attributes (Prototype Pollution)"
+    description: "The product receives input from an upstream component but does not properly control modification of attributes of object prototypes, allowing an attacker to modify the behavior of all objects inheriting from the polluted prototype."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "Prototype pollution through lodash merge function"
+      - "Polluting Object.prototype via JSON parsing"
+      - "Prototype pollution leading to remote code execution in Node.js"
+    mitigations:
+      - "Use Object.create(null) for dictionary objects"
+      - "Freeze Object.prototype and other critical prototypes"
+      - "Validate and sanitize all keys in user-controlled objects"
+      - "Use Map instead of plain objects for user-controlled data"
+    related_cwes: ["CWE-913", "CWE-915", "CWE-502"]
+
+  - id: "CWE-1333"
+    name: "Inefficient Regular Expression Complexity"
+    description: "The product uses a regular expression with an inefficient, possibly exponential worst-case computational complexity that allows an attacker to cause a denial of service (ReDoS)."
+    severity: "high"
+    category: "Resource Management"
+    examples:
+      - "ReDoS through nested quantifiers in email validation regex"
+      - "Catastrophic backtracking in URL parsing regular expression"
+      - "Exponential time regex in user input validation"
+    mitigations:
+      - "Use linear-time regex engines (RE2, rust regex)"
+      - "Limit input length before applying regular expressions"
+      - "Test regular expressions for ReDoS vulnerability with fuzzing tools"
+      - "Set timeouts on regex execution"
+    related_cwes: ["CWE-400", "CWE-770", "CWE-185"]
+
+  - id: "CWE-1336"
+    name: "Improper Neutralization of Special Elements Used in a Template Engine"
+    description: "The product uses a template engine to insert or process externally-influenced input but does not neutralize or incorrectly neutralizes special elements that could be interpreted as template directives."
+    severity: "critical"
+    category: "Injection"
+    examples:
+      - "Server-Side Template Injection (SSTI) in Jinja2 templates"
+      - "Template injection in Freemarker leading to RCE"
+      - "Twig template injection allowing arbitrary code execution"
+    mitigations:
+      - "Never use user input directly in template strings"
+      - "Use sandboxed template execution environments"
+      - "Apply strict input validation before template rendering"
+      - "Use logic-less template engines where possible"
+    related_cwes: ["CWE-94", "CWE-77", "CWE-116"]
+
+  - id: "CWE-1352"
+    name: "OWASP Top Ten 2021 Category A04:2021 - Insecure Design"
+    description: "Weaknesses related to insecure design patterns, missing or ineffective security controls, and architectural flaws that cannot be fixed by implementation changes alone."
+    severity: "high"
+    category: "Security Architecture"
+    examples:
+      - "Missing rate limiting on financially sensitive operations"
+      - "Lack of defense in depth in application architecture"
+      - "Business logic flaws allowing abuse of discount or reward systems"
+    mitigations:
+      - "Implement threat modeling during the design phase"
+      - "Use secure design patterns and reference architectures"
+      - "Establish and use a library of secure design patterns"
+    related_cwes: ["CWE-284", "CWE-693", "CWE-840"]
+
+  - id: "CWE-1385"
+    name: "Missing Origin Validation in WebSockets"
+    description: "The product uses WebSocket communication but does not properly validate the origin of the connecting client, allowing cross-site WebSocket hijacking."
+    severity: "high"
+    category: "Access Control"
+    examples:
+      - "WebSocket endpoint accepting connections from any origin"
+      - "Cross-site WebSocket hijacking to steal real-time data"
+      - "Malicious website establishing WebSocket connections to internal services"
+    mitigations:
+      - "Validate the Origin header on WebSocket handshake requests"
+      - "Implement authentication tokens for WebSocket connections"
+      - "Use CSRF-like protections for WebSocket connection establishment"
+    related_cwes: ["CWE-346", "CWE-352", "CWE-284"]
+
+  - id: "CWE-1386"
+    name: "Insecure Operation on Windows Junction / Mount Point"
+    description: "The product performs an operation on a file or directory but does not properly handle Windows junction points or mount points, allowing an attacker to redirect operations to unintended locations."
+    severity: "medium"
+    category: "File Handling"
+    examples:
+      - "Privileged file delete redirected via junction point to system files"
+      - "Arbitrary file write through mount point manipulation"
+      - "Antivirus scan bypass using directory junctions"
+    mitigations:
+      - "Check for reparse points before performing file operations"
+      - "Avoid following symbolic links and junction points in privileged operations"
+      - "Implement proper access checks that account for redirection"
+    related_cwes: ["CWE-22", "CWE-59", "CWE-362"]
+
+  - id: "CWE-1390"
+    name: "Weak Authentication"
+    description: "The product uses an authentication mechanism that is weak and does not provide adequate security to protect against unauthorized access."
+    severity: "high"
+    category: "Authentication"
+    examples:
+      - "Basic authentication over unencrypted connections"
+      - "Single-factor authentication for sensitive operations"
+      - "Authentication based on easily spoofed attributes like IP address"
+    mitigations:
+      - "Implement multi-factor authentication"
+      - "Use strong authentication protocols (OAuth 2.0, OIDC)"
+      - "Enforce strong password policies with breach detection"
+    related_cwes: ["CWE-287", "CWE-307", "CWE-521"]
+
+  - id: "CWE-1391"
+    name: "Use of Weak Credentials"
+    description: "The product uses weak credentials such as default passwords, easily guessable credentials, or credentials with insufficient entropy for authentication."
+    severity: "high"
+    category: "Authentication"
+    examples:
+      - "Default admin/admin credentials in deployed applications"
+      - "Four-digit PINs for account access"
+      - "Predictable temporary passwords following patterns"
+    mitigations:
+      - "Require strong credential creation during initial setup"
+      - "Disable or force change of default credentials on first login"
+      - "Implement credential strength checking against known weak passwords"
+    related_cwes: ["CWE-521", "CWE-798", "CWE-1390"]
+
+  - id: "CWE-1392"
+    name: "Use of Default Credentials"
+    description: "The product uses default credentials that are established during installation or manufacturing and are intended to be changed by administrators but often remain unchanged."
+    severity: "critical"
+    category: "Authentication"
+    examples:
+      - "IoT devices with factory-default passwords accessible from the internet"
+      - "Database installations with unchanged default admin passwords"
+      - "Network equipment with well-known default community strings"
+    mitigations:
+      - "Force password change on first login or during setup"
+      - "Generate unique default credentials for each installation"
+      - "Implement automated scanning for default credentials"
+    related_cwes: ["CWE-798", "CWE-1391", "CWE-1393"]
+
+  - id: "CWE-1393"
+    name: "Use of Default Password"
+    description: "The product is deployed with a default password that is intended to be changed post-installation but is the same across all installations, making it easily discoverable."
+    severity: "critical"
+    category: "Authentication"
+    examples:
+      - "Router with default password documented in manual"
+      - "CMS installation with standard admin password"
+      - "Industrial control system with published default credentials"
+    mitigations:
+      - "Require unique password creation during initial setup"
+      - "Disable account access until password is changed"
+      - "Generate random initial passwords unique to each deployment"
+    related_cwes: ["CWE-798", "CWE-1391", "CWE-1392"]
+
+  - id: "CWE-1394"
+    name: "Use of Default Cryptographic Key"
+    description: "The product uses a default cryptographic key that is the same across all installations, allowing attackers who obtain the key to decrypt or forge data across all deployments."
+    severity: "critical"
+    category: "Cryptography"
+    examples:
+      - "Shared TLS certificate private key across all product installations"
+      - "Default encryption key for session tokens across instances"
+      - "Firmware signing key shared across all devices of the same model"
+    mitigations:
+      - "Generate unique cryptographic keys during installation or first boot"
+      - "Implement automated key rotation"
+      - "Use hardware security modules for key generation and storage"
+    related_cwes: ["CWE-321", "CWE-798", "CWE-330"]
+
+  - id: "CWE-1395"
+    name: "Dependency on Vulnerable Third-Party Component"
+    description: "The product has a dependency on a third-party component that contains one or more known vulnerabilities, exposing the product to the same risks."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Application depending on Log4j version with Log4Shell vulnerability"
+      - "Using OpenSSL version affected by Heartbleed"
+      - "Including vulnerable version of Spring Framework"
+    mitigations:
+      - "Implement software composition analysis in CI/CD pipeline"
+      - "Maintain a software bill of materials (SBOM)"
+      - "Establish automated alerting for new vulnerabilities in dependencies"
+      - "Define and enforce maximum acceptable vulnerability severity and age"
+    related_cwes: ["CWE-1035", "CWE-1036", "CWE-1104"]

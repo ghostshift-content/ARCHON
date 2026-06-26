@@ -1,0 +1,522 @@
+remediations:
+  - vulnerability: Broken Object Level Authorization (BOLA / IDOR)
+    description: >
+      BOLA (also known as Insecure Direct Object Reference or IDOR) occurs when
+      an application exposes internal object identifiers (database IDs, filenames)
+      and fails to verify that the authenticated user is authorized to access the
+      requested object. Attackers can enumerate or guess IDs to access other
+      users' data, modify records, or delete resources they do not own.
+    fix: >
+      Implement object-level authorization checks on every data access. Verify
+      that the authenticated user owns or has explicit permission to the requested
+      resource. Use UUIDs instead of sequential IDs to reduce enumeration risk
+      (but do not rely on this alone). Centralize authorization logic for
+      consistency.
+    severity: high
+    cwe_ids:
+      - CWE-639
+      - CWE-284
+    code_examples:
+      - language: python
+        description: "Django view with object-level permission check"
+        code: |
+          from django.http import JsonResponse, HttpResponseForbidden
+          from django.shortcuts import get_object_or_404
+          from .models import Document
+
+          def get_document(request, document_id):
+              document = get_object_or_404(Document, pk=document_id)
+
+              # CRITICAL: Verify the requesting user owns this document
+              if document.owner_id != request.user.id:
+                  return HttpResponseForbidden("Access denied")
+
+              return JsonResponse({
+                  'id': document.id,
+                  'title': document.title,
+                  'content': document.content
+              })
+
+          # Even better: filter querysets by the authenticated user
+          def list_documents(request):
+              # Only returns documents belonging to the current user
+              documents = Document.objects.filter(owner=request.user)
+              return JsonResponse({
+                  'documents': list(documents.values('id', 'title'))
+              })
+
+      - language: java
+        description: "Spring Boot service with authorization check"
+        code: |
+          @Service
+          public class DocumentService {
+              @Autowired
+              private DocumentRepository documentRepo;
+
+              public Document getDocument(Long documentId, Long userId) {
+                  Document doc = documentRepo.findById(documentId)
+                      .orElseThrow(() -> new NotFoundException("Not found"));
+
+                  // Enforce object-level authorization
+                  if (!doc.getOwnerId().equals(userId)) {
+                      throw new AccessDeniedException(
+                          "User " + userId + " cannot access document " + documentId
+                      );
+                  }
+                  return doc;
+              }
+
+              // Preferred: scope queries to the authenticated user
+              public List<Document> listDocuments(Long userId) {
+                  return documentRepo.findAllByOwnerId(userId);
+              }
+          }
+
+      - language: javascript
+        description: "Express middleware for resource ownership validation"
+        code: |
+          // Reusable ownership check middleware
+          function requireOwnership(model, paramName = 'id') {
+            return async (req, res, next) => {
+              const resource = await model.findById(req.params[paramName]);
+
+              if (!resource) {
+                return res.status(404).json({ error: 'Not found' });
+              }
+
+              // Check that the authenticated user owns this resource
+              if (resource.ownerId.toString() !== req.user.id.toString()) {
+                return res.status(403).json({ error: 'Access denied' });
+              }
+
+              req.resource = resource;
+              next();
+            };
+          }
+
+          // Usage:
+          app.get('/api/documents/:id',
+            authenticate,
+            requireOwnership(Document),
+            (req, res) => {
+              res.json(req.resource);
+            }
+          );
+    references:
+      - "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"
+      - "https://cwe.mitre.org/data/definitions/639.html"
+
+  - vulnerability: Broken Authentication
+    description: >
+      Broken authentication encompasses flaws that allow attackers to compromise
+      user accounts. This includes weak password policies, credential stuffing
+      vulnerabilities, missing brute-force protection, insecure password storage,
+      and improper session management.
+    fix: >
+      Enforce strong password policies. Use bcrypt/scrypt/argon2 for hashing.
+      Implement account lockout or progressive delays. Require multi-factor
+      authentication for sensitive operations. Use secure session management
+      with proper timeouts.
+    severity: critical
+    cwe_ids:
+      - CWE-287
+      - CWE-307
+      - CWE-521
+    code_examples:
+      - language: python
+        description: "Secure password hashing with argon2 and brute-force protection"
+        code: |
+          import argon2
+          from datetime import datetime, timedelta
+          from collections import defaultdict
+
+          hasher = argon2.PasswordHasher(
+              time_cost=3,        # iterations
+              memory_cost=65536,  # 64 MB
+              parallelism=4
+          )
+
+          # Simple in-memory rate limiter (use Redis in production)
+          login_attempts = defaultdict(list)
+          MAX_ATTEMPTS = 5
+          LOCKOUT_MINUTES = 15
+
+          def hash_password(plain_password):
+              return hasher.hash(plain_password)
+
+          def verify_password(stored_hash, plain_password):
+              try:
+                  return hasher.verify(stored_hash, plain_password)
+              except argon2.exceptions.VerifyMismatchError:
+                  return False
+
+          def is_locked_out(username):
+              attempts = login_attempts[username]
+              cutoff = datetime.utcnow() - timedelta(minutes=LOCKOUT_MINUTES)
+              recent = [t for t in attempts if t > cutoff]
+              login_attempts[username] = recent
+              return len(recent) >= MAX_ATTEMPTS
+
+          def login(username, password):
+              if is_locked_out(username):
+                  raise Exception("Account temporarily locked. Try again later.")
+
+              user = get_user_by_username(username)
+              if not user or not verify_password(user.password_hash, password):
+                  login_attempts[username].append(datetime.utcnow())
+                  raise Exception("Invalid credentials")
+
+              login_attempts[username].clear()
+              return create_session(user)
+
+      - language: java
+        description: "Spring Security with BCrypt and account lockout"
+        code: |
+          import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+          import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+
+          @Configuration
+          @EnableWebSecurity
+          public class SecurityConfig {
+
+              @Bean
+              public BCryptPasswordEncoder passwordEncoder() {
+                  // Strength 12 = 2^12 rounds (good balance of speed/security)
+                  return new BCryptPasswordEncoder(12);
+              }
+
+              @Bean
+              public SecurityFilterChain filterChain(HttpSecurity http)
+                      throws Exception {
+                  http
+                      .formLogin(form -> form
+                          .loginPage("/login")
+                          .failureHandler(new CustomAuthFailureHandler())
+                      )
+                      .sessionManagement(session -> session
+                          .maximumSessions(1)
+                          .maxSessionsPreventsLogin(true)
+                      );
+                  return http.build();
+              }
+          }
+
+          // Custom failure handler with lockout logic
+          @Component
+          public class CustomAuthFailureHandler
+                  implements AuthenticationFailureHandler {
+              @Autowired
+              private LoginAttemptService loginAttemptService;
+
+              @Override
+              public void onAuthenticationFailure(HttpServletRequest request,
+                      HttpServletResponse response,
+                      AuthenticationException exception) throws IOException {
+                  String username = request.getParameter("username");
+                  loginAttemptService.recordFailure(username);
+
+                  if (loginAttemptService.isBlocked(username)) {
+                      response.sendRedirect("/login?locked");
+                  } else {
+                      response.sendRedirect("/login?error");
+                  }
+              }
+          }
+
+      - language: javascript
+        description: "Express authentication with bcrypt and rate limiting"
+        code: |
+          const bcrypt = require('bcrypt');
+          const rateLimit = require('express-rate-limit');
+
+          const SALT_ROUNDS = 12;
+
+          // Rate limit login attempts per IP
+          const loginLimiter = rateLimit({
+            windowMs: 15 * 60 * 1000,  // 15 minutes
+            max: 5,                     // 5 attempts per window
+            message: { error: 'Too many login attempts. Try again later.' },
+            standardHeaders: true,
+            legacyHeaders: false,
+          });
+
+          async function registerUser(username, password) {
+            // Enforce password policy
+            if (password.length < 12) {
+              throw new Error('Password must be at least 12 characters');
+            }
+            const hash = await bcrypt.hash(password, SALT_ROUNDS);
+            await db.users.create({ username, passwordHash: hash });
+          }
+
+          app.post('/api/login', loginLimiter, async (req, res) => {
+            const { username, password } = req.body;
+            const user = await db.users.findByUsername(username);
+
+            if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+              // Use generic message - don't reveal if user exists
+              return res.status(401).json({ error: 'Invalid credentials' });
+            }
+
+            // Regenerate session to prevent fixation
+            req.session.regenerate((err) => {
+              req.session.userId = user.id;
+              res.json({ message: 'Login successful' });
+            });
+          });
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/287.html"
+
+  - vulnerability: JWT Security Misconfiguration
+    description: >
+      JSON Web Token (JWT) vulnerabilities include using the 'none' algorithm,
+      weak signing keys, accepting expired tokens, symmetric keys vulnerable to
+      brute-force, missing audience/issuer validation, and storing sensitive data
+      in unencrypted payloads.
+    fix: >
+      Use RS256 or ES256 (asymmetric) for signing. Explicitly set and validate
+      the algorithm. Enforce short token expiry (15 minutes for access tokens).
+      Validate issuer, audience, and expiration claims. Never store sensitive
+      data in JWT payloads. Use refresh token rotation for long sessions.
+    severity: high
+    cwe_ids:
+      - CWE-347
+      - CWE-345
+    code_examples:
+      - language: python
+        description: "Secure JWT creation and validation with PyJWT"
+        code: |
+          import jwt
+          import datetime
+          from cryptography.hazmat.primitives import serialization
+
+          # Load RSA keys (generated with: openssl genrsa -out private.pem 2048)
+          with open('private.pem', 'rb') as f:
+              PRIVATE_KEY = serialization.load_pem_private_key(f.read(), password=None)
+          with open('public.pem', 'rb') as f:
+              PUBLIC_KEY = serialization.load_pem_public_key(f.read())
+
+          def create_access_token(user_id, roles):
+              now = datetime.datetime.utcnow()
+              payload = {
+                  'sub': str(user_id),
+                  'roles': roles,
+                  'iat': now,
+                  'exp': now + datetime.timedelta(minutes=15),  # Short expiry
+                  'iss': 'myapp.example.com',
+                  'aud': 'myapp-api',
+              }
+              return jwt.encode(payload, PRIVATE_KEY, algorithm='RS256')
+
+          def verify_token(token):
+              try:
+                  payload = jwt.decode(
+                      token,
+                      PUBLIC_KEY,
+                      algorithms=['RS256'],          # Explicit algorithm list
+                      issuer='myapp.example.com',    # Validate issuer
+                      audience='myapp-api',          # Validate audience
+                      options={
+                          'require': ['exp', 'iss', 'aud', 'sub'],
+                          'verify_exp': True,
+                      }
+                  )
+                  return payload
+              except jwt.ExpiredSignatureError:
+                  raise AuthError("Token has expired")
+              except jwt.InvalidTokenError as e:
+                  raise AuthError(f"Invalid token: {e}")
+
+      - language: java
+        description: "JWT validation with jjwt and RSA"
+        code: |
+          import io.jsonwebtoken.*;
+          import io.jsonwebtoken.security.Keys;
+          import java.security.*;
+          import java.time.Instant;
+          import java.util.Date;
+
+          public class JwtService {
+              private final PrivateKey privateKey;
+              private final PublicKey publicKey;
+
+              public String createToken(String userId) {
+                  Instant now = Instant.now();
+                  return Jwts.builder()
+                      .subject(userId)
+                      .issuer("myapp.example.com")
+                      .audience().add("myapp-api").and()
+                      .issuedAt(Date.from(now))
+                      .expiration(Date.from(now.plusSeconds(900))) // 15 min
+                      .signWith(privateKey, Jwts.SIG.RS256)
+                      .compact();
+              }
+
+              public Jws<Claims> verifyToken(String token) {
+                  return Jwts.parser()
+                      .verifyWith(publicKey)
+                      .requireIssuer("myapp.example.com")
+                      .requireAudience("myapp-api")
+                      .build()
+                      .parseSignedClaims(token);
+                  // Throws JwtException if invalid, expired, wrong algo, etc.
+              }
+          }
+
+      - language: javascript
+        description: "Node.js JWT with jsonwebtoken and RS256"
+        code: |
+          const jwt = require('jsonwebtoken');
+          const fs = require('fs');
+
+          const PRIVATE_KEY = fs.readFileSync('private.pem');
+          const PUBLIC_KEY = fs.readFileSync('public.pem');
+
+          function createAccessToken(userId, roles) {
+            return jwt.sign(
+              { sub: userId, roles },
+              PRIVATE_KEY,
+              {
+                algorithm: 'RS256',
+                expiresIn: '15m',
+                issuer: 'myapp.example.com',
+                audience: 'myapp-api',
+              }
+            );
+          }
+
+          function verifyToken(token) {
+            return jwt.verify(token, PUBLIC_KEY, {
+              algorithms: ['RS256'],           // ONLY allow RS256
+              issuer: 'myapp.example.com',
+              audience: 'myapp-api',
+              clockTolerance: 30,              // 30 sec clock skew tolerance
+            });
+          }
+
+          // Express middleware
+          function authMiddleware(req, res, next) {
+            const header = req.headers.authorization;
+            if (!header?.startsWith('Bearer ')) {
+              return res.status(401).json({ error: 'Missing token' });
+            }
+            try {
+              req.user = verifyToken(header.slice(7));
+              next();
+            } catch (err) {
+              return res.status(401).json({ error: 'Invalid token' });
+            }
+          }
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/347.html"
+      - "https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/"
+
+  - vulnerability: Session Fixation
+    description: >
+      Session fixation occurs when an attacker sets or predicts a user's session
+      identifier before authentication. After the victim logs in, the attacker
+      uses the pre-set session ID to hijack the authenticated session. This is
+      possible when the application does not regenerate session IDs after login.
+    fix: >
+      Always regenerate the session ID after successful authentication. Invalidate
+      old sessions on login. Set proper cookie attributes (HttpOnly, Secure,
+      SameSite). Implement absolute session timeouts to limit session lifetime.
+    severity: high
+    cwe_ids:
+      - CWE-384
+    code_examples:
+      - language: python
+        description: "Django session regeneration on login"
+        code: |
+          from django.contrib.auth import authenticate, login
+          from django.http import JsonResponse
+
+          def login_view(request):
+              username = request.POST.get('username')
+              password = request.POST.get('password')
+              user = authenticate(request, username=username, password=password)
+
+              if user is not None:
+                  # Django's login() automatically calls request.session.cycle_key()
+                  # which regenerates the session ID, preventing fixation
+                  login(request, user)
+                  return JsonResponse({'message': 'Login successful'})
+              else:
+                  return JsonResponse({'error': 'Invalid credentials'}, status=401)
+
+          # settings.py - secure session configuration
+          SESSION_COOKIE_HTTPONLY = True
+          SESSION_COOKIE_SECURE = True
+          SESSION_COOKIE_SAMESITE = 'Lax'
+          SESSION_COOKIE_AGE = 3600          # 1 hour
+          SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+      - language: java
+        description: "Spring Security session fixation protection"
+        code: |
+          @Configuration
+          @EnableWebSecurity
+          public class SessionSecurityConfig {
+
+              @Bean
+              public SecurityFilterChain filterChain(HttpSecurity http)
+                      throws Exception {
+                  http
+                      .sessionManagement(session -> session
+                          // Migrate session: create new ID, copy attributes
+                          .sessionFixation().migrateSession()
+                          // Limit concurrent sessions
+                          .maximumSessions(1)
+                          .maxSessionsPreventsLogin(false)
+                      )
+                      .logout(logout -> logout
+                          .invalidateHttpSession(true)
+                          .deleteCookies("JSESSIONID")
+                      );
+                  return http.build();
+              }
+          }
+
+      - language: javascript
+        description: "Express session regeneration after login"
+        code: |
+          app.post('/api/login', async (req, res) => {
+            const { username, password } = req.body;
+            const user = await authenticateUser(username, password);
+
+            if (!user) {
+              return res.status(401).json({ error: 'Invalid credentials' });
+            }
+
+            // Regenerate session ID to prevent session fixation
+            const oldSession = { ...req.session };
+            req.session.regenerate((err) => {
+              if (err) {
+                return res.status(500).json({ error: 'Session error' });
+              }
+
+              // Restore any non-auth session data if needed
+              req.session.userId = user.id;
+              req.session.roles = user.roles;
+
+              req.session.save((err) => {
+                if (err) {
+                  return res.status(500).json({ error: 'Session save error' });
+                }
+                res.json({ message: 'Login successful' });
+              });
+            });
+          });
+
+          // On logout, destroy the session entirely
+          app.post('/api/logout', (req, res) => {
+            req.session.destroy((err) => {
+              res.clearCookie('connect.sid');
+              res.json({ message: 'Logged out' });
+            });
+          });
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/384.html"

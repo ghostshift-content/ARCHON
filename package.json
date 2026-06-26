@@ -1,0 +1,41 @@
+{
+  "name": "archon",
+  "version": "1.0.0",
+  "description": "ARCHON — autonomous AI web-application penetration testing. White-box (source) + black-box (live) in one engagement, with independent verification, operator triage, and a merged report.",
+  "main": "event-bus.js",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "setup": "node scripts/setup-local.js",
+    "start": "node event-bus.js",
+    "dashboard": "node scripts/dashboard.js",
+    "verify": "node verify-framework.js",
+    "test": "node test/run-all.js",
+    "test:ui": "bash scripts/e2e.sh",
+    "test:bun": "bun test"
+  },
+  "keywords": [
+    "pentest",
+    "penetration-testing",
+    "appsec",
+    "security",
+    "white-box",
+    "black-box",
+    "code-review",
+    "ai-agents",
+    "llm",
+    "claude"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.162",
+    "@anthropic-ai/sdk": "^0.88.0",
+    "acorn": "^8.16.0",
+    "playwright": "^1.59.1"
+  }
+}

@@ -1,0 +1,174 @@
+# OWASP Top 10 Web Application Security Risks 2021
+# Reference: https://owasp.org/Top10/
+# The definitive awareness document for web application security
+
+items:
+  - id: "A01:2021"
+    name: "Broken Access Control"
+    description: "Access control enforces policy such that users cannot act outside of their intended permissions. Failures typically lead to unauthorized information disclosure, modification, or destruction of data, or performing business functions outside the user's limits. Moving up from the fifth position, 94% of applications were tested for some form of broken access control."
+    severity: "critical"
+    category: "Access Control"
+    examples:
+      - "Bypassing access control checks by modifying the URL or API request"
+      - "Allowing viewing or editing of someone else's account by providing its unique identifier (IDOR)"
+      - "Accessing API endpoints with missing access controls for POST, PUT, and DELETE"
+      - "Elevation of privilege by acting as a user without being logged in or acting as an admin when logged in as a regular user"
+    mitigations:
+      - "Implement access control mechanisms once and reuse them throughout the application"
+      - "Deny by default except for public resources"
+      - "Log access control failures and alert administrators when appropriate"
+      - "Rate limit API and controller access to minimize the harm from automated attack tooling"
+    related_cwes: ["CWE-200", "CWE-284", "CWE-285", "CWE-639", "CWE-862", "CWE-863"]
+
+  - id: "A02:2021"
+    name: "Cryptographic Failures"
+    description: "Shifting up one position to number two, previously known as Sensitive Data Exposure, this category focuses on failures related to cryptography which often lead to sensitive data exposure. This includes the use of weak cryptographic algorithms, insufficient key management, and transmission of data in cleartext."
+    severity: "critical"
+    category: "Cryptography"
+    examples:
+      - "Transmitting sensitive data in cleartext over HTTP, SMTP, or FTP"
+      - "Using old or weak cryptographic algorithms such as MD5, SHA-1, or DES"
+      - "Using default or hard-coded cryptographic keys or reusing weak keys"
+      - "Not enforcing encryption through proper directives like HSTS headers"
+    mitigations:
+      - "Classify data processed, stored, or transmitted by the application and identify which is sensitive"
+      - "Apply controls as per the classification and do not store sensitive data unnecessarily"
+      - "Encrypt all data in transit with secure protocols such as TLS 1.2+ with PFS ciphers"
+      - "Use strong adaptive and salted hashing functions for password storage (Argon2, bcrypt, scrypt)"
+    related_cwes: ["CWE-261", "CWE-296", "CWE-310", "CWE-319", "CWE-326", "CWE-327"]
+
+  - id: "A03:2021"
+    name: "Injection"
+    description: "An application is vulnerable to injection when user-supplied data is not validated, filtered, or sanitized, dynamic queries or non-parameterized calls without context-aware escaping are used, or hostile data is used within ORM search parameters to extract additional sensitive records. Injection has slid down from the first position."
+    severity: "critical"
+    category: "Injection"
+    examples:
+      - "SQL injection via unsanitized user input in database queries"
+      - "OS command injection through unfiltered parameters passed to system calls"
+      - "LDAP injection via unescaped special characters in directory queries"
+      - "Cross-site scripting through unencoded user input reflected in web pages"
+    mitigations:
+      - "Use a safe API which avoids the use of the interpreter entirely or provides a parameterized interface"
+      - "Use positive server-side input validation (allowlisting)"
+      - "Escape special characters for any residual dynamic queries using the specific escape syntax"
+      - "Use LIMIT and other SQL controls within queries to prevent mass disclosure of records"
+    related_cwes: ["CWE-20", "CWE-74", "CWE-75", "CWE-77", "CWE-78", "CWE-79", "CWE-89"]
+
+  - id: "A04:2021"
+    name: "Insecure Design"
+    description: "A new category for 2021 focusing on risks related to design and architectural flaws, calling for increased use of threat modeling, secure design patterns, and reference architectures. Insecure design cannot be fixed by a perfect implementation as by definition the needed security controls were never created to defend against specific attacks."
+    severity: "high"
+    category: "Security Architecture"
+    examples:
+      - "A credential recovery flow that relies on questions and answers which cannot be trusted as evidence of identity"
+      - "A cinema website that allows group discount purchasing without requiring an anti-bot mechanism"
+      - "A retail chain e-commerce site without protection against bots for scalping high-demand items"
+      - "Missing rate limiting on financially sensitive operations like money transfers"
+    mitigations:
+      - "Establish and use a secure development lifecycle with AppSec professionals to evaluate security and privacy-related controls"
+      - "Use threat modeling for critical authentication, access control, business logic, and key flows"
+      - "Integrate security language and controls into user stories"
+      - "Write unit and integration tests to validate that all critical flows are resistant to the threat model"
+    related_cwes: ["CWE-73", "CWE-183", "CWE-209", "CWE-256", "CWE-501", "CWE-522"]
+
+  - id: "A05:2021"
+    name: "Security Misconfiguration"
+    description: "Moving up from number six, 90% of applications were tested for some form of misconfiguration. With more shifts into highly configurable software, it is not surprising to see this category rise. This includes missing security hardening, improperly configured permissions, unnecessary features enabled, and default accounts with unchanged passwords."
+    severity: "high"
+    category: "Security Configuration"
+    examples:
+      - "Unnecessary features are enabled or installed such as ports, services, pages, accounts, or privileges"
+      - "Default accounts and their passwords are still enabled and unchanged"
+      - "Error handling reveals stack traces or overly informative error messages to users"
+      - "Security headers or directives are not sent by the server or are not set to secure values"
+    mitigations:
+      - "Implement a repeatable hardening process that makes it fast and easy to deploy secure environments"
+      - "Use a minimal platform without unnecessary features, components, or documentation"
+      - "Review and update configurations appropriate to all security notes, updates, and patches"
+      - "Implement automated processes to verify the effectiveness of configurations in all environments"
+    related_cwes: ["CWE-2", "CWE-11", "CWE-13", "CWE-15", "CWE-16", "CWE-260", "CWE-315"]
+
+  - id: "A06:2021"
+    name: "Vulnerable and Outdated Components"
+    description: "This category moved up from number nine in 2017 and is a known issue that is difficult to test and assess risk for. It is the only category without any CVEs mapped to the included CWEs, covering the use of components with known vulnerabilities. You are likely vulnerable if you do not know the versions of all components you use."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Using components with known vulnerabilities identified in CVE databases"
+      - "Running software that is unsupported or out of date including the OS, web/application server, DBMS, APIs, and libraries"
+      - "Not scanning for vulnerabilities regularly and not subscribing to security bulletins"
+      - "Not fixing or upgrading the underlying platform, frameworks, and dependencies in a timely fashion"
+    mitigations:
+      - "Remove unused dependencies, unnecessary features, components, files, and documentation"
+      - "Continuously inventory the versions of both client-side and server-side components and their dependencies"
+      - "Only obtain components from official sources over secure links and prefer signed packages"
+      - "Monitor for libraries and components that are unmaintained or do not create security patches for older versions"
+    related_cwes: ["CWE-1035", "CWE-1036", "CWE-1104"]
+
+  - id: "A07:2021"
+    name: "Identification and Authentication Failures"
+    description: "Previously known as Broken Authentication, this category slid down from the second position and now includes CWEs related to identification failures. Confirmation of the user's identity, authentication, and session management is critical to protect against authentication-related attacks."
+    severity: "critical"
+    category: "Authentication"
+    examples:
+      - "Permitting brute-force or other automated attacks on authentication endpoints"
+      - "Permitting default, weak, or well-known passwords such as Password1 or admin/admin"
+      - "Using weak or ineffective credential recovery and forgot-password processes"
+      - "Using plain text, encrypted, or weakly hashed password data stores"
+    mitigations:
+      - "Implement multi-factor authentication to prevent automated credential stuffing, brute force, and stolen credential reuse attacks"
+      - "Do not ship or deploy with any default credentials, particularly for admin users"
+      - "Implement weak password checks against a list of the top 10,000 worst passwords"
+      - "Limit or increasingly delay failed login attempts and log all failures for alerting"
+    related_cwes: ["CWE-255", "CWE-259", "CWE-287", "CWE-288", "CWE-306", "CWE-307"]
+
+  - id: "A08:2021"
+    name: "Software and Data Integrity Failures"
+    description: "A new category for 2021, focusing on making assumptions related to software updates, critical data, and CI/CD pipelines without verifying integrity. This includes insecure deserialization and using software or data from untrusted sources without integrity verification."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Application relying upon plugins, libraries, or modules from untrusted sources, repositories, or CDNs"
+      - "Insecure CI/CD pipeline introducing potential for unauthorized access or malicious code insertion"
+      - "Auto-update functionality downloading updates without sufficient integrity verification"
+      - "Objects or data encoded or serialized into a structure that an attacker can see and modify being vulnerable to insecure deserialization"
+    mitigations:
+      - "Use digital signatures or similar mechanisms to verify the software or data is from the expected source and has not been altered"
+      - "Ensure libraries and dependencies are consuming trusted repositories"
+      - "Use a software supply chain security tool such as OWASP Dependency-Check to verify components"
+      - "Ensure that there is a review process for code and configuration changes to minimize the chance of malicious code"
+    related_cwes: ["CWE-345", "CWE-353", "CWE-426", "CWE-494", "CWE-502", "CWE-565"]
+
+  - id: "A09:2021"
+    name: "Security Logging and Monitoring Failures"
+    description: "This category was expanded from the 2017 edition to include more types of failures. Logging and monitoring can be challenging to test, often relying on interviews or asking if attacks were detected during a penetration test. Without logging and monitoring, breaches cannot be detected."
+    severity: "medium"
+    category: "Detection"
+    examples:
+      - "Auditable events such as logins, failed logins, and high-value transactions are not logged"
+      - "Warnings and errors generate no, inadequate, or unclear log messages"
+      - "Logs of applications and APIs are not monitored for suspicious activity"
+      - "Penetration testing and scans by DAST tools do not trigger alerts"
+    mitigations:
+      - "Ensure all login, access control, and server-side input validation failures can be logged with sufficient context"
+      - "Ensure logs are generated in a format that log management solutions can easily consume"
+      - "Establish or adopt an incident response and recovery plan"
+      - "Ensure high-value transactions have an audit trail with integrity controls to prevent tampering or deletion"
+    related_cwes: ["CWE-117", "CWE-223", "CWE-532", "CWE-778"]
+
+  - id: "A10:2021"
+    name: "Server-Side Request Forgery (SSRF)"
+    description: "A new category added by the Top 10 community survey. SSRF flaws occur whenever a web application fetches a remote resource without validating the user-supplied URL. It allows an attacker to coerce the application to send a crafted request to an unexpected destination, even when protected by a firewall or VPN."
+    severity: "high"
+    category: "Injection"
+    examples:
+      - "Fetching internal metadata from cloud provider endpoints (e.g., http://169.254.169.254/)"
+      - "Scanning internal ports and services through server-side URL requests"
+      - "Accessing internal REST APIs or services that are not exposed to the internet"
+      - "Reading local files through file:// protocol in URL parameters"
+    mitigations:
+      - "Sanitize and validate all client-supplied input data including URLs"
+      - "Enforce URL schema, port, and destination with a positive allowlist"
+      - "Do not send raw responses to clients from server-side requests"
+      - "Disable HTTP redirections and use network-layer segmentation to limit SSRF impact"
+    related_cwes: ["CWE-918", "CWE-20", "CWE-441"]

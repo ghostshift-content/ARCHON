@@ -1,0 +1,44 @@
+[
+  {
+    "name": "verify_open_ports",
+    "description": "Open port claims verified with actual nmap/nc probes",
+    "expectation": "nmap -sV or nc -v executed for each claimed open port",
+    "weight": 2
+  },
+  {
+    "name": "verify_service_versions",
+    "description": "Service version claims verified with banner grabbing",
+    "expectation": "Actual banner/version string shown from probe, not assumed",
+    "weight": 2
+  },
+  {
+    "name": "verify_default_creds",
+    "description": "Default credential claims verified with actual login attempt",
+    "expectation": "Actual authentication attempt shown with success/failure output",
+    "weight": 2
+  },
+  {
+    "name": "verify_ssl_issues",
+    "description": "SSL/TLS claims verified with openssl or nmap scripts",
+    "expectation": "openssl s_client or nmap --script ssl-enum-ciphers output shown",
+    "weight": 1
+  },
+  {
+    "name": "verify_protocol_vulns",
+    "description": "Protocol vulnerability claims verified with specific probes",
+    "expectation": "Appropriate protocol tool used (smbclient, snmpwalk, etc.) with output",
+    "weight": 1
+  },
+  {
+    "name": "false_positive_identification",
+    "description": "Marks unverifiable claims as FALSE_POSITIVE",
+    "expectation": "Findings that cannot be independently reproduced are marked FALSE_POSITIVE with reason",
+    "weight": 1
+  },
+  {
+    "name": "verdict_present",
+    "description": "Final VERDICT and PASS_RATE present",
+    "expectation": "Output ends with VERDICT: and PASS_RATE: lines",
+    "weight": 1
+  }
+]

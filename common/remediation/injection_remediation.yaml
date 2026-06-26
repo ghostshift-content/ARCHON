@@ -1,0 +1,419 @@
+remediations:
+  - vulnerability: SQL Injection
+    description: >
+      SQL injection occurs when untrusted data is sent to an interpreter as part
+      of a command or query. An attacker can use crafted input to alter query logic,
+      bypass authentication, extract sensitive data, or modify/delete database records.
+    fix: >
+      Use parameterized queries (prepared statements) or ORM frameworks that
+      automatically handle escaping. Never concatenate user input directly into
+      SQL strings. Apply least-privilege database permissions and validate all
+      input against strict allowlists where possible.
+    severity: critical
+    cwe_ids:
+      - CWE-89
+      - CWE-564
+    code_examples:
+      - language: python
+        description: "Parameterized queries with psycopg2"
+        code: |
+          import psycopg2
+
+          def get_user(conn, user_id):
+              # SAFE: parameterized query - the driver handles escaping
+              cursor = conn.cursor()
+              cursor.execute(
+                  "SELECT id, username, email FROM users WHERE id = %s",
+                  (user_id,)
+              )
+              return cursor.fetchone()
+
+          # UNSAFE - never do this:
+          # cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
+
+      - language: python
+        description: "ORM usage with SQLAlchemy"
+        code: |
+          from sqlalchemy import select
+          from models import User
+
+          def get_user_by_email(session, email):
+              # SAFE: SQLAlchemy handles parameterization internally
+              stmt = select(User).where(User.email == email)
+              return session.execute(stmt).scalar_one_or_none()
+
+      - language: java
+        description: "Parameterized queries with JDBC PreparedStatement"
+        code: |
+          public User getUser(Connection conn, String userId) throws SQLException {
+              // SAFE: PreparedStatement with parameter binding
+              String sql = "SELECT id, username, email FROM users WHERE id = ?";
+              try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                  pstmt.setString(1, userId);
+                  try (ResultSet rs = pstmt.executeQuery()) {
+                      if (rs.next()) {
+                          return new User(rs.getString("id"),
+                                          rs.getString("username"),
+                                          rs.getString("email"));
+                      }
+                  }
+              }
+              return null;
+          }
+
+      - language: javascript
+        description: "Parameterized queries with node-postgres"
+        code: |
+          const { Pool } = require('pg');
+          const pool = new Pool();
+
+          async function getUser(userId) {
+            // SAFE: parameterized query with $1 placeholder
+            const result = await pool.query(
+              'SELECT id, username, email FROM users WHERE id = $1',
+              [userId]
+            );
+            return result.rows[0];
+          }
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/89.html"
+      - "https://portswigger.net/web-security/sql-injection"
+
+  - vulnerability: NoSQL Injection
+    description: >
+      NoSQL injection targets NoSQL databases (MongoDB, CouchDB, etc.) by
+      manipulating query operators through unsanitized user input. Attackers can
+      bypass authentication, extract data, or cause denial of service.
+    fix: >
+      Validate and sanitize all input. Reject or strip MongoDB query operators
+      ($gt, $ne, $where, etc.) from user-supplied data. Use schema validation
+      libraries and type-check all inputs before passing them to database drivers.
+    severity: high
+    cwe_ids:
+      - CWE-943
+      - CWE-89
+    code_examples:
+      - language: python
+        description: "Input sanitization for MongoDB with pymongo"
+        code: |
+          import re
+
+          MONGO_OPERATORS = re.compile(r'^\$')
+
+          def sanitize_query_value(value):
+              """Strip MongoDB operators from user input."""
+              if isinstance(value, dict):
+                  return {
+                      k: sanitize_query_value(v)
+                      for k, v in value.items()
+                      if not MONGO_OPERATORS.match(str(k))
+                  }
+              if isinstance(value, list):
+                  return [sanitize_query_value(item) for item in value]
+              return value
+
+          def find_user(db, username):
+              # Ensure username is a plain string, not an operator dict
+              if not isinstance(username, str):
+                  raise ValueError("username must be a string")
+              return db.users.find_one({"username": username})
+
+      - language: java
+        description: "Type-safe queries with MongoDB Java driver"
+        code: |
+          import com.mongodb.client.MongoCollection;
+          import static com.mongodb.client.model.Filters.eq;
+          import org.bson.Document;
+
+          public Document findUser(MongoCollection<Document> collection,
+                                   String username) {
+              // SAFE: Filters.eq uses typed BSON encoding, not string concat
+              if (username == null || username.startsWith("$")) {
+                  throw new IllegalArgumentException("Invalid username");
+              }
+              return collection.find(eq("username", username)).first();
+          }
+
+      - language: javascript
+        description: "Express middleware to strip MongoDB operators"
+        code: |
+          function sanitizeInput(obj) {
+            if (typeof obj !== 'object' || obj === null) return obj;
+            const clean = {};
+            for (const [key, value] of Object.entries(obj)) {
+              // Reject any key starting with $ (MongoDB operator)
+              if (key.startsWith('$')) continue;
+              clean[key] = typeof value === 'object'
+                ? sanitizeInput(value)
+                : value;
+            }
+            return clean;
+          }
+
+          // Express middleware
+          function noSQLSanitizer(req, res, next) {
+            if (req.body)  req.body  = sanitizeInput(req.body);
+            if (req.query) req.query = sanitizeInput(req.query);
+            next();
+          }
+
+          app.use(noSQLSanitizer);
+    references:
+      - "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/05.6-Testing_for_NoSQL_Injection"
+      - "https://cwe.mitre.org/data/definitions/943.html"
+
+  - vulnerability: Command Injection
+    description: >
+      Command injection occurs when an application passes untrusted input to a
+      system shell. Attackers can chain arbitrary commands using metacharacters
+      such as ;, |, &&, or $() to execute code on the host system.
+    fix: >
+      Avoid calling system commands with user input entirely. If shell interaction
+      is unavoidable, never use shell=True, use strict allowlists for permitted
+      values, and escape arguments with shlex.quote (Python) or equivalent.
+    severity: critical
+    cwe_ids:
+      - CWE-78
+      - CWE-77
+    code_examples:
+      - language: python
+        description: "Safe subprocess usage and shlex.quote"
+        code: |
+          import subprocess
+          import shlex
+
+          def ping_host(host):
+              # Validate against an allowlist of characters
+              if not host.replace('.', '').replace(':', '').isalnum():
+                  raise ValueError("Invalid hostname")
+
+              # SAFE: pass arguments as a list, never use shell=True
+              result = subprocess.run(
+                  ["ping", "-c", "4", host],
+                  capture_output=True, text=True, timeout=10
+              )
+              return result.stdout
+
+          # If you absolutely must use a shell string (avoid this):
+          def safe_shell_cmd(filename):
+              safe_name = shlex.quote(filename)
+              subprocess.run(f"wc -l {safe_name}", shell=True)
+
+      - language: java
+        description: "ProcessBuilder with argument list (no shell interpretation)"
+        code: |
+          import java.io.*;
+          import java.util.regex.Pattern;
+
+          public class SafeCommand {
+              private static final Pattern HOSTNAME_RE =
+                  Pattern.compile("^[a-zA-Z0-9.\\-]+$");
+
+              public String pingHost(String host) throws Exception {
+                  if (!HOSTNAME_RE.matcher(host).matches()) {
+                      throw new IllegalArgumentException("Invalid hostname");
+                  }
+                  // SAFE: ProcessBuilder does not invoke a shell
+                  ProcessBuilder pb = new ProcessBuilder("ping", "-c", "4", host);
+                  pb.redirectErrorStream(true);
+                  Process proc = pb.start();
+                  try (BufferedReader reader = new BufferedReader(
+                          new InputStreamReader(proc.getInputStream()))) {
+                      return reader.lines().reduce("", (a, b) -> a + "\n" + b);
+                  }
+              }
+          }
+
+      - language: javascript
+        description: "execFile instead of exec in Node.js"
+        code: |
+          const { execFile } = require('child_process');
+
+          function pingHost(host) {
+            // Validate input
+            if (!/^[a-zA-Z0-9.\-]+$/.test(host)) {
+              throw new Error('Invalid hostname');
+            }
+            return new Promise((resolve, reject) => {
+              // SAFE: execFile does NOT spawn a shell
+              execFile('ping', ['-c', '4', host], (err, stdout) => {
+                if (err) return reject(err);
+                resolve(stdout);
+              });
+            });
+          }
+
+          // UNSAFE - never do this:
+          // exec(`ping -c 4 ${host}`)
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/78.html"
+
+  - vulnerability: LDAP Injection
+    description: >
+      LDAP injection occurs when user-supplied data is incorporated into LDAP
+      queries without proper escaping. Attackers can modify query logic to bypass
+      authentication, enumerate directory objects, or extract sensitive attributes.
+    fix: >
+      Escape all special LDAP characters in user input before inserting into
+      filters. Use parameterized LDAP filter construction APIs. Validate input
+      against strict patterns (e.g., alphanumeric usernames only).
+    severity: high
+    cwe_ids:
+      - CWE-90
+    code_examples:
+      - language: python
+        description: "LDAP input escaping with ldap3"
+        code: |
+          from ldap3.utils.conv import escape_filter_chars
+
+          def find_user(conn, username):
+              # Validate: only allow alphanumeric and limited chars
+              if not username.isalnum():
+                  raise ValueError("Username must be alphanumeric")
+
+              # Escape special LDAP filter characters: * ( ) \ NUL
+              safe_username = escape_filter_chars(username)
+              search_filter = f"(uid={safe_username})"
+
+              conn.search(
+                  search_base="ou=users,dc=example,dc=com",
+                  search_filter=search_filter,
+                  attributes=["cn", "mail"]
+              )
+              return conn.entries
+
+      - language: java
+        description: "Parameterized LDAP search with Spring LDAP"
+        code: |
+          import org.springframework.ldap.core.LdapTemplate;
+          import org.springframework.ldap.filter.EqualsFilter;
+          import org.springframework.ldap.query.LdapQueryBuilder;
+
+          public class UserRepository {
+              private final LdapTemplate ldapTemplate;
+
+              public List<User> findByUsername(String username) {
+                  // Validate input
+                  if (!username.matches("[a-zA-Z0-9_]+")) {
+                      throw new IllegalArgumentException("Invalid username");
+                  }
+                  // SAFE: EqualsFilter handles escaping automatically
+                  return ldapTemplate.search(
+                      LdapQueryBuilder.query()
+                          .base("ou=users")
+                          .filter(new EqualsFilter("uid", username)),
+                      new UserAttributeMapper()
+                  );
+              }
+          }
+
+      - language: javascript
+        description: "Manual LDAP filter escaping in Node.js"
+        code: |
+          function escapeLdapFilter(input) {
+            return input.replace(/[\\*()\\x00]/g, (ch) => {
+              return '\\' + ch.charCodeAt(0).toString(16).padStart(2, '0');
+            });
+          }
+
+          async function findUser(client, username) {
+            if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+              throw new Error('Invalid username');
+            }
+            const filter = `(uid=${escapeLdapFilter(username)})`;
+            const { searchEntries } = await client.search(
+              'ou=users,dc=example,dc=com',
+              { scope: 'sub', filter }
+            );
+            return searchEntries;
+          }
+    references:
+      - "https://cheatsheetseries.owasp.org/cheatsheets/LDAP_Injection_Prevention_Cheat_Sheet.html"
+      - "https://cwe.mitre.org/data/definitions/90.html"
+
+  - vulnerability: OGNL Injection
+    description: >
+      OGNL (Object-Graph Navigation Language) injection affects Java frameworks
+      that evaluate OGNL expressions from user input, notably Apache Struts.
+      Attackers can execute arbitrary Java code, access internal objects, and
+      achieve remote code execution.
+    fix: >
+      Disable dynamic method invocation in Struts. Upgrade to patched framework
+      versions. Validate all input strictly and never allow user data to reach
+      OGNL evaluation. Use a Web Application Firewall to block OGNL patterns.
+    severity: critical
+    cwe_ids:
+      - CWE-917
+      - CWE-94
+    code_examples:
+      - language: java
+        description: "Disable dynamic method invocation in Struts 2"
+        code: |
+          <!-- struts.xml - disable dangerous features -->
+          <struts>
+              <!-- Disable dynamic method invocation to prevent OGNL abuse -->
+              <constant name="struts.enable.DynamicMethodInvocation"
+                        value="false" />
+
+              <!-- Restrict OGNL access to only public methods -->
+              <constant name="struts.ognl.allowStaticMethodAccess"
+                        value="false" />
+
+              <!-- Exclude sensitive parameters from binding -->
+              <constant name="struts.excludedClasses"
+                        value="java.lang.Runtime,java.lang.ProcessBuilder" />
+          </struts>
+
+      - language: java
+        description: "Input validation interceptor to block OGNL patterns"
+        code: |
+          import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
+          import com.opensymphony.xwork2.ActionInvocation;
+          import java.util.regex.Pattern;
+
+          public class OgnlProtectionInterceptor extends AbstractInterceptor {
+              // Patterns that indicate OGNL injection attempts
+              private static final Pattern OGNL_PATTERN = Pattern.compile(
+                  "(%\\{|\\$\\{|#_memberAccess|@java\\.lang|" +
+                  "Runtime|ProcessBuilder|getClass\\(\\))",
+                  Pattern.CASE_INSENSITIVE
+              );
+
+              @Override
+              public String intercept(ActionInvocation invocation)
+                      throws Exception {
+                  var params = invocation.getInvocationContext()
+                                         .getParameters();
+                  for (var entry : params.entrySet()) {
+                      String key = entry.getKey();
+                      if (OGNL_PATTERN.matcher(key).find()) {
+                          throw new SecurityException(
+                              "Potentially malicious OGNL input detected"
+                          );
+                      }
+                  }
+                  return invocation.invoke();
+              }
+          }
+
+      - language: python
+        description: "WAF rule to detect OGNL injection patterns (ModSecurity)"
+        code: |
+          # ModSecurity rule to block common OGNL injection payloads
+          # Place in modsecurity.conf or a custom rules file
+
+          SecRule ARGS|ARGS_NAMES|REQUEST_BODY \
+              "(%\{|#_memberAccess|@java\.lang\.Runtime|ProcessBuilder)" \
+              "id:900001,\
+               phase:2,\
+               deny,\
+               status:403,\
+               log,\
+               msg:'OGNL injection attempt detected',\
+               severity:CRITICAL"
+    references:
+      - "https://cwe.mitre.org/data/definitions/917.html"
+      - "https://owasp.org/www-community/attacks/Expression_Language_Injection"
+      - "https://cwiki.apache.org/confluence/display/WW/S2-045"

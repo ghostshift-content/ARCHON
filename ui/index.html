@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARCHON — Offensive Operations Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%232563eb'/><text x='50' y='73' font-size='62' text-anchor='middle' fill='%23ffffff' font-family='sans-serif' font-weight='700'>&#923;</text></svg>">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="aurora"><i></i></div>
+  <div class="grain"></div>
+
+  <!-- shared svg gradient for progress rings -->
+  <svg width="0" height="0" style="position:absolute"><defs>
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f8bff"/><stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs></svg>
+
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">
+        <span class="mark">Λ</span>
+        <span class="name">ARCHON<small>Autonomous Research &amp; Code Hunting for Offensive Networks</small></span>
+      </div>
+      <div class="spacer"></div>
+      <span class="pill" id="daemonPill"><span class="dot"></span> <span id="daemonText">checking…</span></span>
+      <span class="meta" id="clock">—</span>
+    </div>
+
+    <nav class="nav">
+      <button data-view="overview" class="active">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Overview</button>
+      <button data-view="tasks">
+        <svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="4.5" cy="18" r="1.5"/></svg>
+        Tasks <span class="count" id="cTasks">0</span></button>
+      <button data-view="dispatch">
+        <svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+        New dispatch</button>
+      <button data-view="squads">
+        <svg viewBox="0 0 24 24"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 8l4 2.2v4.4L12 17l-4-2.4v-4.4L12 8z"/></svg>
+        Squads <span class="count" id="cSquads">0</span></button>
+      <button data-view="reports">
+        <svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5M9 13h7M9 17h7"/></svg>
+        Reports <span class="count" id="cReports">0</span></button>
+      <button data-view="activity">
+        <svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+        Activity</button>
+      <div class="sep"></div>
+      <div class="foot" id="footMeta">intel: …</div>
+    </nav>
+
+    <main class="main">
+      <section class="view active" id="view-overview">
+        <div class="view-head"><h1>Overview</h1><span class="sub" id="ovSub"></span></div>
+        <div class="stats" id="stats"></div>
+        <div class="grid cols-2">
+          <div class="card"><h3>Active &amp; recent tasks</h3><div id="ovTasks"></div></div>
+          <div class="card"><h3>Live activity</h3><div id="ovActivity"></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-tasks">
+        <div class="view-head"><h1>Tasks</h1><span class="sub">live status · phases · cost · model routing</span>
+          <div class="spacer"></div><button class="btn primary sm" data-view="dispatch"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg> New dispatch</button></div>
+        <div class="grid cols-2" id="taskList"></div>
+      </section>
+
+      <section class="view" id="view-dispatch">
+        <div class="view-head"><h1>New dispatch</h1><span class="sub">queue work to a squad — the daemon picks it up in seconds</span></div>
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="field"><label>Squad <span class="req">*</span></label><select class="select" id="fSquad"></select><div class="hint" id="fSquadHint"></div></div>
+            <div class="field"><label>Title</label><input class="input" id="fTitle" placeholder="e.g. Pentest staging.acme.com"></div>
+
+            <!-- code-review-specific fields (shown only when squad = code-review) -->
+            <div id="crFields" style="display:none">
+              <div class="field"><label>Source directory <span class="req">*</span></label>
+                <input class="input" id="crSourceDir" placeholder="/home/parallels/Desktop/gitlab/gitlab-master  (absolute, local)">
+                <div class="hint">Absolute path to the source tree to review (white-box).</div></div>
+              <div class="row2">
+                <div class="field"><label>Mode</label>
+                  <div class="seg" id="crMode"><button data-v="auto" class="on">Auto</button><button data-v="gitlab">GitLab</button><button data-v="generic">Generic</button></div>
+                  <div class="hint" id="crModeHint">Auto-detect GitLab vs generic.</div></div>
+                <div class="field"><label>Deploy URL <span style="color:var(--fg-dim)">(optional)</span></label>
+                  <input class="input" id="crDeployUrl" placeholder="https://staging… → UTTARA runtime validation"></div>
+              </div>
+              <div class="field"><label>Vulnerability classes</label>
+                <div id="crClasses" style="display:flex;flex-wrap:wrap;gap:8px">
+                  <label class="chip"><input type="checkbox" value="access-control" checked> access-control / IDOR</label>
+                  <label class="chip"><input type="checkbox" value="xss" checked> XSS</label>
+                  <label class="chip"><input type="checkbox" value="sqli"> sqli</label>
+                  <label class="chip"><input type="checkbox" value="ssrf"> ssrf</label>
+                  <label class="chip"><input type="checkbox" value="rce"> rce</label>
+                  <label class="chip"><input type="checkbox" value="account-takeover"> account-takeover</label>
+                </div>
+                <div class="hint">access-control + XSS have full pattern catalogs; others use the specialist's skill.</div></div>
+              <div class="row2">
+                <div class="field"><label>Max features <span style="color:var(--fg-dim)">(generic)</span></label><input class="input" id="crMaxFeatures" type="number" min="1" max="50" placeholder="10"></div>
+                <div class="field"><label>Phase-2 features <span style="color:var(--fg-dim)">(cost cap)</span></label><input class="input" id="crMaxPhase2" type="number" min="1" max="50" placeholder="6"></div>
+              </div>
+            </div>
+
+            <!-- pentest-specific fields (shown only when squad = pentest) -->
+            <div id="ptFields" style="display:none">
+              <div class="field"><label>Web application URL <span class="req">*</span></label>
+                <input class="input" id="ptUrl" placeholder="https://app.example.com">
+                <div class="hint">The primary target. Its host is auto-added to in-scope.</div></div>
+              <div class="field"><label>Source code directory <span style="color:var(--fg-dim)">(optional — white-box)</span></label>
+                <input class="input" id="ptSourceDir" placeholder="/absolute/path/to/source (leave blank for black-box only)">
+                <div class="hint">Provide source to run a <b>white-box + black-box</b> engagement: a source review (mapped to the live target) runs alongside the live pentest, and the findings merge into one de-duplicated report.</div></div>
+              <div class="field" id="ptPresetField" style="display:none"><label>Source preset</label>
+                <div class="seg" id="ptPreset"><button data-v="auto" class="on">Auto-detect</button><button data-v="gitlab">GitLab</button><button data-v="generic">Generic</button></div></div>
+              <div class="field"><label>Coverage</label>
+                <div class="seg" id="ptType"><button data-v="full" class="on">Full end-to-end</button><button data-v="feature">Feature-driven</button></div>
+                <div class="hint">Full = test the whole app. Feature-driven = focus on specific features.</div></div>
+              <div class="field" id="ptFocusField" style="display:none"><label>Focus areas <span class="req">*</span></label>
+                <textarea class="textarea" id="ptFocus" placeholder="Which features to focus on, e.g. authentication & session, payment flow, file upload, admin panel, API tokens…"></textarea></div>
+              <div class="row2">
+                <div class="field"><label>In scope <span style="color:var(--fg-dim)">(one host per line)</span></label>
+                  <textarea class="textarea" id="ptInScope" placeholder="app.example.com&#10;*.api.example.com" style="min-height:84px"></textarea></div>
+                <div class="field"><label>Out of scope <span style="color:var(--fg-dim)">(one per line)</span></label>
+                  <textarea class="textarea" id="ptOutScope" placeholder="blog.example.com&#10;status.example.com" style="min-height:84px"></textarea></div>
+              </div>
+              <div class="field"><label>Test accounts <span style="color:var(--fg-dim)">(black-box — add the users to test with)</span></label>
+                <div id="ptCreds"></div>
+                <button type="button" class="btn sm ghost" id="ptAddCred" style="margin-top:8px">＋ Add user</button>
+                <div class="hint">Each row: username · password · role. Agents authenticate as each role and test cross-role authorization (IDOR / privilege escalation).</div></div>
+              <div class="field"><label>Scan strategy</label>
+                <label class="chk-line"><input type="checkbox" id="ptSkipRecon"> <span>Skip initial recon (nmap / surface discovery) — go straight to authenticated functionality testing</span></label>
+                <div class="hint" style="margin:11px 0 7px">Vulnerability focus — pick classes to run a <b>focused</b> scan (none selected = full A→Z deep dive)</div>
+                <div class="focus-pick" id="ptFocusClasses">
+                  <button type="button" data-cls="access-control">Access control / IDOR</button>
+                  <button type="button" data-cls="auth">Auth &amp; session</button>
+                  <button type="button" data-cls="sqli">SQL injection</button>
+                  <button type="button" data-cls="command-injection">Command injection</button>
+                  <button type="button" data-cls="xss">XSS</button>
+                  <button type="button" data-cls="ssrf">SSRF</button>
+                  <button type="button" data-cls="ssti">SSTI</button>
+                  <button type="button" data-cls="xxe">XXE</button>
+                  <button type="button" data-cls="csrf">CSRF</button>
+                  <button type="button" data-cls="lfi">LFI / path traversal</button>
+                  <button type="button" data-cls="api">API (REST/GraphQL/JWT)</button>
+                  <button type="button" data-cls="business-logic">Business logic</button>
+                </div></div>
+            </div>
+
+            <div class="field" id="fGoalField"><label id="fGoalLabel">Goal / target <span class="req">*</span></label><textarea class="textarea" id="fGoal" placeholder="What should the squad attack? Red-team: objective. Network: CIDR/host. Cloud: account/region."></textarea></div>
+            <div class="row2">
+              <div class="field"><label>Priority</label><div class="seg" id="fPriority"><button data-v="low">Low</button><button data-v="normal" class="on">Normal</button><button data-v="high">High</button></div></div>
+              <div class="field"><label>Model override <span style="color:var(--fg-dim)">(optional)</span></label>
+                <select class="select" id="fModel"><option value="">auto (router decides)</option><option value="claude-haiku-4-5">claude-haiku-4-5 · fast</option><option value="claude-sonnet-4-6">claude-sonnet-4-6 · balanced</option><option value="claude-opus-4-8">claude-opus-4-8 · powerful</option></select></div>
+            </div>
+            <button class="btn primary" id="fSubmit"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg> Dispatch to squad</button>
+          </div>
+          <div class="card"><h3>What happens</h3><div class="md" id="dispatchInfo"></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-squads">
+        <div class="view-head"><h1>Squads &amp; personas</h1><span class="sub">offensive security squads · leaders, phases, rosters</span></div>
+        <div class="grid cols-3" id="squadList"></div>
+      </section>
+
+      <section class="view" id="view-reports">
+        <div class="view-head"><h1>Reports</h1><span class="sub">final published dossiers &amp; pentest reports</span></div>
+        <div class="replist" id="reportList"></div>
+      </section>
+
+      <section class="view" id="view-activity">
+        <div class="view-head"><h1>Activity stream</h1><span class="sub">the agent action log · most recent first</span></div>
+        <div class="card" id="activityFull"></div>
+      </section>
+
+      <!-- per-run detail page: opened by clicking a task. Holds Overview / Findings / Report. -->
+      <section class="view" id="view-task">
+        <div class="view-head">
+          <button class="btn" id="tdBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M15 18l-6-6 6-6"/></svg> Back</button>
+          <h1 id="tdTitle">Run</h1>
+          <span class="badge" id="tdStatus"></span>
+          <span class="sub" id="tdId"></span>
+        </div>
+        <div class="subtabs" id="tdTabs">
+          <button data-td="overview" class="on">Overview</button>
+          <button data-td="findings">Findings <span class="count" id="tdFnCount">0</span></button>
+          <button data-td="report">Report</button>
+        </div>
+
+        <div class="td-panel" id="td-overview"></div>
+
+        <div class="td-panel" id="td-findings" style="display:none">
+          <!-- engagement iterations: filter findings by iteration + launch a new one -->
+          <div id="fnIterBar" class="iter-bar"></div>
+          <div id="fnIterForm" class="card" style="display:none;margin-bottom:16px">
+            <h3>Run another test on this engagement</h3>
+            <div class="hint">Same target, scope &amp; accounts — new focus. Runs as an independent iteration; existing results are untouched and new findings append.</div>
+            <label class="chk-line" style="margin-top:10px"><input type="checkbox" id="itSkipRecon"> <span>Skip initial recon — straight to functionality testing</span></label>
+            <div class="hint" style="margin:11px 0 7px">Vulnerability focus (none = full A→Z)</div>
+            <div class="focus-pick" id="itFocusClasses">
+              <button type="button" data-cls="access-control">Access control / IDOR</button>
+              <button type="button" data-cls="auth">Auth &amp; session</button>
+              <button type="button" data-cls="sqli">SQL injection</button>
+              <button type="button" data-cls="command-injection">Command injection</button>
+              <button type="button" data-cls="xss">XSS</button>
+              <button type="button" data-cls="ssrf">SSRF</button>
+              <button type="button" data-cls="ssti">SSTI</button>
+              <button type="button" data-cls="xxe">XXE</button>
+              <button type="button" data-cls="csrf">CSRF</button>
+              <button type="button" data-cls="lfi">LFI / path traversal</button>
+              <button type="button" data-cls="api">API (REST/GraphQL/JWT)</button>
+              <button type="button" data-cls="business-logic">Business logic</button>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:14px">
+              <button class="btn primary" id="itRun">▶ Run iteration</button>
+              <button class="btn" id="itCancel">Cancel</button>
+            </div>
+          </div>
+          <div id="fnSummary" class="stats" style="margin-bottom:18px"></div>
+          <div id="fnList"></div>
+          <div id="fnActions" style="display:none;position:sticky;bottom:0;margin-top:18px;padding:14px 0;background:linear-gradient(0deg,var(--bg) 70%,transparent);align-items:center;gap:10px">
+            <span class="hint" id="fnTriageState"></span>
+            <div class="spacer" style="flex:1"></div>
+            <button class="btn" id="fnEnrich" title="Have KRIPA fill description / impact / remediation / raw request">⟳ Enrich details</button>
+            <button class="btn" id="fnSave">Save triage</button>
+            <button class="btn primary" id="fnGen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg> Generate report</button>
+          </div>
+        </div>
+
+        <div class="td-panel" id="td-report" style="display:none">
+          <div class="card"><div class="md" id="tdReportBody"></div></div>
+        </div>
+      </section>
+
+      <!-- single finding detail (notes + CVSS calculator + triage) -->
+      <section class="view" id="view-finding">
+        <div class="view-head">
+          <button class="btn" id="fdBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M15 18l-6-6 6-6"/></svg> Back</button>
+          <span class="badge" id="fdSevBadge"></span>
+          <h1 id="fdTitle" style="font-size:18px">Finding</h1>
+        </div>
+        <div class="grid cols-2">
+          <div class="card" id="fdInfo"></div>
+          <div class="card">
+            <h3>Triage</h3>
+            <div class="field"><label>Verdict</label>
+              <div class="seg" id="fdVerdict"><button data-fv="confirmed" class="on">✓ Confirm</button><button data-fv="rejected">✕ Reject</button></div></div>
+
+            <h3 style="margin-top:18px">CVSS 3.1 calculator</h3>
+            <div id="fdCvssCalc" class="cvss-calc"></div>
+            <div class="cvss-out">
+              <div><span class="cvss-score" id="fdScore">0.0</span> <span class="badge" id="fdScoreSev">Info</span></div>
+              <code id="fdVector" class="cvss-vector"></code>
+            </div>
+            <div class="hint">Pick the metrics — score + vector update live. Severity follows the score (override below if needed).</div>
+            <div class="field" style="margin-top:14px"><label>Severity (override)</label>
+              <select class="select" id="fdSev" style="width:auto"></select></div>
+
+            <div class="field" style="margin-top:6px"><label>Notes <span style="color:var(--fg-dim)">(rationale / CVSS justification — kept with the finding &amp; sent to the report)</span></label>
+              <textarea class="textarea" id="fdNotes" placeholder="e.g. CVSS raised to High — endpoint is internet-facing and leaks PII; reset-token reuse confirmed across 3 accounts."></textarea></div>
+
+            <button class="btn primary" id="fdSave">Save finding</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- amend a run -->
+      <section class="view" id="view-amend">
+        <div class="view-head">
+          <button class="btn" id="amBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M15 18l-6-6 6-6"/></svg> Back</button>
+          <h1 id="amTitle">Amend run</h1>
+        </div>
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="field"><label>Additional instructions</label>
+              <textarea class="textarea" id="amInstr" placeholder="e.g. also test the /admin API for IDOR; check the password-reset flow for token reuse"></textarea>
+              <div class="hint">Appended to the engagement brief — used by remaining work and the report.</div></div>
+            <div class="field"><label>Add in-scope hosts <span style="color:var(--fg-dim)">(one per line)</span></label>
+              <textarea class="textarea" id="amScope" placeholder="api2.example.com&#10;admin.example.com" style="min-height:80px"></textarea>
+              <div class="hint">Merged into the task's scope config.</div></div>
+            <button class="btn primary" id="amApply">Apply amendment</button>
+          </div>
+          <div class="card"><h3>How this works</h3><div class="md" id="amInfo"></div></div>
+        </div>
+      </section>
+
+      <!-- full-page report view (opened from a task card or the Reports tab) -->
+      <section class="view" id="view-report">
+        <div class="view-head">
+          <button class="btn" id="repBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M15 18l-6-6 6-6"/></svg> Back</button>
+          <h1 id="repTitle">Report</h1>
+          <span class="sub" id="repPath"></span>
+        </div>
+        <div class="card"><div class="md" id="repBody"></div></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-wrap" id="toasts"></div>
+  <script src="/cvss.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

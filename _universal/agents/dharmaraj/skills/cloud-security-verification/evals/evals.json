@@ -1,0 +1,44 @@
+[
+  {
+    "name": "verify_iam_findings",
+    "description": "IAM misconfigurations verified with actual AWS CLI commands",
+    "expectation": "Actual aws iam/sts commands executed to verify claimed IAM issues",
+    "weight": 2
+  },
+  {
+    "name": "verify_public_exposure",
+    "description": "Public exposure claims verified with actual HTTP/S3 probes",
+    "expectation": "curl or aws s3 commands confirm public accessibility",
+    "weight": 2
+  },
+  {
+    "name": "verify_network_rules",
+    "description": "Security group/firewall claims verified with actual probes",
+    "expectation": "nmap or nc used to verify claimed open ports on cloud resources",
+    "weight": 2
+  },
+  {
+    "name": "verify_encryption_gaps",
+    "description": "Encryption claims verified with actual resource inspection",
+    "expectation": "aws describe commands show actual encryption status",
+    "weight": 1
+  },
+  {
+    "name": "compliance_mapping_accurate",
+    "description": "CIS/SOC2/PCI-DSS references are correct",
+    "expectation": "Compliance framework references match the actual finding type",
+    "weight": 1
+  },
+  {
+    "name": "false_positive_identification",
+    "description": "Marks unverifiable claims as FALSE_POSITIVE",
+    "expectation": "Findings that cannot be independently reproduced are marked FALSE_POSITIVE with reason",
+    "weight": 1
+  },
+  {
+    "name": "verdict_present",
+    "description": "Final VERDICT and PASS_RATE present",
+    "expectation": "Output ends with VERDICT: and PASS_RATE: lines",
+    "weight": 1
+  }
+]

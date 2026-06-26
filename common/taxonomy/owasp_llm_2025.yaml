@@ -1,0 +1,164 @@
+# OWASP Top 10 for Large Language Model Applications 2025
+# Reference: https://genai.owasp.org/
+# Security risks specific to LLM-powered applications
+
+items:
+  - id: "LLM01:2025"
+    name: "Prompt Injection"
+    description: "Prompt injection occurs when user-crafted inputs alter the LLM's behavior or output in unintended ways. These inputs can affect the model even if they are imperceptible to humans. Direct prompt injection overwrites system prompts, while indirect prompt injection manipulates the LLM through external content it processes during retrieval-augmented generation or tool use."
+    severity: "critical"
+    category: "Injection"
+    examples:
+      - "Direct prompt injection overriding system instructions to bypass safety filters"
+      - "Indirect prompt injection via malicious content in web pages processed during RAG retrieval"
+      - "Injecting hidden instructions in documents that the LLM processes as context"
+      - "Using special tokens or delimiters to escape the intended prompt structure"
+    mitigations:
+      - "Enforce privilege separation between the LLM and external systems, limiting the LLM's autonomous actions"
+      - "Implement input filtering and sanitization for prompts with awareness of indirect injection vectors"
+      - "Use human-in-the-loop approval for privileged operations triggered by the LLM"
+      - "Monitor LLM input and output for signs of prompt injection attacks"
+
+  - id: "LLM02:2025"
+    name: "Sensitive Information Disclosure"
+    description: "LLM applications may reveal sensitive information, proprietary algorithms, or confidential data through their output. This can result in unauthorized access to sensitive data, intellectual property exposure, privacy violations, and security breaches. The LLM may have been trained on or given access to sensitive data that should not be disclosed."
+    severity: "high"
+    category: "Information Disclosure"
+    examples:
+      - "LLM revealing personally identifiable information from its training data"
+      - "Model outputs exposing proprietary business logic or trade secrets"
+      - "Extracting API keys or credentials that were included in training data"
+      - "Membership inference attacks determining if specific data was in the training set"
+    mitigations:
+      - "Implement robust data sanitization and scrubbing techniques on training data"
+      - "Apply strict output filtering to prevent sensitive data from being returned in responses"
+      - "Implement access controls and least privilege for the LLM's data access"
+      - "Use differential privacy techniques during model training to reduce memorization"
+
+  - id: "LLM03:2025"
+    name: "Supply Chain Vulnerabilities"
+    description: "LLM supply chains are susceptible to various vulnerabilities that can affect the integrity of training data, models, and deployment platforms. These risks can result in biased outputs, security breaches, or complete system failures. The complexity of LLM supply chains including pre-trained models, fine-tuning datasets, and plugin ecosystems creates multiple attack surfaces."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Using pre-trained models from untrusted sources containing backdoors or trojans"
+      - "Compromised training data from third-party datasets introducing biases or vulnerabilities"
+      - "Vulnerable or malicious third-party plugins and extensions for the LLM platform"
+      - "Dependency vulnerabilities in LLM frameworks and inference libraries"
+    mitigations:
+      - "Vet all third-party model providers, data sources, and plugin suppliers for security"
+      - "Implement model integrity verification using cryptographic signatures and checksums"
+      - "Maintain a software bill of materials (SBOM) for all LLM components"
+      - "Conduct regular security audits of the entire LLM supply chain"
+
+  - id: "LLM04:2025"
+    name: "Data and Model Poisoning"
+    description: "Data poisoning occurs when pre-training, fine-tuning, or embedding data is manipulated to introduce vulnerabilities, backdoors, or biases that compromise model security, effectiveness, or ethical behavior. Model poisoning extends this to manipulation of the model weights or architecture directly. Poisoned data or models can lead to compromised outputs that appear normal but serve attacker objectives."
+    severity: "high"
+    category: "Data Integrity"
+    examples:
+      - "Injecting malicious samples into fine-tuning datasets to create backdoor triggers"
+      - "Poisoning training data to make the model output biased or harmful responses for specific inputs"
+      - "Manipulating embedding databases to alter retrieval-augmented generation results"
+      - "Trojan attacks where the model behaves normally except when specific trigger patterns are present"
+    mitigations:
+      - "Verify the integrity and provenance of all training and fine-tuning data"
+      - "Implement data validation pipelines with anomaly detection for training datasets"
+      - "Use adversarial testing to detect potential backdoors in models"
+      - "Maintain data lineage tracking and audit trails for all data used in model training"
+
+  - id: "LLM05:2025"
+    name: "Improper Output Handling"
+    description: "Improper output handling refers to insufficient validation, sanitization, and handling of outputs generated by the LLM before they are passed downstream to other components. Since LLM-generated content can be controlled by prompt input, this behavior is similar to providing users indirect access to additional functionality. This can lead to XSS, CSRF, SSRF, privilege escalation, and remote code execution."
+    severity: "critical"
+    category: "Output Validation"
+    examples:
+      - "LLM output containing JavaScript being rendered in web pages leading to XSS"
+      - "LLM-generated SQL queries executed directly against databases without sanitization"
+      - "LLM output used in system commands leading to OS command injection"
+      - "LLM-generated code executed without sandboxing or review"
+    mitigations:
+      - "Treat the LLM as an untrusted user and apply proper input validation on LLM outputs"
+      - "Encode LLM output before rendering in web contexts to prevent XSS"
+      - "Use parameterized queries when LLM output is used in database operations"
+      - "Implement sandboxing for any code generated or suggested by the LLM"
+
+  - id: "LLM06:2025"
+    name: "Excessive Agency"
+    description: "An LLM-based system is often granted a degree of agency by its developer, the ability to call functions or interface with other systems via extensions, tools, or plugins. Excessive agency occurs when an LLM is given permissions, capabilities, or autonomy beyond what is necessary for the task, potentially leading to unintended or harmful actions."
+    severity: "high"
+    category: "Privilege Management"
+    examples:
+      - "LLM plugin with read/write database access when only read access is needed"
+      - "LLM agent authorized to execute arbitrary system commands without restrictions"
+      - "LLM with ability to send emails or make financial transactions without human approval"
+      - "LLM tool integration allowing access to all files instead of a restricted directory"
+    mitigations:
+      - "Restrict LLM plugins and tools to the minimum functionality needed"
+      - "Implement least privilege access for all LLM-accessible functions and data"
+      - "Require human-in-the-loop confirmation for high-impact or irreversible actions"
+      - "Track and limit the rate and total number of actions an LLM can perform in a session"
+
+  - id: "LLM07:2025"
+    name: "System Prompt Leakage"
+    description: "System prompt leakage occurs when the system prompt or instructions that guide the LLM's behavior are exposed to users through the model's responses. These system prompts may contain sensitive information such as internal APIs, content filtering rules, security controls, or business logic that should remain confidential."
+    severity: "medium"
+    category: "Information Disclosure"
+    examples:
+      - "User requesting the LLM to repeat its system prompt verbatim"
+      - "LLM revealing content moderation rules when asked about its guidelines"
+      - "System prompt exposure revealing API endpoints or authentication details"
+      - "Extracting business logic and decision criteria from leaked system prompts"
+    mitigations:
+      - "Avoid placing sensitive information in system prompts when possible"
+      - "Implement output filtering to detect and prevent system prompt leakage"
+      - "Use hardcoded behavioral constraints rather than prompt-based instructions for critical rules"
+      - "Regularly test the LLM with adversarial prompts designed to extract system prompts"
+
+  - id: "LLM08:2025"
+    name: "Vector and Embedding Weaknesses"
+    description: "Vulnerabilities in how vectors and embeddings are generated, stored, and retrieved can be exploited to inject malicious content, manipulate model outputs, or access sensitive information. Weaknesses in the vector database or embedding pipeline used for retrieval-augmented generation (RAG) can undermine the integrity of the knowledge base and the quality of generated outputs."
+    severity: "medium"
+    category: "Data Integrity"
+    examples:
+      - "Injecting adversarial documents into the knowledge base to manipulate RAG retrieval"
+      - "Exploiting weak access controls on vector databases to read or modify stored embeddings"
+      - "Embedding inversion attacks to reconstruct sensitive source documents from embeddings"
+      - "Manipulating similarity search results through adversarial embedding crafting"
+    mitigations:
+      - "Implement strict access controls on vector databases and embedding stores"
+      - "Validate and sanitize all documents before they are embedded and stored"
+      - "Use embedding models that are robust against adversarial manipulation"
+      - "Monitor vector database operations for anomalous access patterns or modifications"
+
+  - id: "LLM09:2025"
+    name: "Misinformation"
+    description: "Misinformation from LLMs poses a core vulnerability for applications relying on these models. LLMs can generate content that is factually incorrect, misleading, or fabricated (hallucinations) while presenting it with high confidence. This can lead to security risks when misinformation is trusted and acted upon, particularly in medical, legal, financial, or safety-critical contexts."
+    severity: "medium"
+    category: "Output Quality"
+    examples:
+      - "LLM generating fabricated legal citations in a legal research tool"
+      - "Confidently providing incorrect medical dosage information"
+      - "Hallucinating API endpoints or function signatures in code documentation"
+      - "Generating realistic-sounding but false historical events or statistics"
+    mitigations:
+      - "Implement retrieval-augmented generation (RAG) to ground outputs in verified sources"
+      - "Use cross-referencing and fact-checking mechanisms for critical outputs"
+      - "Clearly communicate to users that LLM outputs should be verified"
+      - "Implement confidence scoring and flag outputs with low factual certainty"
+
+  - id: "LLM10:2025"
+    name: "Unbounded Consumption"
+    description: "Unbounded consumption refers to the process where an LLM application allows excessive and uncontrolled inferences, leading to denial of service, economic losses, model theft, or degraded service. The high computational cost of LLM inference combined with potential for variable-length inputs and outputs creates unique resource consumption challenges."
+    severity: "high"
+    category: "Resource Management"
+    examples:
+      - "Flooding the LLM API with requests causing denial of service for legitimate users"
+      - "Crafting prompts that maximize token generation to increase computational costs"
+      - "Repeated queries designed to extract and reconstruct the model through side channels"
+      - "Recursive tool use or chain-of-thought exploitation causing unbounded computation"
+    mitigations:
+      - "Implement input validation to limit prompt size and complexity"
+      - "Set caps on resource usage per request including maximum response tokens and compute time"
+      - "Apply rate limiting per user, session, and API key with progressive throttling"
+      - "Monitor for patterns indicating model extraction or denial-of-wallet attacks"

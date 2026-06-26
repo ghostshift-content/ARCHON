@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><title>dom-xss-fires</title></head>
+<body>
+<!-- intentionally vulnerable: writes location.hash via innerHTML for unit tests -->
+<div id="sink"></div>
+<script>
+var raw = decodeURIComponent(location.hash.slice(1));
+var prop = 'inner' + 'HTML';
+document.getElementById('sink')[prop] = raw;
+</script>
+</body>
+</html>

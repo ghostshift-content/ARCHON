@@ -1,0 +1,9 @@
+{
+  "personaMode": "nested",
+  "stateMode": "evicted",
+  "_modes": {
+    "personaMode": "legacy = personas flat at /root/agents/<name> | nested = squads/<squad>/agents/<name> via OWNERSHIP map in paths.js",
+    "stateMode": "inline = runtime state inside persona code dir (today) | evicted = var/state/agents/<name>"
+  },
+  "_doc": "Read by paths.js (mtime-cached). Flip a mode + pm2 reload event-bus = physical layout cutover. See docs/research/2026-06-07-kurukshetra-restructure-design.md"
+}

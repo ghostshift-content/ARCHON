@@ -1,0 +1,44 @@
+[
+  {
+    "name": "verify_initial_access",
+    "description": "DHARMARAJ must independently reproduce the claimed initial access vector",
+    "expectation": "An actual command was executed to reproduce the initial access (not just read from the report)",
+    "weight": 2
+  },
+  {
+    "name": "verify_lateral_movement",
+    "description": "Each lateral movement hop must be independently confirmed",
+    "expectation": "Each claimed hop has its own verification command and output",
+    "weight": 2
+  },
+  {
+    "name": "verify_privilege_escalation",
+    "description": "Privilege escalation claims must show before/after access levels",
+    "expectation": "Shows pre-escalation and post-escalation access with proof commands",
+    "weight": 2
+  },
+  {
+    "name": "adversarial_probe",
+    "description": "At least one adversarial probe attempted per finding",
+    "expectation": "At least one alternative technique or evasion method tested per finding",
+    "weight": 1
+  },
+  {
+    "name": "kill_chain_gaps",
+    "description": "Identifies gaps in multi-step attack chains",
+    "expectation": "Any missing steps between attack phases are explicitly noted",
+    "weight": 1
+  },
+  {
+    "name": "false_positive_identification",
+    "description": "Marks unverifiable claims as FALSE_POSITIVE",
+    "expectation": "Findings that cannot be independently reproduced are marked FALSE_POSITIVE with reason",
+    "weight": 1
+  },
+  {
+    "name": "verdict_present",
+    "description": "Final VERDICT and PASS_RATE present",
+    "expectation": "Output ends with VERDICT: and PASS_RATE: lines",
+    "weight": 1
+  }
+]

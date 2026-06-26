@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head><title>proto-pollution</title></head>
+<body>
+<!-- intentionally vulnerable: unsafeMerge walks __proto__ keys for unit tests -->
+<script>
+function unsafeMerge(dst, src) {
+  for (var k in src) {
+    if (src[k] && typeof src[k] === 'object') {
+      if (!dst[k]) dst[k] = {};
+      unsafeMerge(dst[k], src[k]);
+    } else {
+      dst[k] = src[k];
+    }
+  }
+  return dst;
+}
+var q = new URLSearchParams(location.search).get('payload');
+if (q) { unsafeMerge({}, JSON.parse(q)); }
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "_doc": "persona dir name → squad home relative to KURU_AGENTS_ROOT. Consulted ONLY when layout.config.json personaMode=nested. Personas live at <home>/agents/<name>. Read at runtime (mtime-cached) by paths.js. Universals (kripa/vyasa/dharmaraj/rof) share _universal. ARCHON ships two squads: pentest (black-box) + code-review (white-box engine).",
+  "map": {
+    "krishna": "squads/pentest",
+    "abhimanyu": "squads/pentest",
+    "arjun": "squads/pentest",
+    "ashwatthama": "squads/pentest",
+    "bheem": "squads/pentest",
+    "dharma": "squads/pentest",
+    "draupadi": "squads/pentest",
+    "eklavya": "squads/pentest",
+    "karna": "squads/pentest",
+    "nakul": "squads/pentest",
+    "rudra": "squads/pentest",
+    "sahdev": "squads/pentest",
+    "satyaki": "squads/pentest",
+    "yuyutsu": "squads/pentest",
+    "shikhandi": "squads/pentest",
+    "kritavarma": "squads/pentest",
+    "vibhishana": "squads/code-review",
+    "dhrishtadyumna": "squads/code-review",
+    "vikarna": "squads/code-review",
+    "virata": "squads/code-review",
+    "jayadratha": "squads/code-review",
+    "barbarika": "squads/code-review",
+    "drupada": "squads/code-review",
+    "uttara": "squads/code-review",
+    "kripa": "_universal",
+    "vyasa": "_universal",
+    "dharmaraj": "_universal",
+    "rof": "_universal"
+  }
+}

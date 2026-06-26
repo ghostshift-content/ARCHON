@@ -1,0 +1,164 @@
+# OWASP Mobile Top 10 2024
+# Reference: https://owasp.org/www-project-mobile-top-10/
+# Security risks specific to mobile applications
+
+items:
+  - id: "M1:2024"
+    name: "Improper Credential Usage"
+    description: "This risk covers the improper use of credentials within mobile applications, including hard-coded credentials, insecure credential storage, and improper handling of authentication tokens. Mobile applications often mishandle credentials by embedding them in source code, storing them in insecure locations, or transmitting them without proper protection."
+    severity: "critical"
+    category: "Authentication"
+    examples:
+      - "API keys and secrets hard-coded in the mobile application source code or configuration files"
+      - "Storing authentication tokens in shared preferences or plist files without encryption"
+      - "Embedding third-party service credentials directly in the application binary"
+      - "Using the same credentials across development, staging, and production environments"
+    mitigations:
+      - "Never hard-code credentials in mobile application source code or resources"
+      - "Use secure storage mechanisms like Android Keystore or iOS Keychain for credential storage"
+      - "Implement OAuth 2.0 or similar token-based authentication instead of embedding secrets"
+      - "Use environment-specific credential management and rotate credentials regularly"
+
+  - id: "M2:2024"
+    name: "Inadequate Supply Chain Security"
+    description: "Mobile applications depend on numerous third-party components, SDKs, and libraries that introduce supply chain risks. Attackers may compromise these dependencies to inject malicious code, steal data, or introduce vulnerabilities. The mobile ecosystem's reliance on app stores, SDKs, and third-party services creates a complex supply chain with many potential attack vectors."
+    severity: "high"
+    category: "Supply Chain"
+    examples:
+      - "Integrating a compromised third-party SDK that exfiltrates user data"
+      - "Using outdated libraries with known vulnerabilities in the mobile application"
+      - "Dependency confusion attacks targeting mobile package managers"
+      - "Malicious code injected through compromised build tools or CI/CD pipelines"
+    mitigations:
+      - "Vet all third-party SDKs and libraries for security before integration"
+      - "Implement software composition analysis (SCA) to identify vulnerable dependencies"
+      - "Verify the integrity of all dependencies using checksums and signatures"
+      - "Maintain a software bill of materials (SBOM) for the mobile application"
+
+  - id: "M3:2024"
+    name: "Insecure Authentication/Authorization"
+    description: "This category covers weaknesses in authentication and authorization mechanisms within mobile applications. Mobile apps often implement authentication poorly, relying on local checks that can be bypassed, failing to validate tokens properly, or implementing inadequate session management. Authorization flaws allow users to access functionality or data beyond their intended permissions."
+    severity: "critical"
+    category: "Authentication"
+    examples:
+      - "Client-side authentication checks that can be bypassed through code modification"
+      - "Missing server-side validation of authentication tokens"
+      - "Biometric authentication implemented without proper fallback security"
+      - "Authorization decisions made client-side without server-side enforcement"
+    mitigations:
+      - "Perform all authentication and authorization checks server-side"
+      - "Implement proper session management with server-side session validation"
+      - "Use industry-standard authentication protocols (OAuth 2.0, OpenID Connect)"
+      - "Implement multi-factor authentication for sensitive operations"
+
+  - id: "M4:2024"
+    name: "Insufficient Input/Output Validation"
+    description: "Mobile applications that fail to properly validate input from users, external sources, or inter-process communication are vulnerable to various injection and data manipulation attacks. Similarly, insufficient output validation can lead to data leakage or injection attacks when the app communicates with backend systems or other applications."
+    severity: "high"
+    category: "Input Validation"
+    examples:
+      - "SQL injection through unvalidated input in local SQLite database queries"
+      - "JavaScript injection via WebView loading untrusted content"
+      - "Path traversal through unvalidated file paths in intent handlers"
+      - "Buffer overflow through unvalidated input in native (C/C++) components"
+    mitigations:
+      - "Validate all input on both client-side and server-side"
+      - "Use parameterized queries for all database interactions"
+      - "Sanitize data before displaying in WebViews or passing to native code"
+      - "Implement strict input validation for all inter-process communication"
+
+  - id: "M5:2024"
+    name: "Insecure Communication"
+    description: "This risk covers the failure to properly protect network traffic in mobile applications. Mobile devices frequently connect through untrusted networks such as public Wi-Fi, making secure communication essential. Insecure communication includes transmitting data in cleartext, using weak TLS configurations, ignoring certificate validation errors, and failing to implement certificate pinning."
+    severity: "high"
+    category: "Cryptography"
+    examples:
+      - "Transmitting sensitive data over HTTP instead of HTTPS"
+      - "Disabling certificate validation to resolve development SSL errors in production builds"
+      - "Using outdated TLS versions (TLS 1.0/1.1) or weak cipher suites"
+      - "Missing certificate pinning allowing man-in-the-middle attacks on public Wi-Fi"
+    mitigations:
+      - "Enforce TLS 1.2 or higher for all network communications"
+      - "Implement certificate pinning for connections to known servers"
+      - "Never disable certificate validation in production builds"
+      - "Use network security configuration (Android) or App Transport Security (iOS) to enforce secure defaults"
+
+  - id: "M6:2024"
+    name: "Inadequate Privacy Controls"
+    description: "Mobile applications collect and process large amounts of personal data, and inadequate privacy controls can lead to unauthorized data collection, processing, or sharing. This includes excessive data collection beyond what is necessary, insufficient user consent mechanisms, and improper handling of privacy-sensitive device features like location, contacts, and camera."
+    severity: "high"
+    category: "Privacy"
+    examples:
+      - "Collecting and transmitting device identifiers without user consent"
+      - "Accessing contacts, location, or photos beyond what the application requires"
+      - "Sharing user data with third-party analytics SDKs without disclosure"
+      - "Retaining personal data longer than necessary without a data retention policy"
+    mitigations:
+      - "Implement data minimization principles, collecting only necessary data"
+      - "Provide clear and transparent privacy disclosures and consent mechanisms"
+      - "Request only the minimum required device permissions"
+      - "Implement data retention policies and allow users to delete their data"
+
+  - id: "M7:2024"
+    name: "Insufficient Binary Protections"
+    description: "Mobile application binaries can be reverse-engineered, tampered with, or repackaged by attackers. Without sufficient binary protections, attackers can analyze the application's logic, extract sensitive information, bypass security controls, or distribute modified versions of the application. This is especially critical for applications handling financial transactions or sensitive data."
+    severity: "medium"
+    category: "Code Protection"
+    examples:
+      - "Extracting API keys and secrets from unobfuscated application binaries"
+      - "Reverse engineering business logic to bypass license checks or in-app purchases"
+      - "Repackaging the application with injected malware and distributing via third-party stores"
+      - "Debugging and hooking into the running application to bypass security controls"
+    mitigations:
+      - "Apply code obfuscation to make reverse engineering more difficult"
+      - "Implement runtime integrity checks to detect tampering and debugging"
+      - "Use anti-tamper mechanisms to detect repackaged applications"
+      - "Move sensitive business logic to the server side where possible"
+
+  - id: "M8:2024"
+    name: "Security Misconfiguration"
+    description: "Mobile applications and their supporting infrastructure can be misconfigured in ways that create security vulnerabilities. This includes insecure default settings, overly permissive configurations, unnecessary permissions, and exposed debug features. Misconfigurations in the mobile app, backend APIs, cloud services, or development tools can all introduce security weaknesses."
+    severity: "high"
+    category: "Security Configuration"
+    examples:
+      - "Debug mode or logging enabled in production builds"
+      - "Exported Android components (activities, services, receivers) without proper protection"
+      - "Overly permissive file sharing configurations allowing access to sensitive app data"
+      - "Backup enabled for application data that contains sensitive information"
+    mitigations:
+      - "Implement secure build configurations that differ between debug and release builds"
+      - "Disable debug features, verbose logging, and development tools in production releases"
+      - "Restrict exported components and enforce proper permissions on Android"
+      - "Disable application data backup or encrypt backed-up data"
+
+  - id: "M9:2024"
+    name: "Insecure Data Storage"
+    description: "Mobile devices store data locally in various locations, and improper protection of stored data is a common vulnerability. This includes sensitive data stored in plaintext, insecure use of local databases, improper file permissions, and data leakage through device logs, clipboard, or cached data. Attackers with physical access or malware can extract this data."
+    severity: "high"
+    category: "Data Protection"
+    examples:
+      - "Storing sensitive data in plaintext in shared preferences or plist files"
+      - "Sensitive information written to system logs accessible to other applications"
+      - "Cached HTTP responses containing authentication tokens stored on disk"
+      - "Sensitive data persisted in screenshot caches when the application is backgrounded"
+    mitigations:
+      - "Use platform-provided secure storage (Android Keystore, iOS Keychain) for sensitive data"
+      - "Encrypt all sensitive data stored locally using strong encryption algorithms"
+      - "Disable screenshot caching for screens displaying sensitive information"
+      - "Clear sensitive data from clipboard, logs, and caches when no longer needed"
+
+  - id: "M10:2024"
+    name: "Insufficient Cryptography"
+    description: "Mobile applications frequently use cryptography to protect data, but often implement it incorrectly. This includes using weak or deprecated algorithms, improper key management, hard-coded encryption keys, insufficient key lengths, and incorrect use of cryptographic modes. These weaknesses can render the cryptographic protection ineffective against determined attackers."
+    severity: "high"
+    category: "Cryptography"
+    examples:
+      - "Using deprecated algorithms like DES, RC4, or MD5 for data protection"
+      - "Hard-coding encryption keys in the application source code"
+      - "Using ECB mode for block cipher encryption, which preserves data patterns"
+      - "Implementing custom cryptographic algorithms instead of using established libraries"
+    mitigations:
+      - "Use established cryptographic libraries and avoid custom implementations"
+      - "Use strong algorithms (AES-256, RSA-2048+, SHA-256+) with proper modes (GCM, CBC with HMAC)"
+      - "Store cryptographic keys in hardware-backed secure storage (Keystore, Secure Enclave)"
+      - "Implement proper key lifecycle management including generation, rotation, and destruction"

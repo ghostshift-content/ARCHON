@@ -1,0 +1,22 @@
+# CORS - Origin reflection
+Origin: https://evil.com
+Origin: https://attacker.example.com
+
+# CORS - Null origin
+Origin: null
+
+# CORS - Subdomain wildcard / regex bypass
+Origin: https://target.com.evil.com
+Origin: https://eviltarget.com
+Origin: https://subdomain.target.com
+Origin: https://target.com.attacker.com
+
+# CORS - Credential leak / wildcard + credentials
+Origin: https://evil.com
+
+# CORS - Protocol downgrade
+Origin: http://target.com
+
+# CORS - Special character bypass
+Origin: https://target.com%60.evil.com
+Origin: https://target.com_.evil.com

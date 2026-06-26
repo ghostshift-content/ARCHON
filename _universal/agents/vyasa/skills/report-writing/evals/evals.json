@@ -1,0 +1,37 @@
+{
+  "skill_name": "report-writing",
+  "version": "2.0",
+  "default_eval": "pentest_report",
+  "evals": [
+    {
+      "id": "pentest_report",
+      "prompt": "Write final pentest report from findings",
+      "expected_output": "Professional pentest report",
+      "expectations": [
+        "Executive summary present",
+        "Engagement scope documented",
+        "Testing methodology described",
+        "Testing team (agents) listed",
+        "Test date range documented",
+        "Finding count by severity (Critical/High/Medium/Low/Info)",
+        "Overall risk rating stated",
+        "Each finding has unique ID",
+        "Each finding has title",
+        "Each finding has severity",
+        "Each finding has CVSS score",
+        "Each finding has affected component/endpoint",
+        "Each finding has description",
+        "Each finding has reproduction steps",
+        "Each finding has evidence",
+        "Each finding has business impact",
+        "Each finding has remediation steps",
+        "OWASP category mapped per finding",
+        "Remediation priority order recommended",
+        "Executive-readable risk summary (non-technical)",
+        "Technical appendix with tools used",
+        "Report is professional and client-ready",
+        "No false positives included without evidence"
+      ]
+    }
+  ]
+}
