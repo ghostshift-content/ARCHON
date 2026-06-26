@@ -147,6 +147,7 @@ function buildCodeReviewMeta(body) {
     if (vc.length) out.vulnClasses = vc
   }
   if (m.deployUrl && /^https?:\/\//.test(String(m.deployUrl))) out.deployUrl = String(m.deployUrl)
+  if (m.testAccounts && typeof m.testAccounts === 'object') out.testAccounts = m.testAccounts // UTTARA runtime-validation auth
   if (Number.isFinite(+m.maxFeatures) && +m.maxFeatures > 0) out.maxFeatures = Math.min(50, Math.floor(+m.maxFeatures))
   if (Number.isFinite(+m.maxPhase2) && +m.maxPhase2 > 0) out.maxPhase2 = Math.min(50, Math.floor(+m.maxPhase2))
   return out

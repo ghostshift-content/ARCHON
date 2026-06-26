@@ -79,13 +79,14 @@ const ok = (label, cond, extra = '') => cond ? (console.log(`  ✓ ${label}`), p
     const stillDispatch = await p.$eval('#view-dispatch', el => el.classList.contains('active'))
     ok('empty-URL submit blocked (stays on dispatch, no crash)', stillDispatch && errs.length === beforeV, errsAt().slice(beforeV).join(' | '))
 
-    // ── white-box source dir is part of the pentest form (code-review is the
-    // backend engine, not a separate dispatch option in this pentest-only product) ──
+    // ── test-type mode selector reshapes the pentest form (black/white/both) ──
     await p.selectOption('#fSquad', 'pentest'); await p.waitForTimeout(250)
-    ok('pentest form has optional source-dir (white-box)', !!(await p.$('#ptSourceDir')))
-    await p.fill('#ptSourceDir', '/tmp/x'); await p.waitForTimeout(150)
-    ok('source preset reveals when source entered', await p.$eval('#ptPresetField', el => el.style.display !== 'none'))
-    await p.fill('#ptSourceDir', ''); await p.waitForTimeout(150)
+    ok('default black-box: source group hidden', await p.$eval('#ptSourceGroup', el => el.style.display === 'none'))
+    await p.$eval('#ptMode button[data-v="whitebox"]', el => el.click()); await p.waitForTimeout(150)
+    ok('white-box mode: source group shown', await p.$eval('#ptSourceGroup', el => el.style.display !== 'none'))
+    ok('white-box mode: black group hidden', await p.$eval('#ptBlackGroup', el => el.style.display === 'none'))
+    await p.$eval('#ptMode button[data-v="blackbox"]', el => el.click()); await p.waitForTimeout(150)
+    ok('back to black-box: source group hidden again', await p.$eval('#ptSourceGroup', el => el.style.display === 'none'))
 
     ok('TOTAL: zero uncaught errors across the whole sweep', errs.length === 0, errs.join(' | '))
   } catch (e) {

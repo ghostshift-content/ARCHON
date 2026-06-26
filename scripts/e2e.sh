@@ -13,7 +13,7 @@ if ! ss -ltn 2>/dev/null | grep -q ':4000'; then
 fi
 
 fail=0
-for t in test/ui-findings.e2e.js test/ui-smoke.e2e.js test/ui-flows.e2e.js test/ui-engagement.e2e.js test/ui-whitebox.e2e.js; do
+for t in test/ui-findings.e2e.js test/ui-smoke.e2e.js test/ui-flows.e2e.js test/ui-engagement.e2e.js test/ui-whitebox.e2e.js test/ui-mode.e2e.js; do
   echo "──── $t ────"
   node "$t" || fail=1
 done

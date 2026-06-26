@@ -589,9 +589,21 @@ $$('#crMode button').forEach(b => b.onclick = () => { $$('#crMode button').forEa
 $$('#ptType button').forEach(b => b.onclick = () => { $$('#ptType button').forEach(x => x.classList.remove('on')); b.classList.add('on'); $('#ptFocusField').style.display = b.dataset.v === 'feature' ? 'block' : 'none' })
 // focus-class chips: multi-select toggle (none on = full A→Z)
 $$('#ptFocusClasses button').forEach(b => b.onclick = () => b.classList.toggle('on'))
-// source-preset segment + reveal it only when a source dir is entered (white-box)
 $$('#ptPreset button').forEach(b => b.onclick = () => { $$('#ptPreset button').forEach(x => x.classList.remove('on')); b.classList.add('on') })
-if ($('#ptSourceDir')) $('#ptSourceDir').addEventListener('input', () => { $('#ptPresetField').style.display = $('#ptSourceDir').value.trim() ? 'block' : 'none' })
+// ── test-type mode: Black-box / White-box / White+Black → reshape the form ──
+function applyPtMode(mode) {
+  const wb = mode === 'whitebox', both = mode === 'both', bb = mode === 'blackbox'
+  $('#ptSourceGroup').style.display = (wb || both) ? 'block' : 'none'
+  $('#ptBlackGroup').style.display = (bb || both) ? 'block' : 'none'
+  $('#ptStrategyField').style.display = (bb || both) ? 'block' : 'none'
+  $('#ptUrlReq').style.display = wb ? 'none' : 'inline'        // URL optional in white-box (runtime validation)
+  $('#ptUrlLabel').firstChild.nodeValue = wb ? 'Deployed URL ' : 'Web application URL '
+  $('#ptUrlHint').textContent = wb
+    ? 'Optional — if the source is deployed, agents runtime-validate the source findings against this live URL.'
+    : 'The primary live target. Its host is auto-added to in-scope.'
+}
+$$('#ptMode button').forEach(b => b.onclick = () => { $$('#ptMode button').forEach(x => x.classList.remove('on')); b.classList.add('on'); applyPtMode(b.dataset.v) })
+if ($('#ptMode')) applyPtMode('blackbox')
 
 /* ── dispatch ── */
 $('#fSubmit').onclick = async () => {
@@ -610,29 +622,40 @@ $('#fSubmit').onclick = async () => {
     const mp = +$('#crMaxPhase2').value; if (mp > 0) meta.maxPhase2 = mp
     body = { squad, taskTitle: $('#fTitle').value.trim() || undefined, priority: ($('#fPriority button.on') || {}).dataset?.v || 'normal', meta }
   } else if (isPT()) {
+    const mode = ($('#ptMode button.on') || {}).dataset?.v || 'blackbox'
     const targetUrl = $('#ptUrl').value.trim()
-    if (!targetUrl) { toast('Target URL required', 'e.g. https://app.example.com', 'err'); $('#ptUrl').focus(); return }
-    const testType = ($('#ptType button.on') || {}).dataset?.v || 'full'
-    const featureFocus = $('#ptFocus').value.trim()
-    if (testType === 'feature' && !featureFocus) { toast('Focus required', 'Name the features to focus on', 'err'); $('#ptFocus').focus(); return }
-    const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean)
-    const credentials = $$('#ptCreds .credrow').map(r => ({
-      username: r.querySelector('.cu').value.trim(),
-      password: r.querySelector('.cp').value,
-      role: r.querySelector('.cr').value,
-    })).filter(c => c.username)
-    const skipRecon = $('#ptSkipRecon').checked
-    const focusClasses = $$('#ptFocusClasses button.on').map(b => b.dataset.cls)
-    const meta = { targetUrl, testType, inScope: lines('#ptInScope'), outOfScope: lines('#ptOutScope'), credentials, skipRecon, focusClasses }
-    if (testType === 'feature') meta.featureFocus = featureFocus
-    // optional white-box: source dir → combined white+black engagement
     const sourceDir = $('#ptSourceDir').value.trim()
-    if (sourceDir) {
-      meta.sourceDir = sourceDir
-      const pm = ($('#ptPreset button.on') || {}).dataset?.v || 'auto'
-      if (pm !== 'auto') meta.preset = pm
+    const preset = ($('#ptPreset button.on') || {}).dataset?.v || 'auto'
+    const prio = ($('#fPriority button.on') || {}).dataset?.v || 'normal'
+    const title = $('#fTitle').value.trim() || undefined
+    const credentials = $$('#ptCreds .credrow').map(r => ({
+      username: r.querySelector('.cu').value.trim(), password: r.querySelector('.cp').value, role: r.querySelector('.cr').value,
+    })).filter(c => c.username)
+
+    if (mode === 'whitebox') {
+      // white-box only → code-review squad; URL (if given) becomes the runtime-validation target
+      if (!sourceDir) { toast('Source directory required', 'Absolute path to the source tree', 'err'); $('#ptSourceDir').focus(); return }
+      const meta = { sourceDir }
+      if (preset !== 'auto') meta.preset = preset
+      if (targetUrl) meta.deployUrl = targetUrl
+      if (credentials.length) meta.testAccounts = { attacker: credentials[0], ...(credentials[1] ? { victim: credentials[1] } : {}) }
+      body = { squad: 'code-review', taskTitle: title, priority: prio, meta }
+    } else {
+      // black-box OR both → live pentest (both also runs a white-box iteration)
+      if (!targetUrl) { toast('Target URL required', 'e.g. https://app.example.com', 'err'); $('#ptUrl').focus(); return }
+      const testType = ($('#ptType button.on') || {}).dataset?.v || 'full'
+      const featureFocus = $('#ptFocus').value.trim()
+      if (testType === 'feature' && !featureFocus) { toast('Focus required', 'Name the features to focus on', 'err'); $('#ptFocus').focus(); return }
+      const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean)
+      const meta = { targetUrl, testType, inScope: lines('#ptInScope'), outOfScope: lines('#ptOutScope'), credentials, skipRecon: $('#ptSkipRecon').checked, focusClasses: $$('#ptFocusClasses button.on').map(b => b.dataset.cls) }
+      if (testType === 'feature') meta.featureFocus = featureFocus
+      if (mode === 'both') {
+        if (!sourceDir) { toast('Source directory required', 'White + Black needs a URL and a source directory', 'err'); $('#ptSourceDir').focus(); return }
+        meta.sourceDir = sourceDir
+        if (preset !== 'auto') meta.preset = preset
+      }
+      body = { squad: 'pentest', taskTitle: title, priority: prio, meta }
     }
-    body = { squad, taskTitle: $('#fTitle').value.trim() || undefined, priority: ($('#fPriority button.on') || {}).dataset?.v || 'normal', meta }
   } else {
     const goal = $('#fGoal').value.trim()
     if (!goal) { toast('Goal required', 'Describe the target or task', 'err'); $('#fGoal').focus(); return }
@@ -641,7 +664,7 @@ $('#fSubmit').onclick = async () => {
   $('#fSubmit').disabled = true
   const r = await api('POST', '/api/dispatch', body)
   $('#fSubmit').disabled = false
-  if (r && !r.error) { toast('Dispatched ✓', `${r.assignee} · ${r.taskId}`, 'ok'); $('#fGoal').value = ''; $('#fTitle').value = ''; $('#crSourceDir').value = ''; $('#ptSourceDir').value = ''; $('#ptPresetField').style.display = 'none'; show('tasks'); tick() }
+  if (r && !r.error) { toast('Dispatched ✓', `${r.assignee} · ${r.taskId}`, 'ok'); $('#fGoal').value = ''; $('#fTitle').value = ''; $('#crSourceDir').value = ''; $('#ptSourceDir').value = ''; $$('#ptMode button').forEach(x => x.classList.toggle('on', x.dataset.v === 'blackbox')); applyPtMode('blackbox'); show('tasks'); tick() }
   else toast('Dispatch failed', r && r.error, 'err')
 }
 

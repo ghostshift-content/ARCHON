@@ -108,30 +108,37 @@
 
             <!-- pentest-specific fields (shown only when squad = pentest) -->
             <div id="ptFields" style="display:none">
-              <div class="field"><label>Web application URL <span class="req">*</span></label>
+              <div class="field"><label>Test type</label>
+                <div class="seg" id="ptMode"><button data-v="blackbox" class="on">Black-box</button><button data-v="whitebox">White-box</button><button data-v="both">White + Black</button></div>
+                <div class="hint" id="ptModeHint">Black-box: live target only. White-box: source code review. White + Black: both, merged into one de-duplicated report.</div></div>
+              <div class="field" id="ptUrlField"><label id="ptUrlLabel">Web application URL <span class="req" id="ptUrlReq">*</span></label>
                 <input class="input" id="ptUrl" placeholder="https://app.example.com">
-                <div class="hint">The primary target. Its host is auto-added to in-scope.</div></div>
-              <div class="field"><label>Source code directory <span style="color:var(--fg-dim)">(optional — white-box)</span></label>
-                <input class="input" id="ptSourceDir" placeholder="/absolute/path/to/source (leave blank for black-box only)">
-                <div class="hint">Provide source to run a <b>white-box + black-box</b> engagement: a source review (mapped to the live target) runs alongside the live pentest, and the findings merge into one de-duplicated report.</div></div>
-              <div class="field" id="ptPresetField" style="display:none"><label>Source preset</label>
-                <div class="seg" id="ptPreset"><button data-v="auto" class="on">Auto-detect</button><button data-v="gitlab">GitLab</button><button data-v="generic">Generic</button></div></div>
-              <div class="field"><label>Coverage</label>
-                <div class="seg" id="ptType"><button data-v="full" class="on">Full end-to-end</button><button data-v="feature">Feature-driven</button></div>
-                <div class="hint">Full = test the whole app. Feature-driven = focus on specific features.</div></div>
-              <div class="field" id="ptFocusField" style="display:none"><label>Focus areas <span class="req">*</span></label>
-                <textarea class="textarea" id="ptFocus" placeholder="Which features to focus on, e.g. authentication & session, payment flow, file upload, admin panel, API tokens…"></textarea></div>
-              <div class="row2">
-                <div class="field"><label>In scope <span style="color:var(--fg-dim)">(one host per line)</span></label>
-                  <textarea class="textarea" id="ptInScope" placeholder="app.example.com&#10;*.api.example.com" style="min-height:84px"></textarea></div>
-                <div class="field"><label>Out of scope <span style="color:var(--fg-dim)">(one per line)</span></label>
-                  <textarea class="textarea" id="ptOutScope" placeholder="blog.example.com&#10;status.example.com" style="min-height:84px"></textarea></div>
+                <div class="hint" id="ptUrlHint">The primary live target. Its host is auto-added to in-scope.</div></div>
+              <div id="ptSourceGroup" style="display:none">
+                <div class="field"><label>Source code directory <span class="req">*</span></label>
+                  <input class="input" id="ptSourceDir" placeholder="/absolute/path/to/source">
+                  <div class="hint">Absolute path to the source tree to review.</div></div>
+                <div class="field"><label>Source preset</label>
+                  <div class="seg" id="ptPreset"><button data-v="auto" class="on">Auto-detect</button><button data-v="gitlab">GitLab</button><button data-v="generic">Generic</button></div></div>
               </div>
-              <div class="field"><label>Test accounts <span style="color:var(--fg-dim)">(black-box — add the users to test with)</span></label>
+              <div id="ptBlackGroup">
+                <div class="field"><label>Coverage</label>
+                  <div class="seg" id="ptType"><button data-v="full" class="on">Full end-to-end</button><button data-v="feature">Feature-driven</button></div>
+                  <div class="hint">Full = test the whole app. Feature-driven = focus on specific features.</div></div>
+                <div class="field" id="ptFocusField" style="display:none"><label>Focus areas <span class="req">*</span></label>
+                  <textarea class="textarea" id="ptFocus" placeholder="Which features to focus on, e.g. authentication & session, payment flow, file upload, admin panel, API tokens…"></textarea></div>
+                <div class="row2">
+                  <div class="field"><label>In scope <span style="color:var(--fg-dim)">(one host per line)</span></label>
+                    <textarea class="textarea" id="ptInScope" placeholder="app.example.com&#10;*.api.example.com" style="min-height:84px"></textarea></div>
+                  <div class="field"><label>Out of scope <span style="color:var(--fg-dim)">(one per line)</span></label>
+                    <textarea class="textarea" id="ptOutScope" placeholder="blog.example.com&#10;status.example.com" style="min-height:84px"></textarea></div>
+                </div>
+              </div>
+              <div class="field"><label>Test accounts <span style="color:var(--fg-dim)">(add the users to test with)</span></label>
                 <div id="ptCreds"></div>
                 <button type="button" class="btn sm ghost" id="ptAddCred" style="margin-top:8px">＋ Add user</button>
                 <div class="hint">Each row: username · password · role. Agents authenticate as each role and test cross-role authorization (IDOR / privilege escalation).</div></div>
-              <div class="field"><label>Scan strategy</label>
+              <div class="field" id="ptStrategyField"><label>Scan strategy</label>
                 <label class="chk-line"><input type="checkbox" id="ptSkipRecon"> <span>Skip initial recon (nmap / surface discovery) — go straight to authenticated functionality testing</span></label>
                 <div class="hint" style="margin:11px 0 7px">Vulnerability focus — pick classes to run a <b>focused</b> scan (none selected = full A→Z deep dive)</div>
                 <div class="focus-pick" id="ptFocusClasses">
