@@ -589,7 +589,6 @@ $$('#crMode button').forEach(b => b.onclick = () => { $$('#crMode button').forEa
 $$('#ptType button').forEach(b => b.onclick = () => { $$('#ptType button').forEach(x => x.classList.remove('on')); b.classList.add('on'); $('#ptFocusField').style.display = b.dataset.v === 'feature' ? 'block' : 'none' })
 // focus-class chips: multi-select toggle (none on = full A→Z)
 $$('#ptFocusClasses button').forEach(b => b.onclick = () => b.classList.toggle('on'))
-$$('#ptPreset button').forEach(b => b.onclick = () => { $$('#ptPreset button').forEach(x => x.classList.remove('on')); b.classList.add('on') })
 // ── test-type mode: Black-box / White-box / White+Black → reshape the form ──
 function applyPtMode(mode) {
   const wb = mode === 'whitebox', both = mode === 'both', bb = mode === 'blackbox'
@@ -625,7 +624,6 @@ $('#fSubmit').onclick = async () => {
     const mode = ($('#ptMode button.on') || {}).dataset?.v || 'blackbox'
     const targetUrl = $('#ptUrl').value.trim()
     const sourceDir = $('#ptSourceDir').value.trim()
-    const preset = ($('#ptPreset button.on') || {}).dataset?.v || 'auto'
     const prio = ($('#fPriority button.on') || {}).dataset?.v || 'normal'
     const title = $('#fTitle').value.trim() || undefined
     const credentials = $$('#ptCreds .credrow').map(r => ({
@@ -635,8 +633,7 @@ $('#fSubmit').onclick = async () => {
     if (mode === 'whitebox') {
       // white-box only → code-review squad; URL (if given) becomes the runtime-validation target
       if (!sourceDir) { toast('Source directory required', 'Absolute path to the source tree', 'err'); $('#ptSourceDir').focus(); return }
-      const meta = { sourceDir }
-      if (preset !== 'auto') meta.preset = preset
+      const meta = { sourceDir }   // preset auto-detected by the code-review engine
       if (targetUrl) meta.deployUrl = targetUrl
       if (credentials.length) meta.testAccounts = { attacker: credentials[0], ...(credentials[1] ? { victim: credentials[1] } : {}) }
       body = { squad: 'code-review', taskTitle: title, priority: prio, meta }
@@ -651,8 +648,7 @@ $('#fSubmit').onclick = async () => {
       if (testType === 'feature') meta.featureFocus = featureFocus
       if (mode === 'both') {
         if (!sourceDir) { toast('Source directory required', 'White + Black needs a URL and a source directory', 'err'); $('#ptSourceDir').focus(); return }
-        meta.sourceDir = sourceDir
-        if (preset !== 'auto') meta.preset = preset
+        meta.sourceDir = sourceDir   // preset auto-detected
       }
       body = { squad: 'pentest', taskTitle: title, priority: prio, meta }
     }
