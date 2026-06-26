@@ -76,7 +76,7 @@ function cleanup() {
   ok('combined: 2nd is white-box code-review', cr.squad === 'code-review' && cr.kind === 'whitebox' && cr.label === 'White-box (source)')
   ok('combined: cr taskId distinct from root', cr.taskId !== CE)
   ok('combined: engagement records sourceDir', ceng.sourceDir === srcDir)
-  ok('combined: scope-<crTaskId>.json written (Phase 0.0 for UTTARA)', fs.existsSync(F(`scope-${cr.taskId}.json`)))
+  ok('combined: scope-<crTaskId>.json written (Phase 0.0 for PROBER)', fs.existsSync(F(`scope-${cr.taskId}.json`)))
   // two inbox dispatches: pentest-squad + code-review-squad(meta.sourceDir, deployUrl=URL)
   const inbox = fs.readdirSync(F('inbox/task-actions')).map(f => { try { return JSON.parse(fs.readFileSync(F('inbox/task-actions/' + f), 'utf8')) } catch { return {} } })
   const ptD = inbox.find(j => j.taskId === CE && j.squad === 'pentest-squad')

@@ -474,7 +474,7 @@ const CHAIN_OUTPUT_SCHEMA = {
           narrative: { type: 'string' },
           // Sprint B Task B3.5 (2026-05-22): IDs of the underlying confirmed
           // findings this chain composes. MUST match VALIDATED-FINDINGS IDs —
-          // VYASA chain-orphan guard (agents/vyasa-chain-orphan-guard.js)
+          // SCRIBE chain-orphan guard (agents/scribe-chain-orphan-guard.js)
           // drops chains whose finding_ids have no validated backing. Without
           // this field, the guard would drop every chain in production.
           finding_ids: {

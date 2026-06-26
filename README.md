@@ -30,17 +30,17 @@ engagement whose findings merge into one de-duplicated report.
 
 ```
 New dispatch (pentest)
-  URL                     → black-box pipeline (KRISHNA's squad)
+  URL                     → black-box pipeline (ATLAS's squad)
   + source dir (optional) → white-box pipeline runs in parallel, bridged to the URL
         │
         ▼
-  recon → specialists → KRIPA verify → DHARMARAJ judge
+  recon → specialists → AUDITOR verify → ARBITER judge
         │
         ▼  ⏸ AWAITING TRIAGE  (findings ready, no report yet)
   you triage in the Findings tab (confirm / reject / CVSS / notes)
         │
         ▼  Generate report
-  VYASA writes ONE report — for combined runs, correlated + de-duplicated across both views
+  SCRIBE writes ONE report — for combined runs, correlated + de-duplicated across both views
 ```
 
 ---
@@ -93,8 +93,8 @@ limits, not metered API billing. Point `KURU_CLAUDE_BIN` at your local `claude` 
   dispatch/triage/report controls (writes flow to the daemon's inbox, never to core state directly).
 - **`ui/`** — the single-page portal (no build step): dispatch, tasks, per-run findings/triage,
   CVSS calculator, reports.
-- **`squads/pentest/`** — the black-box squad (KRISHNA + specialists). **`squads/code-review/`** —
-  the white-box engine. **`_universal/agents/`** — KRIPA (verifier), DHARMARAJ (judge), VYASA (reporter).
+- **`squads/pentest/`** — the black-box squad (ATLAS + specialists). **`squads/code-review/`** —
+  the white-box engine. **`_universal/agents/`** — AUDITOR (verifier), ARBITER (judge), SCRIBE (reporter).
 - **Engagement model** — one dispatch holds N independent iterations (incl. the white-box + black-box
   pair); findings aggregate and one report is generated across all of them.
 
@@ -118,5 +118,6 @@ MIT — see [LICENSE](./LICENSE).
 
 ---
 
-*Agent personas are named from the Mahābhārata (KRISHNA, ARJUN, KARNA, KRIPA, VYASA, …). ARCHON =
-Autonomous Research & Code Hunting for Offensive Networks.*
+*Agents use operator call-signs by role — ATLAS (lead), SCOUT (recon), DRILL (SQLi), AUDITOR
+(verifier), ARBITER (judge), SCRIBE (reporter), … ARCHON = Autonomous Research & Code Hunting for
+Offensive Networks.*

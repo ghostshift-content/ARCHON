@@ -21,7 +21,7 @@ test('GATE-81: event-bus.js wires Phase 0.0 scope pre-validator', () => {
 
 test('GATE-81: blocked dispatches do NOT proceed to Phase 0.5 WAF detect', () => {
   const idx00 = eb.indexOf('Phase 0.0')
-  // Use lastIndexOf: Phase 0.5 appears in EKLAVYA function definitions earlier in the file;
+  // Use lastIndexOf: Phase 0.5 appears in TRACER function definitions earlier in the file;
   // the relevant Phase 0.5 (pentest pipeline — surface discovery + WAF context) is the LAST
   // occurrence, which lives inside the pentest dispatch path after our insertion point.
   const idx05 = eb.lastIndexOf('Phase 0.5')

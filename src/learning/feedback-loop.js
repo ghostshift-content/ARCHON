@@ -2,7 +2,7 @@
 /**
  * FEEDBACK LOOP — Universal Post-Task Learning Engine
  * 
- * Called after DHARMARAJ verification completes for ANY squad.
+ * Called after ARBITER verification completes for ANY squad.
  * Extracts failure traces, generates lessons, updates disproven cache,
  * calculates agent scores, and detects patterns.
  * 
@@ -118,7 +118,7 @@ function extractFailureTraces(taskId, squad) {
     }
   }
 
-  // Read verification log for DHARMARAJ rejections
+  // Read verification log for ARBITER rejections
   const verifications = parseJSONL(VERIFICATION_LOG)
   const taskVerifications = verifications.filter(e => String(e.taskId) === String(taskId))
 
@@ -170,7 +170,7 @@ function generateLessons(agentName, failureTraces) {
     })
   }
 
-  // Lessons from DHARMARAJ rejections
+  // Lessons from ARBITER rejections
   for (const r of failureTraces.rejections) {
     if (r.finding) {
       lessons.push({
@@ -178,7 +178,7 @@ function generateLessons(agentName, failureTraces) {
         taskId,
         agent: agentName,
         type: 'REJECTION',
-        rule: `RULE: Finding "${r.finding}" was rejected by DHARMARAJ — ${r.reason}. Ensure independent verification before claiming this type of finding.`,
+        rule: `RULE: Finding "${r.finding}" was rejected by ARBITER — ${r.reason}. Ensure independent verification before claiming this type of finding.`,
       })
     } else if (r.passRate !== undefined && r.passRate < 70) {
       lessons.push({
@@ -300,7 +300,7 @@ function writeDisprovenCache(taskId, squad, disproven) {
 // ══════════════════════════════════════════════════════════
 // E) AGENT SCORECARD
 // ══════════════════════════════════════════════════════════
-function calculateAgentScore(agentName, taskId, squad, grade, dharmarajPassRate) {
+function calculateAgentScore(agentName, taskId, squad, grade, arbiterPassRate) {
   const scores = readJSONSafe(AGENT_SCORES_FILE, {})
   const dateStr = new Date().toISOString().slice(0, 10)
   const key = agentName.toLowerCase()
@@ -308,7 +308,7 @@ function calculateAgentScore(agentName, taskId, squad, grade, dharmarajPassRate)
   if (!scores[key]) {
     scores[key] = {
       avgGrade: 0,
-      avgDharmaraj: 0,
+      avgarbiter: 0,
       tasksCompleted: 0,
       trend: 'new',
       lastUpdated: dateStr,
@@ -323,7 +323,7 @@ function calculateAgentScore(agentName, taskId, squad, grade, dharmarajPassRate)
     taskId,
     squad,
     grade: grade || 0,
-    dharmaraj: dharmarajPassRate || 0,
+    arbiter: arbiterPassRate || 0,
     date: dateStr,
   })
 
@@ -335,7 +335,7 @@ function calculateAgentScore(agentName, taskId, squad, grade, dharmarajPassRate)
   // Calculate rolling averages
   const prevAvgGrade = agent.avgGrade
   agent.avgGrade = Math.round(agent.history.reduce((s, h) => s + h.grade, 0) / agent.history.length)
-  agent.avgDharmaraj = Math.round(agent.history.reduce((s, h) => s + h.dharmaraj, 0) / agent.history.length)
+  agent.avgarbiter = Math.round(agent.history.reduce((s, h) => s + h.arbiter, 0) / agent.history.length)
   agent.tasksCompleted = (agent.tasksCompleted || 0) + 1
   agent.lastUpdated = dateStr
 
@@ -409,7 +409,7 @@ function detectPatterns(squad) {
   report += `## Verification Stats\n`
   report += `- Total verifications: ${totalVerifications}\n`
   report += `- Pass rate: ${totalPasses}/${totalVerifications} (${totalVerifications > 0 ? Math.round(totalPasses / totalVerifications * 100) : 0}%)\n`
-  report += `- Average DHARMARAJ score: ${avgPassRate}%\n\n`
+  report += `- Average ARBITER score: ${avgPassRate}%\n\n`
 
   if (recurring.length > 0) {
     report += `## Recurring Failed Techniques\n`
@@ -568,7 +568,7 @@ function getSquadLessons(squad, target) {
 // ══════════════════════════════════════════════════════════
 
 /**
- * Process all feedback after a task's DHARMARAJ verification completes.
+ * Process all feedback after a task's ARBITER verification completes.
  * Single entry point called by event bus.
  * 
  * @param {string} taskId
@@ -682,8 +682,8 @@ Every modern web framework has some subset of these layers. Identify which apply
 
 ### Severity discipline
 - \`full\` = you inspected EVERY relevant layer + verified absence of defense at each. May claim Critical.
-- \`partial\` = some layers inspected, others not. Max severity KRIPA will accept: Medium.
-- \`local_only\` = single-file evidence (e.g., "class inherits from X"). Max severity KRIPA will accept: Low.
+- \`partial\` = some layers inspected, others not. Max severity AUDITOR will accept: Medium.
+- \`local_only\` = single-file evidence (e.g., "class inherits from X"). Max severity AUDITOR will accept: Low.
 
 ### Anti-patterns (automatic downgrade triggers)
 - Claiming Critical/High without pipeline_trace ≥ 3 entries → treated as partial
@@ -760,7 +760,7 @@ For claims alleging validation gap: record every layer you inspected. Array from
 
 If validation-gap claim with fewer than 3 layers inspected → cap Medium. Validation can live at any layer — must check all.
 
-### Severity cap stacking (KRIPA applies)
+### Severity cap stacking (AUDITOR applies)
 1. Specialist claim →
 2. v1 evidence_completeness cap (full/partial/local_only) →
 3. attacker_privilege cap →
@@ -773,14 +773,14 @@ If validation-gap claim with fewer than 3 layers inspected → cap Medium. Valid
 ### Anti-inflation patterns (learned from GitLab verification 2026-04-23)
 - Admin changing user email silently: admin + none + documented=true → Informational. Not a vuln — it's the admin rescue feature.
 - Admin injecting OAuth identity into victim account: admin + privilege-escalation → +1 from Medium = High (genuine privilege transfer).
-- Controller doesn't inherit from AdminController: local_only evidence + admin_privilege=unauth on /admin/ path = INCOHERENT → KRIPA rejects.
+- Controller doesn't inherit from AdminController: local_only evidence + admin_privilege=unauth on /admin/ path = INCOHERENT → AUDITOR rejects.
 - ImageMagick CVE claim without \`which convert\` verification: max Low (toolchain unverified).
 
 ### Universal principle
 Severity must match realistic attack path, not theoretical worst case. An admin doing admin things is not a CVE; a non-admin doing admin things is. A library CVE is only exploitable if the library runs. A validation gap at one layer may be closed at another — check every layer before you claim.
 
 ### Missing threat_model → SAFE defaults
-Forgetting to emit threat_model doesn't help you inflate severity. KRIPA applies SAFE defaults (admin / none / documented=true / []) which cascade to Low/Informational. Fill it honestly or your claim drops.
+Forgetting to emit threat_model doesn't help you inflate severity. AUDITOR applies SAFE defaults (admin / none / documented=true / []) which cascade to Low/Informational. Fill it honestly or your claim drops.
 `
   }
 

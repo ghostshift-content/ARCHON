@@ -17,7 +17,7 @@
 //
 // Stored under /root/intel/poc-evidence/{taskId}/{findingId}.json with
 // {status, headers, body, timing_ms, redirect_chain, captured_at, error?}.
-// VYASA's report builder reads these alongside ACTIVITY-LOG so reports cite
+// SCRIBE's report builder reads these alongside ACTIVITY-LOG so reports cite
 // concrete payloads instead of LLM paraphrases.
 //
 // Anti-sycophancy: captures and stores even when body looks empty / hostile
@@ -210,7 +210,7 @@ async function captureForValidatedFindings({
   return result
 }
 
-// Read previously captured evidence for a task. Used by VYASA report builder.
+// Read previously captured evidence for a task. Used by SCRIBE report builder.
 // Returns {findingId: artifact} map. Empty object if no captures yet.
 function readCapturesForTask(taskId, { intelDir = INTEL_DIR } = {}) {
   const dir = path.join(intelDir, 'poc-evidence', String(taskId))

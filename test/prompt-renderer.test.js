@@ -36,8 +36,8 @@ test('config loads + has enabled + rollback_mode + versions', () => {
 })
 
 test('render substitutes {{var}} placeholders', () => {
-  const out = pr.render('Hello {{name}}, you are {{role}}.', { name: 'ARJUN', role: 'recon' })
-  assert.strictEqual(out, 'Hello ARJUN, you are recon.')
+  const out = pr.render('Hello {{name}}, you are {{role}}.', { name: 'SCOUT', role: 'recon' })
+  assert.strictEqual(out, 'Hello SCOUT, you are recon.')
 })
 
 test('render handles missing vars as empty string', () => {
@@ -79,7 +79,7 @@ test('loadTemplate returns null for missing template', () => {
 
 test('renderPrompt returns rendered string for valid role', () => {
   const out = pr.renderPrompt('specialist', {
-    agentUpper: 'ARJUN', agentLower: 'arjun',
+    agentUpper: 'SCOUT', agentLower: 'scout',
     squad: 'pentest', targetUrl: 'https://example.com',
     taskTitle: 'Test', taskId: 'T1', wafStatus: 'cloudflare',
     goalContext: '', techStack: '',
@@ -88,7 +88,7 @@ test('renderPrompt returns rendered string for valid role', () => {
     projectId: '',
   })
   assert.ok(out, 'should render')
-  assert.ok(out.includes('ARJUN'), 'agentUpper must interpolate')
+  assert.ok(out.includes('SCOUT'), 'agentUpper must interpolate')
   assert.ok(out.includes('https://example.com'), 'target URL must interpolate')
   assert.ok(out.includes('cloudflare'), 'wafStatus must interpolate')
   assert.ok(!out.includes('{{'), 'no unresolved placeholders')
@@ -102,7 +102,7 @@ test('renderPrompt returns null when rollback_mode=inline', () => {
     raw.rollback_mode = 'inline'
     fs.writeFileSync(cfgPath, JSON.stringify(raw))
     pr.resetCache()
-    const out = pr.renderPrompt('specialist', { agentUpper: 'ARJUN' })
+    const out = pr.renderPrompt('specialist', { agentUpper: 'SCOUT' })
     assert.strictEqual(out, null, 'must return null so caller falls back to inline')
   } finally {
     fs.writeFileSync(cfgPath, original)

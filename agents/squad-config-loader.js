@@ -8,7 +8,7 @@
 // currently scattered across squad-framework.js, model-router.js,
 // severity-profile.js, and event-bus.js.
 //
-// Spec: docs/research/2026-06-03-kurukshetra-THE-FRAMEWORK.md
+// Spec: docs/research/2026-06-03-archon-THE-FRAMEWORK.md
 // Built: 2026-06-05 (B5 — squad.yaml configs slice)
 
 'use strict'

@@ -12,7 +12,7 @@ function makeMetric(taskId, opts = {}) {
     task_id: taskId,
     target: opts.target || `Target-${taskId.split('-')[0]}`,
     model_profile: opts.profile || 'default',
-    krishna_model: opts.krishna || 'claude-opus-4-7',
+    atlas_model: opts.atlas || 'claude-opus-4-7',
     captured_at: new Date().toISOString(),
     metrics: {
       findings_total: opts.findings ?? 12,
@@ -34,7 +34,7 @@ test('renderReport produces side-by-side comparison string', () => {
   const sonnet = makeMetric('T1-sonnet', {
     target: 'Target-1',
     profile: 'G4_test_sonnet',
-    krishna: 'claude-sonnet-4-6',
+    atlas: 'claude-sonnet-4-6',
     cost: 28.50,
     findings: 11,
   })
@@ -49,7 +49,7 @@ test('renderReport produces side-by-side comparison string', () => {
 test('applyDecisionCriteria: ALL THREE pass → ADOPT', () => {
   const opus = makeMetric('T1-opus', { target: 'T1', cost: 142.30, findings: 12, critical: 1 })
   const sonnet = makeMetric('T1-sonnet', {
-    target: 'T1', profile: 'G4_test_sonnet', krishna: 'claude-sonnet-4-6',
+    target: 'T1', profile: 'G4_test_sonnet', atlas: 'claude-sonnet-4-6',
     cost: 28.50, findings: 11, critical: 1,
   })
   const decision = applyDecisionCriteria([{ opus, sonnet }])
@@ -59,7 +59,7 @@ test('applyDecisionCriteria: ALL THREE pass → ADOPT', () => {
 test('applyDecisionCriteria: cost reduction <60% → REJECT', () => {
   const opus = makeMetric('T-opus', { target: 'T', cost: 142.30 })
   const sonnet = makeMetric('T-sonnet', {
-    target: 'T', profile: 'G4_test_sonnet', krishna: 'claude-sonnet-4-6',
+    target: 'T', profile: 'G4_test_sonnet', atlas: 'claude-sonnet-4-6',
     cost: 100.00, // only 30% cheaper
   })
   const decision = applyDecisionCriteria([{ opus, sonnet }])
@@ -70,7 +70,7 @@ test('applyDecisionCriteria: cost reduction <60% → REJECT', () => {
 test('applyDecisionCriteria: new false-Critical → REJECT', () => {
   const opus = makeMetric('T-opus', { target: 'T', cost: 142.30, critical: 1 })
   const sonnet = makeMetric('T-sonnet', {
-    target: 'T', profile: 'G4_test_sonnet', krishna: 'claude-sonnet-4-6',
+    target: 'T', profile: 'G4_test_sonnet', atlas: 'claude-sonnet-4-6',
     cost: 28.50, critical: 3, // more Criticals!
   })
   const decision = applyDecisionCriteria([{ opus, sonnet }])
@@ -81,7 +81,7 @@ test('applyDecisionCriteria: new false-Critical → REJECT', () => {
 test('applyDecisionCriteria: findings ratio >1.2 → REJECT', () => {
   const opus = makeMetric('T-opus', { target: 'T', cost: 142.30, findings: 10 })
   const sonnet = makeMetric('T-sonnet', {
-    target: 'T', profile: 'G4_test_sonnet', krishna: 'claude-sonnet-4-6',
+    target: 'T', profile: 'G4_test_sonnet', atlas: 'claude-sonnet-4-6',
     cost: 28.50, findings: 25, // 2.5x more findings — too noisy!
   })
   const decision = applyDecisionCriteria([{ opus, sonnet }])
@@ -93,7 +93,7 @@ test('applyDecisionCriteria: 3 targets, all pass → ADOPT', () => {
   const pairs = [1, 2, 3].map(i => ({
     opus: makeMetric(`T${i}-opus`, { target: `T${i}`, cost: 140, findings: 10, critical: 1 }),
     sonnet: makeMetric(`T${i}-sonnet`, {
-      target: `T${i}`, profile: 'G4_test_sonnet', krishna: 'claude-sonnet-4-6',
+      target: `T${i}`, profile: 'G4_test_sonnet', atlas: 'claude-sonnet-4-6',
       cost: 30, findings: 10, critical: 1,
     }),
   }))
@@ -106,7 +106,7 @@ test('applyDecisionCriteria: 3 targets, 1 fails → REJECT', () => {
   const pairs = [1, 2, 3].map(i => ({
     opus: makeMetric(`T${i}-opus`, { target: `T${i}`, cost: 140, findings: 10, critical: 1 }),
     sonnet: makeMetric(`T${i}-sonnet`, {
-      target: `T${i}`, profile: 'G4_test_sonnet', krishna: 'claude-sonnet-4-6',
+      target: `T${i}`, profile: 'G4_test_sonnet', atlas: 'claude-sonnet-4-6',
       cost: i === 2 ? 80 : 30, // T2's cost reduction <60% — fails
       findings: 10, critical: 1,
     }),
@@ -118,7 +118,7 @@ test('applyDecisionCriteria: 3 targets, 1 fails → REJECT', () => {
 test('pairBySource pairs Opus and Sonnet by target name', () => {
   const opus1 = makeMetric('T1-opus', { target: 'TargetA' })
   const sonnet1 = makeMetric('T1-sonnet', {
-    target: 'TargetA', profile: 'G4_test_sonnet', krishna: 'claude-sonnet-4-6',
+    target: 'TargetA', profile: 'G4_test_sonnet', atlas: 'claude-sonnet-4-6',
   })
   const opus2 = makeMetric('T2-opus', { target: 'TargetB' })
   const pairs = pairBySource([opus1, sonnet1, opus2])
@@ -173,7 +173,7 @@ test('wilsonInterval: 50/100 → point 0.5, CI roughly symmetric', () => {
 test('renderReport includes Wilson CI section when pairs exist', () => {
   const opus = {
     task_id: 'T1-opus', target: 'T1', model_profile: 'default',
-    krishna_model: 'claude-opus-4-7', captured_at: '2026-05-06T00:00:00Z',
+    atlas_model: 'claude-opus-4-7', captured_at: '2026-05-06T00:00:00Z',
     metrics: {
       findings_total: 12,
       findings_by_severity: { critical: 1, high: 3, medium: 5, low: 3, info: 0 },
@@ -182,7 +182,7 @@ test('renderReport includes Wilson CI section when pairs exist', () => {
   }
   const sonnet = {
     task_id: 'T1-sonnet', target: 'T1', model_profile: 'G4_test_sonnet',
-    krishna_model: 'claude-sonnet-4-6', captured_at: '2026-05-06T00:00:00Z',
+    atlas_model: 'claude-sonnet-4-6', captured_at: '2026-05-06T00:00:00Z',
     metrics: {
       findings_total: 11,
       findings_by_severity: { critical: 1, high: 3, medium: 4, low: 3, info: 0 },

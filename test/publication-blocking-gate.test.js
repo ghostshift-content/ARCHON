@@ -2,7 +2,7 @@
 const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see paths.js
 // test/publication-blocking-gate.test.js
 //
-// FIX 1 (2026-05-09): real DHARMARAJ publication gate. Sprint B.3 added
+// FIX 1 (2026-05-09): real ARBITER publication gate. Sprint B.3 added
 // an informational banner; this gate makes the block REAL — moves the
 // report file out of /root/intel/reports/ and into reports-blocked/, and
 // updates tasks.json to status='blocked' so triagers cannot accidentally
@@ -182,8 +182,8 @@ test('blockReportPublication: moves file, prepends banner, updates tasks.json', 
     { id: taskId, title: 'sample', status: 'in-progress', progress: 50 }
   ], null, 2))
 
-  const dharmaraj = { verdict: 'FALSE_POSITIVE', passRate: 0 }
-  helpers.blockReportPublication(taskId, dharmaraj, 'DHARMARAJ verdict: FALSE_POSITIVE')
+  const arbiter = { verdict: 'FALSE_POSITIVE', passRate: 0 }
+  helpers.blockReportPublication(taskId, arbiter, 'ARBITER verdict: FALSE_POSITIVE')
 
   assert.ok(!fs.existsSync(srcReport), 'src report must be removed from reports/')
   assert.ok(fs.existsSync(dstReport), 'dst must exist in reports-blocked/')

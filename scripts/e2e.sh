@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run the browser e2e suites safely. The seeding suites write tasks.json and queue
 # inbox actions, so the daemon (single writer + inbox consumer) is stopped first to
-# avoid clobber / accidental VYASA runs, then restarted afterwards.
+# avoid clobber / accidental SCRIBE runs, then restarted afterwards.
 set +e
 cd "$(dirname "$0")/.." || exit 1
 

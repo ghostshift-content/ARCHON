@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Local data-layer scaffolder for Kurukshetra.
+// Local data-layer scaffolder for ARCHON.
 //
 // Recreates the parts of the production /root/intel data layer needed for the
 // daemon to boot and the gate suite to run, under whatever KURU_INTEL_ROOT
@@ -28,7 +28,7 @@ if (INTEL === '/root/intel' && !process.env.KURU_FORCE_PROD_SEED) {
   process.exit(1)
 }
 
-console.log(`Kurukshetra local setup`)
+console.log(`ARCHON local setup`)
 console.log(`  AGENTS_ROOT = ${AGENTS}`)
 console.log(`  INTEL_ROOT  = ${INTEL}`)
 
@@ -74,12 +74,12 @@ const CONFIGS = {
     // Extend this as you wire up more personas; unmapped agents fall to
     // 'vuln_specialist' (balanced/high) — a safe default.
     agent_roles: {
-      arjun: 'recon', rudra: 'recon', eklavya: 'recon',
-      krishna: 'chain_analysis', chanakya: 'stock_leader',
-      kripa: 'verification', dharmaraj: 'validation', vyasa: 'report',
+      scout: 'recon', ranger: 'recon', tracer: 'recon',
+      atlas: 'chain_analysis', chanakya: 'stock_leader',
+      auditor: 'verification', arbiter: 'validation', scribe: 'report',
     },
     complexity_scoring: { signals: [], tiers: [] },
-    deny_family_downgrade_for: ['kripa', 'krishna', 'chanakya', 'vyasa', 'dharmaraj'],
+    deny_family_downgrade_for: ['auditor', 'atlas', 'chanakya', 'scribe', 'arbiter'],
   },
   'grader-config.json': {
     enabled: true,

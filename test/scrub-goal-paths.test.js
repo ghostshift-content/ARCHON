@@ -8,7 +8,7 @@ const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see path
 // "/root/intel/trajectory-observations.jsonl". Result: 28+ specialists
 // wrote NON-CANONICAL custom-schema entries to that file (verdicts like
 // "HONEST", "CONFIRMED", "DISPROVEN" — none of which are our canonical
-// verdicts). Same pattern caused ASHWATTHAMA to write
+// verdicts). Same pattern caused FORGE to write
 // /root/intel/CLOUD-SECURITY-HANDOFF-{taskId}.md instead of the proper
 // inbox JSON.
 //

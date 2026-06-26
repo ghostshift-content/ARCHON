@@ -38,7 +38,7 @@ if (fs.existsSync(GLOBAL_LOG)) {
 const merged = Array.from(byKey.values()).sort((a,b) => String(a.ts||'').localeCompare(String(b.ts||'')))
 
 // New filter: check action AND details (the Phase 3.5 fix)
-// +5s delay after Phase 3 would shift cutoff by 5s, capturing post-KRIPA flushes
+// +5s delay after Phase 3 would shift cutoff by 5s, capturing post-AUDITOR flushes
 const cutoffWithDelay = new Date(new Date(PHASE35_CUTOFF).getTime() + 5000).toISOString()
 const prePhase = merged.filter(e => e.ts <= cutoffWithDelay)
 const confirmed = prePhase.filter(e => {

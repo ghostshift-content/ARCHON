@@ -216,8 +216,8 @@ test('collectUsageLedger is idempotent — same-day same-window double-run yield
   const fixtureActivity = path.join(outDir, 'ACTIVITY-LOG.jsonl')
   const recentTs2 = (m) => new Date(Date.now() - m * 60 * 1000).toISOString()
   const sampleEvents = [
-    { ts: recentTs2(30), agent: 'BHISHMA', type: 'cost', squad: 'stocks-squad', taskId: '111', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $1.0000' },
-    { ts: recentTs2(29), agent: 'ARJUN', type: 'cost', squad: 'pentest-squad', taskId: '222', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $2.0000' },
+    { ts: recentTs2(30), agent: 'veteran', type: 'cost', squad: 'stocks-squad', taskId: '111', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $1.0000' },
+    { ts: recentTs2(29), agent: 'SCOUT', type: 'cost', squad: 'pentest-squad', taskId: '222', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $2.0000' },
   ]
   fs.writeFileSync(fixtureActivity, sampleEvents.map((e) => JSON.stringify(e)).join('\n') + '\n')
 
@@ -244,7 +244,7 @@ test('collectUsageLedger — different windowDays coexist on same day', async ()
   const fixtureActivity = path.join(outDir, 'ACTIVITY-LOG.jsonl')
   const recentTs3 = (m) => new Date(Date.now() - m * 60 * 1000).toISOString()
   const sampleEvents = [
-    { ts: recentTs3(20), agent: 'BHISHMA', type: 'cost', squad: 'stocks-squad', taskId: '111', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $1.0000' },
+    { ts: recentTs3(20), agent: 'veteran', type: 'cost', squad: 'stocks-squad', taskId: '111', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $1.0000' },
   ]
   fs.writeFileSync(fixtureActivity, sampleEvents.map((e) => JSON.stringify(e)).join('\n') + '\n')
 
@@ -281,11 +281,11 @@ test('collectUsageLedger tallies costs per squad and per agent correctly', async
   // Use relative timestamps (1h ago) so the 1-day cutoff window always includes them
   const recentTs = (offsetMinutes) => new Date(Date.now() - offsetMinutes * 60 * 1000).toISOString()
   const sampleEvents = [
-    { ts: recentTs(60), agent: 'BHISHMA', type: 'cost', squad: 'stocks-squad', taskId: '111', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $1.5000' },
-    { ts: recentTs(59), agent: 'DRONA',   type: 'cost', squad: 'stocks-squad', taskId: '111', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $0.5000' },
-    { ts: recentTs(58), agent: 'ARJUN',   type: 'cost', squad: 'pentest-squad', taskId: '222', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $3.2000' },
+    { ts: recentTs(60), agent: 'veteran', type: 'cost', squad: 'stocks-squad', taskId: '111', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $1.5000' },
+    { ts: recentTs(59), agent: 'analyst',   type: 'cost', squad: 'stocks-squad', taskId: '111', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $0.5000' },
+    { ts: recentTs(58), agent: 'SCOUT',   type: 'cost', squad: 'pentest-squad', taskId: '222', details: 'Model: claude-sonnet-4-6\nTokens: 0\nTotal: $3.2000' },
     // non-cost event, should not count
-    { ts: recentTs(57), agent: 'SANJAY', type: 'dispatch', squad: 'stocks-squad', taskId: '111', details: '' },
+    { ts: recentTs(57), agent: 'NEXUS', type: 'dispatch', squad: 'stocks-squad', taskId: '111', details: '' },
   ]
   fs.writeFileSync(fixtureActivity, sampleEvents.map((e) => JSON.stringify(e)).join('\n') + '\n')
 
@@ -321,23 +321,23 @@ test('collectUsageLedger tallies costs per squad and per agent correctly', async
   assert.strictEqual(snap.costData, true)
 
   // Check agent tallies (perAgent)
-  const bhishmaData = snap.perAgent['BHISHMA']
-  assert.ok(bhishmaData, 'BHISHMA should be in perAgent')
-  assert.strictEqual(bhishmaData.events, 1, 'BHISHMA should have 1 cost event')
-  assert.ok(Math.abs(bhishmaData.totalCostUSD - 1.5) < 0.001, `BHISHMA cost should be ~$1.50, got ${bhishmaData.totalCostUSD}`)
+  const veteranData = snap.perAgent['veteran']
+  assert.ok(veteranData, 'veteran should be in perAgent')
+  assert.strictEqual(veteranData.events, 1, 'veteran should have 1 cost event')
+  assert.ok(Math.abs(veteranData.totalCostUSD - 1.5) < 0.001, `veteran cost should be ~$1.50, got ${veteranData.totalCostUSD}`)
 
-  const dronaData = snap.perAgent['DRONA']
-  assert.ok(dronaData, 'DRONA should be in perAgent')
-  assert.strictEqual(dronaData.events, 1, 'DRONA should have 1 cost event')
-  assert.ok(Math.abs(dronaData.totalCostUSD - 0.5) < 0.001, `DRONA cost should be ~$0.50, got ${dronaData.totalCostUSD}`)
+  const analystData = snap.perAgent['analyst']
+  assert.ok(analystData, 'analyst should be in perAgent')
+  assert.strictEqual(analystData.events, 1, 'analyst should have 1 cost event')
+  assert.ok(Math.abs(analystData.totalCostUSD - 0.5) < 0.001, `analyst cost should be ~$0.50, got ${analystData.totalCostUSD}`)
 
-  const arjunData = snap.perAgent['ARJUN']
-  assert.ok(arjunData, 'ARJUN should be in perAgent')
-  assert.strictEqual(arjunData.events, 1, 'ARJUN should have 1 cost event')
-  assert.ok(Math.abs(arjunData.totalCostUSD - 3.2) < 0.001, `ARJUN cost should be ~$3.20, got ${arjunData.totalCostUSD}`)
+  const scoutData = snap.perAgent['SCOUT']
+  assert.ok(scoutData, 'SCOUT should be in perAgent')
+  assert.strictEqual(scoutData.events, 1, 'SCOUT should have 1 cost event')
+  assert.ok(Math.abs(scoutData.totalCostUSD - 3.2) < 0.001, `SCOUT cost should be ~$3.20, got ${scoutData.totalCostUSD}`)
 
-  // SANJAY's dispatch event must NOT appear in perAgent (non-cost event)
-  assert.ok(!snap.perAgent['SANJAY'], 'SANJAY dispatch event must not appear in perAgent')
+  // NEXUS's dispatch event must NOT appear in perAgent (non-cost event)
+  assert.ok(!snap.perAgent['NEXUS'], 'NEXUS dispatch event must not appear in perAgent')
 })
 
 // ---------------------------------------------------------------------------

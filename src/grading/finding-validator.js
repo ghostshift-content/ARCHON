@@ -10,9 +10,9 @@ const __roots = require('../../paths') // portable roots (KURU_*_ROOT) — see p
 //   - rationale (one sentence)
 //   - evidence_quote (literal substring — same hallucination guard as grader)
 //
-// Independent of the KRIPA validator (KRIPA checks the 7-question gate; this checks
+// Independent of the AUDITOR validator (AUDITOR checks the 7-question gate; this checks
 // exploitability from raw evidence). Stacked, they catch different failure classes:
-// KRIPA = procedural quality, finding-validator = evidence-based exploitability.
+// AUDITOR = procedural quality, finding-validator = evidence-based exploitability.
 //
 // Config-driven: /root/intel/finding-validator-config.json controls enable + model +
 // max-findings-per-task cost cap. Rollback: set enabled=false or mode=noop.

@@ -22,13 +22,13 @@ function test(name, fn) {
 console.log('url-extractor tests:')
 
 test('extracts https:// from title (regression: pentest #1 msi.emiratesnbd.com)', () => {
-  const out = extractTargetUrl({ taskTitle: 'Pentest H1-ENBD — https://msi.emiratesnbd.com (KRISHNA full pipeline)' })
+  const out = extractTargetUrl({ taskTitle: 'Pentest H1-ENBD — https://msi.emiratesnbd.com (ATLAS full pipeline)' })
   assert.strictEqual(out, 'https://msi.emiratesnbd.com')
 })
 
 test('https:// in goal beats bare-domain in title (Gap 2 fix)', () => {
   const out = extractTargetUrl({
-    taskTitle: 'Pentest H1-ENBD — politemail-read.emiratesnbd.com (KRISHNA full pipeline)',
+    taskTitle: 'Pentest H1-ENBD — politemail-read.emiratesnbd.com (ATLAS full pipeline)',
     goal: 'Web application pentest of https://politemail-read.emiratesnbd.com — full surface',
   })
   assert.strictEqual(out, 'https://politemail-read.emiratesnbd.com')

@@ -19,9 +19,9 @@ const PROFILES = Object.freeze({
   // Default profile = no overrides (use modelRouter's normal logic)
   default: Object.freeze({}),
 
-  // G4 experiment: KRISHNA only swap to Sonnet, everything else default
+  // G4 experiment: ATLAS only swap to Sonnet, everything else default
   G4_test_sonnet: Object.freeze({
-    krishna: 'claude-sonnet-4-6',
+    atlas: 'claude-sonnet-4-6',
   }),
 })
 
@@ -29,7 +29,7 @@ const PROFILES = Object.freeze({
  * Returns the model override for an agent under the current/specified profile,
  * or null if no override applies (caller should fall through to default routing).
  *
- * @param {string} agent - agent name (case-insensitive, e.g. 'KRISHNA' or 'krishna')
+ * @param {string} agent - agent name (case-insensitive, e.g. 'ATLAS' or 'atlas')
  * @param {string} [profile] - profile name; defaults to process.env.MODEL_PROFILE or 'default'
  * @returns {string|null} model name (e.g. 'claude-sonnet-4-6') or null
  */

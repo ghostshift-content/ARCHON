@@ -149,10 +149,10 @@ test('sampled run writes shadow-output.json + diff.json with correct shape', asy
 
   const res = await maybeShadowRun(
     {
-      agentName: 'ARJUN',
+      agentName: 'SCOUT',
       taskId,
       model: 'claude-sonnet-4-6',
-      systemPrompt: 'you are arjun',
+      systemPrompt: 'you are scout',
       userPrompt: 'find the bug',
       liveText: 'live cli text here that is longer than the shadow',
       liveOk: true,
@@ -166,10 +166,10 @@ test('sampled run writes shadow-output.json + diff.json with correct shape', asy
   assert.strictEqual(fakeRun.captured.length, 1)
   assert.strictEqual(fakeRun.captured[0].adapter, 'sdk')
   assert.strictEqual(fakeRun.captured[0].userPrompt, 'find the bug')
-  assert.strictEqual(fakeRun.captured[0].systemPrompt, 'you are arjun')
+  assert.strictEqual(fakeRun.captured[0].systemPrompt, 'you are scout')
 
   // Per-agent subdir: shadow-runs/<runKey>/<agentName>/
-  const runDir = path.join(outDir, taskId, 'ARJUN')
+  const runDir = path.join(outDir, taskId, 'SCOUT')
   const outputFile = path.join(runDir, 'shadow-output.json')
   const diffFile = path.join(runDir, 'diff.json')
   assert.ok(fs.existsSync(outputFile), 'shadow-output.json must exist')
@@ -177,7 +177,7 @@ test('sampled run writes shadow-output.json + diff.json with correct shape', asy
 
   const diff = readJson(diffFile)
   assert.strictEqual(diff.taskId, taskId)
-  assert.strictEqual(diff.agentName, 'ARJUN')
+  assert.strictEqual(diff.agentName, 'SCOUT')
   assert.strictEqual(diff.model, 'claude-sonnet-4-6')
   assert.strictEqual(diff.sampled, true)
   assert.strictEqual(diff.sameOutcome, true) // liveOk true, shadowOk true
@@ -204,7 +204,7 @@ test('NO-LIVE-LEAK: all writes land under the injected outDir', async () => {
 
   await maybeShadowRun(
     {
-      agentName: 'KARNA',
+      agentName: 'DRILL',
       taskId,
       model: 'claude-opus-4-8',
       systemPrompt: 'sys',
@@ -245,7 +245,7 @@ test('not-sampled run does no I/O and returns {sampled:false}', async () => {
 
   const res = await maybeShadowRun(
     {
-      agentName: 'BHEEM',
+      agentName: 'RELAY',
       taskId,
       model: 'claude-sonnet-4-6',
       systemPrompt: 'sys',
@@ -273,7 +273,7 @@ test('shadow adapter error → diff.json has error + sameOutcome false (live ok)
 
   const res = await maybeShadowRun(
     {
-      agentName: 'NAKUL',
+      agentName: 'VIPER',
       taskId,
       model: 'claude-sonnet-4-6',
       systemPrompt: 'sys',
@@ -287,7 +287,7 @@ test('shadow adapter error → diff.json has error + sameOutcome false (live ok)
   assert.strictEqual(res.sampled, true)
 
   // Per-agent subdir: shadow-runs/<runKey>/<agentName>/
-  const diffFile = path.join(outDir, taskId, 'NAKUL', 'diff.json')
+  const diffFile = path.join(outDir, taskId, 'VIPER', 'diff.json')
   assert.ok(fs.existsSync(diffFile))
   const diff = readJson(diffFile)
   assert.ok(diff.error, 'diff must record the shadow error')
@@ -306,7 +306,7 @@ test('both fail → sameOutcome true (live failed AND shadow failed)', async () 
 
   await maybeShadowRun(
     {
-      agentName: 'SAHDEV',
+      agentName: 'GATEWAY',
       taskId,
       model: 'claude-sonnet-4-6',
       systemPrompt: 'sys',
@@ -318,7 +318,7 @@ test('both fail → sameOutcome true (live failed AND shadow failed)', async () 
   )
 
   // Per-agent subdir: shadow-runs/<runKey>/<agentName>/
-  const diff = readJson(path.join(outDir, taskId, 'SAHDEV', 'diff.json'))
+  const diff = readJson(path.join(outDir, taskId, 'GATEWAY', 'diff.json'))
   assert.strictEqual(diff.deltas.liveOk, false)
   assert.strictEqual(diff.deltas.shadowOk, false)
   assert.strictEqual(diff.sameOutcome, true) // both failed → same outcome
@@ -339,7 +339,7 @@ test('internal write failure does not throw to caller', async () => {
   // Must resolve (not reject) even though all writes fail.
   const res = await maybeShadowRun(
     {
-      agentName: 'DRAUPADI',
+      agentName: 'WARDEN',
       taskId,
       model: 'claude-sonnet-4-6',
       systemPrompt: 'sys',
@@ -367,7 +367,7 @@ test('synchronously-throwing runAgent is caught (never throws to caller)', async
 
   const res = await maybeShadowRun(
     {
-      agentName: 'ABHIMANYU',
+      agentName: 'VAULT',
       taskId,
       model: 'claude-sonnet-4-6',
       systemPrompt: 'sys',
@@ -381,7 +381,7 @@ test('synchronously-throwing runAgent is caught (never throws to caller)', async
   assert.strictEqual(res.sampled, true)
   // diff.json should still be written with an error recorded.
   // Per-agent subdir: shadow-runs/<runKey>/<agentName>/
-  const diffFile = path.join(outDir, taskId, 'ABHIMANYU', 'diff.json')
+  const diffFile = path.join(outDir, taskId, 'VAULT', 'diff.json')
   assert.ok(fs.existsSync(diffFile))
   const diff = readJson(diffFile)
   assert.ok(diff.error, 'sync-throw must be recorded as an error')
@@ -418,7 +418,7 @@ test('SHADOW_SAMPLE_K env controls K — pick a taskId that flips between env-K 
   try {
     const res = await maybeShadowRun(
       {
-        agentName: 'EKLAVYA',
+        agentName: 'TRACER',
         taskId: diffTaskId,
         model: 'claude-sonnet-4-6',
         systemPrompt: 'sys',
@@ -444,17 +444,17 @@ test('two agents same taskId each write to their own subdir (no clobber)', async
   const outDir = makeTempDir()
   const k = 5
   const taskId = findSampledTaskId(k)
-  const fakeRunA = makeFakeRunAgentOk('output from ARJUN')
-  const fakeRunB = makeFakeRunAgentOk('output from BHEEM')
+  const fakeRunA = makeFakeRunAgentOk('output from SCOUT')
+  const fakeRunB = makeFakeRunAgentOk('output from RELAY')
 
   // Both share the same taskId but have different agentNames.
   const [resA, resB] = await Promise.all([
     maybeShadowRun(
-      { agentName: 'ARJUN', taskId, model: 'claude-sonnet-4-6', systemPrompt: 'sys', userPrompt: 'usr', liveText: 'live', liveOk: true },
+      { agentName: 'SCOUT', taskId, model: 'claude-sonnet-4-6', systemPrompt: 'sys', userPrompt: 'usr', liveText: 'live', liveOk: true },
       { _runAgent: fakeRunA, _outDir: outDir, _sampleK: k }
     ),
     maybeShadowRun(
-      { agentName: 'BHEEM', taskId, model: 'claude-sonnet-4-6', systemPrompt: 'sys', userPrompt: 'usr', liveText: 'live', liveOk: true },
+      { agentName: 'RELAY', taskId, model: 'claude-sonnet-4-6', systemPrompt: 'sys', userPrompt: 'usr', liveText: 'live', liveOk: true },
       { _runAgent: fakeRunB, _outDir: outDir, _sampleK: k }
     ),
   ])
@@ -463,21 +463,21 @@ test('two agents same taskId each write to their own subdir (no clobber)', async
   assert.strictEqual(resB.sampled, true)
 
   // Each agent must have its own subdir with both artifacts.
-  const arjunOutput = path.join(outDir, taskId, 'ARJUN', 'shadow-output.json')
-  const arjunDiff   = path.join(outDir, taskId, 'ARJUN', 'diff.json')
-  const bheemOutput = path.join(outDir, taskId, 'BHEEM', 'shadow-output.json')
-  const bheemDiff   = path.join(outDir, taskId, 'BHEEM', 'diff.json')
+  const scoutOutput = path.join(outDir, taskId, 'SCOUT', 'shadow-output.json')
+  const scoutDiff   = path.join(outDir, taskId, 'SCOUT', 'diff.json')
+  const relayOutput = path.join(outDir, taskId, 'RELAY', 'shadow-output.json')
+  const relayDiff   = path.join(outDir, taskId, 'RELAY', 'diff.json')
 
-  assert.ok(fs.existsSync(arjunOutput), 'ARJUN shadow-output.json must exist')
-  assert.ok(fs.existsSync(arjunDiff),   'ARJUN diff.json must exist')
-  assert.ok(fs.existsSync(bheemOutput), 'BHEEM shadow-output.json must exist')
-  assert.ok(fs.existsSync(bheemDiff),   'BHEEM diff.json must exist')
+  assert.ok(fs.existsSync(scoutOutput), 'SCOUT shadow-output.json must exist')
+  assert.ok(fs.existsSync(scoutDiff),   'SCOUT diff.json must exist')
+  assert.ok(fs.existsSync(relayOutput), 'RELAY shadow-output.json must exist')
+  assert.ok(fs.existsSync(relayDiff),   'RELAY diff.json must exist')
 
   // Verify content is not cross-contaminated.
-  assert.strictEqual(readJson(arjunOutput).text, 'output from ARJUN')
-  assert.strictEqual(readJson(bheemOutput).text, 'output from BHEEM')
-  assert.strictEqual(readJson(arjunDiff).agentName, 'ARJUN')
-  assert.strictEqual(readJson(bheemDiff).agentName, 'BHEEM')
+  assert.strictEqual(readJson(scoutOutput).text, 'output from SCOUT')
+  assert.strictEqual(readJson(relayOutput).text, 'output from RELAY')
+  assert.strictEqual(readJson(scoutDiff).agentName, 'SCOUT')
+  assert.strictEqual(readJson(relayDiff).agentName, 'RELAY')
 })
 
 // ---------------------------------------------------------------------------
@@ -500,7 +500,7 @@ test('TTL prune-on-write removes old run dirs and keeps new artifacts', async ()
 
   // Run a sampled call — should prune the old dir and write new artifacts.
   const res = await maybeShadowRun(
-    { agentName: 'SATYAKI', taskId, model: 'claude-sonnet-4-6', systemPrompt: 'sys', userPrompt: 'usr', liveText: 'live', liveOk: true },
+    { agentName: 'KEYRING', taskId, model: 'claude-sonnet-4-6', systemPrompt: 'sys', userPrompt: 'usr', liveText: 'live', liveOk: true },
     { _runAgent: makeFakeRunAgentOk('prune test output'), _outDir: outDir, _sampleK: k }
   )
 
@@ -508,8 +508,8 @@ test('TTL prune-on-write removes old run dirs and keeps new artifacts', async ()
   // Old dir must be gone.
   assert.ok(!fs.existsSync(oldRunDir), 'old run dir must be pruned')
   // New artifacts must be present.
-  const newOutput = path.join(outDir, taskId, 'SATYAKI', 'shadow-output.json')
-  const newDiff   = path.join(outDir, taskId, 'SATYAKI', 'diff.json')
+  const newOutput = path.join(outDir, taskId, 'KEYRING', 'shadow-output.json')
+  const newDiff   = path.join(outDir, taskId, 'KEYRING', 'diff.json')
   assert.ok(fs.existsSync(newOutput), 'new shadow-output.json must exist after prune')
   assert.ok(fs.existsSync(newDiff),   'new diff.json must exist after prune')
 })

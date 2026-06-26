@@ -57,8 +57,8 @@ test('getSquadGates returns MUST_GATES_STOCKS for stocks, MUST_GATES otherwise',
 })
 
 test('leader resolution works for all squads + -squad suffix variants', () => {
-  assert.strictEqual(sf.getSquadLeader('pentest'), 'krishna')
-  assert.strictEqual(sf.getSquadLeader('pentest-squad'), 'krishna')
+  assert.strictEqual(sf.getSquadLeader('pentest'), 'atlas')
+  assert.strictEqual(sf.getSquadLeader('pentest-squad'), 'atlas')
   assert.strictEqual(sf.getSquadLeader('stocks'), 'chanakya')
   assert.strictEqual(sf.getSquadLeader('red-team'), 'parashurama')
   assert.strictEqual(sf.getSquadLeader('cloud-security'), 'varuna')
@@ -67,7 +67,7 @@ test('leader resolution works for all squads + -squad suffix variants', () => {
 
 test('unknown squad gets DEFAULT config', () => {
   const cfg = sf.getSquadConfig('unknown-xyz')
-  assert.strictEqual(cfg.leaderAgent, 'krishna')
+  assert.strictEqual(cfg.leaderAgent, 'atlas')
   assert.strictEqual(cfg.gateStyle, 'security')
   assert.strictEqual(sf.getSquadGates('unknown-xyz'), sf.MUST_GATES)
 })
@@ -93,7 +93,7 @@ test('adding a new squad to SQUAD_TYPES is detected by listKnownSquads', () => {
     memoryNamespace: 'quantum',
     dispatchType: 'parallel-phases',
     chainAnalysis: true,
-    dharmarajVerification: true,
+    arbiterVerification: true,
     costBudget: 50,
   }
   try {

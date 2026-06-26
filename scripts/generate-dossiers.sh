@@ -19,7 +19,7 @@ while IFS='|' read -r TASK_ID NAME TITLE PROJECT_ID; do
     PROMPT="You are CHANAKYA, CIO. Write a COMPLETE Final Dossier for: $TITLE. TaskID: $TASK_ID.
 
 STEP 1: Read all analyst findings for this task:
-grep '$TASK_ID' /root/.openclaw/intel/ACTIVITY-LOG.jsonl | grep -v SANJAY | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'Auto-repair' | grep -v 'Auto-recovery'
+grep '$TASK_ID' /root/.openclaw/intel/ACTIVITY-LOG.jsonl | grep -v NEXUS | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'Auto-repair' | grep -v 'Auto-recovery'
 
 STEP 2: Read your skill file for the golden template:
 cat /root/agents/chanakya/skills/stock-analysis/SKILL.md

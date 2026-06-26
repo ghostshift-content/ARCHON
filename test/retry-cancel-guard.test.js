@@ -2,7 +2,7 @@
 
 const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see paths.js
 // Regression guard: retry logic must skip when task.status=cancelled.
-// Apr-21 Run 1 bug: first cancel-signal killed ARJUN/RUDRA at 23:34, the
+// Apr-21 Run 1 bug: first cancel-signal killed SCOUT/RANGER at 23:34, the
 // spawn-with-retry path re-spawned them 30s later because one of the two
 // retry sites didn't call _isTaskCancelled. Fixed 2026-04-23.
 //

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Kurukshetra local operator console — backend API + static server.
+// ARCHON local operator console — backend API + static server.
 //
 // Zero dependencies (Node http + fs). Serves the ui/ SPA and a small REST API
 // over the var/intel data layer. It NEVER writes core state directly — dispatch
@@ -274,7 +274,7 @@ function iterateDispatch(body) {
   writeEngagement(E, eng)
   writeInbox('inbox/task-actions', {
     action: 'dispatch', taskId, taskTitle: `Pentest: ${hostOf(meta.targetUrl)} · ${meta.iterationLabel}`.slice(0, 200),
-    assignee: 'KRISHNA', squad: 'pentest-squad', priority: 'normal', goal, createdAt: new Date().toISOString(), projectId: null, meta,
+    assignee: 'ATLAS', squad: 'pentest-squad', priority: 'normal', goal, createdAt: new Date().toISOString(), projectId: null, meta,
   })
   return { taskId, engagementId: E, iterationLabel: meta.iterationLabel }
 }
@@ -307,10 +307,10 @@ function createDispatch(body) {
     if (combined) {
       // build + validate the white-box (code-review) side; bridge it to the live URL
       crMeta = buildCodeReviewMeta(body)          // validates absolute sourceDir
-      crMeta.deployUrl = meta.targetUrl           // UTTARA runtime-validates source findings against the live target
+      crMeta.deployUrl = meta.targetUrl           // PROBER runtime-validates source findings against the live target
       crTaskId = 't-' + Date.now() + '-' + crypto.randomBytes(2).toString('hex')
       crMeta.engagementId = taskId
-      // scope config so the code-review iteration's live (UTTARA) hits pass Phase 0.0
+      // scope config so the code-review iteration's live (PROBER) hits pass Phase 0.0
       try {
         fs.writeFileSync(path.join(INTEL, `scope-${crTaskId}.json`),
           JSON.stringify({ in_scope: meta.inScope, out_of_scope: meta.outOfScope, infra_dependencies: {} }, null, 2))
@@ -330,7 +330,7 @@ function createDispatch(body) {
       writeInbox('inbox/task-actions', {
         action: 'dispatch', taskId: crTaskId,
         taskTitle: `White-box: ${path.basename(crMeta.sourceDir)}`.slice(0, 200),
-        assignee: 'VIBHISHANA', squad: 'code-review-squad', priority: 'normal',
+        assignee: 'CURATOR', squad: 'code-review-squad', priority: 'normal',
         goal: `White-box code review of ${crMeta.sourceDir}; runtime-validate against ${meta.targetUrl}.`.slice(0, 500),
         createdAt: new Date().toISOString(), projectId: null, meta: crMeta,
       })
@@ -368,7 +368,7 @@ function cancelTask(body) {
   return { taskId, cancelled: true }
 }
 
-// ── findings (read-only) — VALIDATED-FINDINGS + DHARMARAJ judgement, by severity ──
+// ── findings (read-only) — VALIDATED-FINDINGS + ARBITER judgement, by severity ──
 const SEV_ORDER = ['Critical', 'High', 'Medium', 'Low', 'Info']
 function titleSev(s) {
   const v = String(s || '').toLowerCase()

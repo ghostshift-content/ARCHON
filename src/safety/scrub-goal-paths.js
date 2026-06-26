@@ -7,7 +7,7 @@
 // the literal "/root/intel/trajectory-observations.jsonl". Result: 28+
 // specialists wrote NON-CANONICAL custom-schema entries to that file
 // (verdicts like "HONEST", "CONFIRMED", "DISPROVEN" — none of which are
-// our canonical verdict set). Same pattern caused ASHWATTHAMA to write
+// our canonical verdict set). Same pattern caused FORGE to write
 // `/root/intel/CLOUD-SECURITY-HANDOFF-{taskId}.md` instead of using the
 // proper inbox JSON.
 //

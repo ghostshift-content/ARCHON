@@ -44,7 +44,7 @@ test('emitEpisode writes JSONL with all expected fields + epVersion=1', async ()
   er.emitEpisode({
     taskId: 'task-001',
     squad: 'pentest',
-    agentName: 'ARJUN',
+    agentName: 'SCOUT',
     phase: 'specialist',
     outcome: 'completed',
     gradeScore: 0.85,
@@ -68,7 +68,7 @@ test('emitEpisode writes JSONL with all expected fields + epVersion=1', async ()
   assert.ok(line.ts, 'ts should be set')
   assert.strictEqual(line.taskId, 'task-001')
   assert.strictEqual(line.squad, 'pentest')
-  assert.strictEqual(line.agentName, 'ARJUN')
+  assert.strictEqual(line.agentName, 'SCOUT')
   assert.strictEqual(line.phase, 'specialist')
   assert.strictEqual(line.outcome, 'completed')
   assert.strictEqual(line.gradeScore, 0.85)

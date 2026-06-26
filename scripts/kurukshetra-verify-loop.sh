@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# /root/agents/scripts/kurukshetra-verify-loop.sh
+# /root/agents/scripts/archon-verify-loop.sh
 #
-# Ralph-pattern continuous verification loop for kurukshetra.
-# Cron: */30 * * * * bash /root/agents/scripts/kurukshetra-verify-loop.sh
+# Ralph-pattern continuous verification loop for archon.
+# Cron: */30 * * * * bash /root/agents/scripts/archon-verify-loop.sh
 #
 # Runs every 30 min:
 #   1. bun test (full test suite, baseline 35/36 passing)
@@ -25,9 +25,9 @@ set -u
 
 JAY_CHAT_ID=487977821
 WORK_DIR=/root/agents
-STATE_FILE=/tmp/kurukshetra-verify-state
+STATE_FILE=/tmp/archon-verify-state
 OUTBOX=/root/intel/telegram-outbox
-LOG=/tmp/kurukshetra-verify.log
+LOG=/tmp/archon-verify.log
 
 ts() { date -u +%FT%TZ; }
 log_line() { echo "[$(ts)] $1" | tee -a "$LOG" >/dev/null; }
@@ -91,10 +91,10 @@ if [ -n "$regression" ]; then
 
   if [ "$prev_msg" != "$regression" ] || [ "$elapsed" -ge "$cooldown" ]; then
     log_line "REGRESSION: $regression"
-    alert_file="$OUTBOX/kurukshetra-verify-regression-${now}.json"
+    alert_file="$OUTBOX/archon-verify-regression-${now}.json"
     python3 -c "
 import json
-text = '''⚠️ Kurukshetra verify-loop REGRESSION
+text = '''⚠️ ARCHON verify-loop REGRESSION
 
 $regression
 
@@ -102,7 +102,7 @@ Tests: $test_pass / 36 passed
 GATEs: $gate_pass / $gate_total passed
 Daemons online: $daemons_online / 4
 
-Run: bash /root/agents/scripts/kurukshetra-verify-loop.sh
+Run: bash /root/agents/scripts/archon-verify-loop.sh
 Log: $LOG
 '''
 import os

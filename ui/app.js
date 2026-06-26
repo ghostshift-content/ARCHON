@@ -1,4 +1,4 @@
-/* Kurukshetra operator console — SPA logic (no framework, no build). */
+/* ARCHON operator console — SPA logic (no framework, no build). */
 'use strict'
 const $ = (s, r = document) => r.querySelector(s)
 const $$ = (s, r = document) => [...r.querySelectorAll(s)]
@@ -401,7 +401,7 @@ async function saveTriage() {
 $('#fnSave').onclick = async () => { const r = await saveTriage(); if (r && !r.error) toast('Triage saved', `${r.triaged} verdict(s)`, 'ok'); else toast('Save failed', r && r.error, 'err') }
 $('#fnEnrich').onclick = async () => {
   const r = await api('POST', '/api/enrich-findings', { taskId: fnTaskId })
-  if (r && !r.error) toast('Enriching findings…', 'KRIPA writing description / impact / remediation — reload in ~1 min', 'ok')
+  if (r && !r.error) toast('Enriching findings…', 'AUDITOR writing description / impact / remediation — reload in ~1 min', 'ok')
   else toast('Enrich failed', r && r.error, 'err')
 }
 
@@ -478,7 +478,7 @@ $('#fnGen').onclick = async () => {
   const s = await saveTriage(); if (s && s.error) return toast('Save failed', s.error, 'err')
   // target the engagement root → daemon aggregates confirmed findings across all iterations
   const r = await api('POST', '/api/generate-report', { taskId: fnEngagementId || fnTaskId })
-  if (r && !r.error) { toast('Generating report ✓', 'VYASA writing from confirmed findings (all iterations)', 'ok'); setTdSub('report') }
+  if (r && !r.error) { toast('Generating report ✓', 'SCRIBE writing from confirmed findings (all iterations)', 'ok'); setTdSub('report') }
   else toast('Generate failed', r && r.error, 'err')
 }
 // ── run another iteration on this engagement ──
@@ -566,18 +566,18 @@ function updateDispatchInfo() {
   $('#fSquadHint').textContent = cr
     ? `White-box review: ${sq.leader} discovers + consolidates; specialists map per-feature then assess per vuln-class.`
     : pt
-    ? `${sq.leader} runs recon → specialists → KRIPA verify → DHARMARAJ judge → VYASA report. Scope is hard-enforced at Phase 0.`
+    ? `${sq.leader} runs recon → specialists → AUDITOR verify → ARBITER judge → SCRIBE report. Scope is hard-enforced at Phase 0.`
     : `Leader ${sq.leader} coordinates ${sq.agents.length} personas through ${sq.phases.length} phases.`
   $('#dispatchInfo').innerHTML = md(cr
     ? `**Code review (white-box, phase1-maps method)** on a local source tree.\n\n`
       + `1. **Inventories** — scripted enumeration\n2. **Feature queue** — GitLab preset (43) or auto-discovered (generic)\n`
-      + `3. **Feature mapping** — one agent per feature → \`features/<slug>.md\`\n4. **Consolidation** — VIBHISHANA → coverage matrices + review queue\n`
-      + `5. **Vuln assessment** — per feature × class (access-control → DHRISHTADYUMNA, XSS → VIRATA)\n6. **Verify** — KRIPA (+ UTTARA if Deploy URL)\n7. **Report** — VYASA\n\n`
+      + `3. **Feature mapping** — one agent per feature → \`features/<slug>.md\`\n4. **Consolidation** — CURATOR → coverage matrices + review queue\n`
+      + `5. **Vuln assessment** — per feature × class (access-control → MARSHAL, XSS → CIPHER)\n6. **Verify** — AUDITOR (+ PROBER if Deploy URL)\n7. **Report** — SCRIBE\n\n`
       + `Artifacts land under \`phase1-maps/\` + \`phase2/\`, viewable in **Reports**.\n\n> **GitLab** uses your 43-feature preset; **Generic** auto-discovers features for any repo.`
     : pt
     ? `**Web pentest** of the target URL.\n\n`
       + `On dispatch the console writes a **scope config** (\`scope-<taskId>.json\`) and an **engagement brief** (target, scope, focus, the test-account table).\n\n`
-      + `1. **Phase 0** scope hard-block (out-of-scope hosts rejected)\n2. **Recon** (ARJUN, RUDRA) — auth/WAF/surface\n3. **Specialists** — per vuln class, authenticating with your test accounts\n4. **KRIPA** verify → **DHARMARAJ** judge → **VYASA** report\n\n`
+      + `1. **Phase 0** scope hard-block (out-of-scope hosts rejected)\n2. **Recon** (SCOUT, RANGER) — auth/WAF/surface\n3. **Specialists** — per vuln class, authenticating with your test accounts\n4. **AUDITOR** verify → **ARBITER** judge → **SCRIBE** report\n\n`
       + `> **Full** tests the whole app; **Feature-driven** focuses on what you name. Each role is tested for cross-role authz (IDOR / priv-esc). Out-of-scope hosts are never touched.`
     : `Dispatching to **${sq.id}** queues a task for **${sq.leader}**.\n\nThe daemon picks it up within seconds and runs the pipeline:\n\n`
       + sq.phases.map((p, i) => `${i + 1}. **${p}**`).join('\n')

@@ -25,7 +25,7 @@ const fs=require("fs");let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{
   // visible telegram note (relay picks up files in the outbox dir)
   try{
     fs.mkdirSync("'"$OUTBOX"'",{recursive:true});
-    const msg="⚠️ Kurukshetra drift detected ("+ts+"): "+bad.map(r=>r.name).concat(alerts.map(a=>a.name||"alert")).join(", ");
+    const msg="⚠️ ARCHON drift detected ("+ts+"): "+bad.map(r=>r.name).concat(alerts.map(a=>a.name||"alert")).join(", ");
     fs.writeFileSync("'"$OUTBOX"'/changelog-drift-"+Date.now()+".txt", msg);
   }catch{}
 });

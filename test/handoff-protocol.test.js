@@ -50,7 +50,7 @@ test('createHandoff: writes a JSON file to inbox dir', () => {
     const result = createHandoff({
       sourceTaskId: 'T1',
       sourceSquad: 'pentest',
-      sourceAgent: 'ASHWATTHAMA',
+      sourceAgent: 'FORGE',
       sourceFindingId: 'ASH-001',
       targetSquad: 'cloud-security',
       targetCapability: 'data-residency',

@@ -64,7 +64,7 @@ test('promotion-mode prompt anti-sycophancy: hides severity_original and special
   // No "specialist thinks", no severity_original
   assert.doesNotMatch(promo, /specialist thinks|the specialist|severity_original/i,
     'promo prompt must not prime with specialist framing')
-  // Should not literally include "Medium" as the analyst's verdict in a priming way
+  // Should not literally include "Medium" as analyst's verdict in a priming way
   // (the rubric may legitimately mention "kept at Medium" in stage C/D guidance — that's OK)
 })
 

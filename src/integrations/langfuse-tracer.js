@@ -64,7 +64,7 @@ function _flush() {
   const cfg = loadConfig()
   if (!cfg) { _buffer.length = 0; return }
   const batch = _buffer.splice(0, _buffer.length)
-  const body = JSON.stringify({ batch, metadata: { source: 'kurukshetra' } })
+  const body = JSON.stringify({ batch, metadata: { source: 'archon' } })
   try {
     const u = new URL(cfg.host + '/api/public/ingestion')
     const lib = u.protocol === 'https:' ? https : http

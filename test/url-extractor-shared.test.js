@@ -6,7 +6,7 @@
 // (exports `extractTargetUrl({dispatch})` — for Phase 3.06 scope routing). The new
 // shared extractor at agents/url-extractor.js has a different API: it takes a raw
 // text string and returns the first http(s) URL with trailing punctuation trimmed.
-// Used by kripa-validated-builder (producer) + scope-validator (consumer fallback).
+// Used by auditor-validated-builder (producer) + scope-validator (consumer fallback).
 //
 // Run: bun test test/url-extractor-shared.test.js
 
@@ -63,7 +63,7 @@ test('extractFirstUrl: trims trailing punctuation (. , ; : ) ])', () => {
   assert.strictEqual(extractFirstUrl('(https://example.com/c)'), 'https://example.com/c')
 })
 
-test('extractFirstUrl: KRIPA-realistic detail text', () => {
+test('extractFirstUrl: AUDITOR-realistic detail text', () => {
   const detail = `Confirmed via curl: curl -sI 'https://uatcommercial.lenovo.com/eticket/login' returned 200 with X-Powered-By header.`
   assert.strictEqual(extractFirstUrl(detail), 'https://uatcommercial.lenovo.com/eticket/login')
 })

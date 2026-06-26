@@ -6,7 +6,7 @@ TOKEN=$(python3 -c "import json; d=json.load(open('/root/.openclaw/openclaw.json
 while true; do
     # Check and restart dead services
     if ! ps aux | grep "node server.js" | grep -v grep > /dev/null; then
-        cd /root/mission-control && NODE_ENV=production PORT=3000 nohup node server.js &>/tmp/sanjay.log &
+        cd /root/mission-control && NODE_ENV=production PORT=3000 nohup node server.js &>/tmp/nexus.log &
         sleep 3
     fi
     if ! ps aux | grep "event-bus.js" | grep -v grep > /dev/null; then

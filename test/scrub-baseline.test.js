@@ -2,7 +2,7 @@
 
 const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see paths.js
 // Unit tests for scrubBaselineFromGoal — prevents sycophantic baseline-number
-// mirroring in specialist/KRIPA/VYASA outputs (Apr-21 Run 1 regression guard).
+// mirroring in specialist/AUDITOR/SCRIBE outputs (Apr-21 Run 1 regression guard).
 // Run: node /root/agents/test/scrub-baseline.test.js
 // Exit 0 = all pass. Non-zero = regression.
 
@@ -86,7 +86,7 @@ test(
 // The complete Apr-21 dispatch goal text verbatim — regression guard
 test(
   'full Apr-21 dispatch goal text — no baseline leakage',
-  `Re-run full pentest on hrconnect.emiratesnbd.com using the updated framework (squad-aware modelRouter, anti-bias discipline, sonnet stock_analyst uplift applied where relevant, modelRouter fixes from 2026-04-20, DHARMARAJ on modelRouter not hardcoded sonnet, LLM grader on modelRouter.resolveFamily('fast')). Apr-20 baseline FINAL-REPORT at ${__roots.INTEL_ROOT}/pentest/FINAL-REPORT.md = 19 confirmed findings (2 CRIT + 7 HIGH + 5 MED + 5 LOW) with 11 critical/high attack chains. Goal: match or exceed this baseline on severity coverage AND show measurable quality improvements`,
+  `Re-run full pentest on hrconnect.emiratesnbd.com using the updated framework (squad-aware modelRouter, anti-bias discipline, sonnet stock_analyst uplift applied where relevant, modelRouter fixes from 2026-04-20, ARBITER on modelRouter not hardcoded sonnet, LLM grader on modelRouter.resolveFamily('fast')). Apr-20 baseline FINAL-REPORT at ${__roots.INTEL_ROOT}/pentest/FINAL-REPORT.md = 19 confirmed findings (2 CRIT + 7 HIGH + 5 MED + 5 LOW) with 11 critical/high attack chains. Goal: match or exceed this baseline on severity coverage AND show measurable quality improvements`,
   ['Apr-20 baseline', '2 CRIT', '7 HIGH', '5 MED', '5 LOW', 'match or exceed', '11 critical/high attack chains', '= 19 confirmed findings'],
   ['Re-run full pentest on hrconnect.emiratesnbd.com', 'anti-bias discipline', 'squad-aware modelRouter']
 )

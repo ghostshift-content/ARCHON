@@ -1,0 +1,3 @@
+# MEMORY.md — scribe Long-Term Memory
+
+_Lessons learned, past analyses, key findings._

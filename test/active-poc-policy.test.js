@@ -49,11 +49,11 @@ test('targetInScope: glob and exact', () => {
 })
 
 test('envIsEnabled returns false without env var', () => {
-  delete process.env.KURUKSHETRA_ACTIVE_POC
+  delete process.env.archon_ACTIVE_POC
   assert.strictEqual(policy.envIsEnabled(), false)
-  process.env.KURUKSHETRA_ACTIVE_POC = 'enabled'
+  process.env.archon_ACTIVE_POC = 'enabled'
   assert.strictEqual(policy.envIsEnabled(), true)
-  delete process.env.KURUKSHETRA_ACTIVE_POC
+  delete process.env.archon_ACTIVE_POC
 })
 
 test('shouldAbortOnDefender detects WAF, rate-limit, CAPTCHA', () => {

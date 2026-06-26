@@ -34,7 +34,7 @@ function baseArgs(overrides = {}) {
   return {
     sourceTaskId: 'T-CAP',
     sourceSquad: 'pentest',
-    sourceAgent: 'ASHWATTHAMA',
+    sourceAgent: 'FORGE',
     sourceFindingId: 'F-1',
     targetSquad: 'cloud-security',
     targetCapability: 'data-residency',

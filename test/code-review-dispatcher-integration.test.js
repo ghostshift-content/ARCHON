@@ -3,7 +3,7 @@ const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see path
 // Integration test for code-review-dispatcher — phase1-maps methodology.
 // Mocks spawnAgent (no real LLM) to assert the full pipeline wiring:
 //   Phase 0 validate → 0a inventories → 0b feature queue → 1 per-feature mapping
-//   → 1c consolidation → 2 per-feature×class assessment → 2v KRIPA verify → 3 VYASA.
+//   → 1c consolidation → 2 per-feature×class assessment → 2v AUDITOR verify → 3 SCRIBE.
 // Run: node test/code-review-dispatcher-integration.test.js
 
 const assert = require('assert')
@@ -61,15 +61,15 @@ function stubDeps(spawnCalls) {
     const mapCalls = calls.filter(c => c.sessionSuffix.includes('-map-'))
     ok('one mapping agent per feature (3)', mapCalls.length === 3, 'got ' + mapCalls.length)
     ok('mapping agents drawn from specialist pool', mapCalls.every(c => cr.MAPPER_POOL.includes(c.agentName)))
-    ok('VIBHISHANA consolidates', calls.some(c => c.sessionSuffix.includes('consolidate') && c.agentName === 'vibhishana'))
+    ok('CURATOR consolidates', calls.some(c => c.sessionSuffix.includes('consolidate') && c.agentName === 'curator'))
 
     const p2 = calls.filter(c => c.sessionSuffix.includes('-p2-'))
     ok('phase2 = maxPhase2(2) × classes(2) = 4 calls', p2.length === 4, 'got ' + p2.length)
-    ok('access-control routed to DHRISHTADYUMNA', p2.some(c => c.sessionSuffix.includes('p2-access-control') && c.agentName === 'dhrishtadyumna'))
-    ok('xss routed to VIRATA', p2.some(c => c.sessionSuffix.includes('p2-xss') && c.agentName === 'virata'))
-    ok('KRIPA verifies', calls.some(c => c.agentName === 'kripa'))
-    ok('UTTARA skipped (no deployUrl)', !calls.some(c => c.agentName === 'uttara'))
-    ok('VYASA reports last', calls[calls.length - 1].agentName === 'vyasa')
+    ok('access-control routed to MARSHAL', p2.some(c => c.sessionSuffix.includes('p2-access-control') && c.agentName === 'marshal'))
+    ok('xss routed to CIPHER', p2.some(c => c.sessionSuffix.includes('p2-xss') && c.agentName === 'cipher'))
+    ok('AUDITOR verifies', calls.some(c => c.agentName === 'auditor'))
+    ok('PROBER skipped (no deployUrl)', !calls.some(c => c.agentName === 'prober'))
+    ok('SCRIBE reports last', calls[calls.length - 1].agentName === 'scribe')
   }
 
   // ── Test 2: generic discovery path ──
@@ -81,7 +81,7 @@ function stubDeps(spawnCalls) {
       { taskId: 'cr-test-2', squad: 'code-review-squad', projectId: '',
         meta: { sourceDir: srcDir, preset: 'generic', vulnClasses: ['access-control'], outputDir: outDir } },
       stubDeps(calls))
-    ok('discovery ran (VIBHISHANA)', calls.some(c => c.sessionSuffix.includes('discovery') && c.agentName === 'vibhishana'))
+    ok('discovery ran (CURATOR)', calls.some(c => c.sessionSuffix.includes('discovery') && c.agentName === 'curator'))
     ok('discovered 2 features → 2 mapping agents', calls.filter(c => c.sessionSuffix.includes('-map-')).length === 2, 'got ' + calls.filter(c => c.sessionSuffix.includes('-map-')).length)
   }
 

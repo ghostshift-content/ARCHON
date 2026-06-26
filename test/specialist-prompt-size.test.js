@@ -84,7 +84,7 @@ test('setup: extract helper module', () => {
 // ── Render each builder ───────────────────────────────────────────────────
 
 function renderPentest() {
-  return H.buildPentestSpecialistPrompt('nakul', 'task', 't1', 'p1', 'pentest', 'goal', 'https://x.com', 'cloudflare', 'php', null)
+  return H.buildPentestSpecialistPrompt('viper', 'task', 't1', 'p1', 'pentest', 'goal', 'https://x.com', 'cloudflare', 'php', null)
 }
 function renderCloud() {
   return H.buildCloudSpecialistPrompt('agni', 'task', 't1', 'p1', 'cloud-security', 'goal', 'acct1', 'aws', ['us-east-1'])
@@ -93,7 +93,7 @@ function renderNetwork() {
   return H.buildNetworkSpecialistPrompt('indra', 'task', 't1', 'p1', 'network-pentest', 'goal', { cidr: '10.0.0.0/16' }, '/tmp/hosts', 'ad')
 }
 function renderCodeReview() {
-  return H.buildSpecialistPrompt('virata', 'task', 't1', 'p1', 'code-review', 'goal', '/src', 'react')
+  return H.buildSpecialistPrompt('cipher', 'task', 't1', 'p1', 'code-review', 'goal', '/src', 'react')
 }
 
 // ── Size ceilings (regression guard) ──────────────────────────────────────
@@ -110,7 +110,7 @@ test('buildPentestSpecialistPrompt under regression ceiling', () => {
   const p = renderPentest()
   // 2026-05-14: ceiling raised 8500→9000 (EndpointModel handoff block)
   // 2026-06-05: ceiling raised 9000→10500 (GATE-13 confidence+reproduction field
-  //   added to MUST_GATES — mandatory quality gate that improves DHARMARAJ evidence)
+  //   added to MUST_GATES — mandatory quality gate that improves ARBITER evidence)
   const ceiling = 10500
   assert.ok(p.length <= ceiling,
     `buildPentestSpecialistPrompt grew to ${p.length} bytes — ceiling is ${ceiling}`)

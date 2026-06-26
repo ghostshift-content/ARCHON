@@ -157,7 +157,7 @@ function distill({ episodes = [], baseline = {} } = {}) {
   }
 
   // --- 2. Cost outliers ---
-  // EXCLUDE failed/hung runs (2026-06-09): a killed agent (e.g. BHISHMA's 45min hang, exit 143)
+  // EXCLUDE failed/hung runs (2026-06-09): a killed agent (e.g. veteran's 45min hang, exit 143)
   // burns cost producing nothing — that's a HANG to fix (the activity-stall watchdog), NOT a
   // "this agent needs less effort" signal. Counting it inflated the avg AND fired a spurious
   // "downgrade effort" proposal. Only completed runs carry a real cost signal.

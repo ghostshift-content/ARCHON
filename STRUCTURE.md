@@ -4,7 +4,7 @@
 > is evicted out of the code dirs. All path resolution goes through one chokepoint (`paths.js`),
 > driven by runtime config (`layout.config.json` + `ownership.json`) that both the daemon and the
 > dashboard read live — so the physical layout can move again with a config flip, no code change.
-> Full design + rationale: `docs/research/2026-06-07-kurukshetra-restructure-design.md`.
+> Full design + rationale: `docs/research/2026-06-07-archon-restructure-design.md`.
 
 ## The layout
 
@@ -20,20 +20,20 @@
 │   ├── pentest/
 │   │   ├── capabilities.json    # A2A handoff capabilities (GATE-64)
 │   │   └── agents/              # ← personas live HERE now
-│   │       ├── krishna/ (leader)  arjun/ rudra/ bheem/ karna/ nakul/ sahdev/ draupadi/
-│   │       └── abhimanyu/ eklavya/ satyaki/ shikhandi/ yuyutsu/ kritavarma/ ashwatthama/ dharma/
-│   ├── stocks/agents/          { chanakya(leader) bhishma drona lakshmi narad saraswati shakuni surya vayu vidura vishnu }
+│   │       ├── atlas/ (leader)  scout/ ranger/ relay/ drill/ viper/ gateway/ warden/
+│   │       └── vault/ tracer/ keyring/ decoy/ ledger/ spectre/ forge/ sentry/
+│   ├── stocks/agents/          { chanakya(leader) the veteran the analyst lakshmi narad saraswati shakuni surya vayu vidura vishnu }
 │   ├── cloud-security/         { capabilities.json, agents/{varuna(leader) agni kubera mitra soma} }
 │   ├── network-pentest/agents/ { shalya(leader) indra ghatotkacha }   # GHATOTKACHA's ONE home
-│   ├── code-review/agents/     { vibhishana(leader) dhrishtadyumna vikarna virata jayadratha barbarika drupada uttara }
+│   ├── code-review/agents/     { curator(leader) marshal siphon cipher quill beacon breaker prober }
 │   ├── red-team/agents/        { parashurama }
 │   └── ai-security/agents/     { maya }
 │
 ├── _universal/agents/           # cross-squad agents — ONE shared home (squad-parameterized)
-│   ├── kripa/      (independent verifier — used by all squads w/ Phase 3)
-│   ├── vyasa/      (final reporter)
-│   ├── dharmaraj/  (confidence-calibrated judge — Phase 3.9, all squads)
-│   └── rof/        (main-squad leader)        # sanjay = router, no dir
+│   ├── auditor/      (independent verifier — used by all squads w/ Phase 3)
+│   ├── scribe/      (final reporter)
+│   ├── arbiter/  (confidence-calibrated judge — Phase 3.9, all squads)
+│   └── command/        (main-squad leader)        # nexus = router, no dir
 │
 ├── agents/                      # framework helper MODULES (NOT personas — historical name)
 │   ├── runner/  squads/<sq>/squad.json (GATE-101 operational config — see note)

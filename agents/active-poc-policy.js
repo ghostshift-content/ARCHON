@@ -5,7 +5,7 @@
 //
 //   1. taskConfig.engagement_mode === 'active-poc'
 //   2. active_poc_permission token valid (issuer, expiry, scope, caps)
-//   3. KURUKSHETRA_ACTIVE_POC=enabled env var (operator kill-switch)
+//   3. archon_ACTIVE_POC=enabled env var (operator kill-switch)
 //
 // Per-probe runtime gates: target-in-scope + per-finding cap + per-task
 // cap + defender-response abort.
@@ -73,11 +73,11 @@ function targetInScope(domain, permission) {
   return false
 }
 
-// Operator kill-switch: the daemon must have KURUKSHETRA_ACTIVE_POC=enabled
+// Operator kill-switch: the daemon must have archon_ACTIVE_POC=enabled
 // to allow ANY active probe. Means even if a task ships with active-poc
 // config, an unprepared daemon refuses to run.
 function envIsEnabled() {
-  return process.env.KURUKSHETRA_ACTIVE_POC === 'enabled'
+  return process.env.archon_ACTIVE_POC === 'enabled'
 }
 
 // Defender-response detection: rate-limit, WAF challenge, CAPTCHA wall.

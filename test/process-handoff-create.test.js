@@ -34,7 +34,7 @@ function validHandoffJson() {
   return {
     source_task_id: 'CLI-T1',
     source_squad: 'pentest',
-    source_agent: 'ASHWATTHAMA',
+    source_agent: 'FORGE',
     source_finding_id: 'CLI-F1',
     target_squad: 'cloud-security',
     target_capability: 'data-residency',

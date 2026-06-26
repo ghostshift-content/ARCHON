@@ -4,7 +4,7 @@
 // Bug context (2026-05-09 round-8 motorola.com):
 //   Title: "Pentest round-8 — full Sprint A+B+C+polish+gates validation on motorola.com"
 //   Config: { target: "https://support.motorola.com", target_url: "https://support.motorola.com" }
-//   Pre-fix: bare 'motorola.com' won from title, EKLAVYA crawled wrong URL.
+//   Pre-fix: bare 'motorola.com' won from title, TRACER crawled wrong URL.
 //   Post-fix: config.target_url MUST win over title-extracted bare domain.
 //
 // Priority order locked in here:

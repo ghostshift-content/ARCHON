@@ -4,14 +4,14 @@
 //
 // Production audit on /root/intel/pentest/VALIDATED-FINDINGS.jsonl (48 findings)
 // found 22 distinct key signatures, severity in 3 case variants, 42/48 missing
-// `title`, and two schema families (DHARMA-style / DURYODHANA-style). Downstream
+// `title`, and two schema families (SENTRY-style / adversary-style). Downstream
 // components silently broke on the variance (e.g., severity case-sensitive
 // comparisons skipped half the findings; missing `title` produced "(no title)"
 // in judge prompts that anchored Stage A on absence of context).
 //
 // This module is the SINGLE source of truth for finding-record shape between
-// the specialist→KRIPA write boundary and any downstream reader (judge, browser
-// verifier, VYASA). Belt-and-suspenders with judge-verifier's extractEvidence:
+// the specialist→AUDITOR write boundary and any downstream reader (judge, browser
+// verifier, SCRIBE). Belt-and-suspenders with judge-verifier's extractEvidence:
 // normalize the record once, stringify object fields in the prompt builder.
 
 const fs = require('node:fs')
@@ -141,7 +141,7 @@ function readFindingsFile(filePath) {
     try {
       findings.push(normalizeFinding(JSON.parse(line)))
     } catch {
-      // malformed line — skip silently (typical when KRIPA writes mid-flush)
+      // malformed line — skip silently (typical when AUDITOR writes mid-flush)
     }
   }
   return findings
@@ -155,7 +155,7 @@ function readFindingsFile(filePath) {
  *
  * @param {object} finding          - Raw or pre-validated finding object
  * @param {object} opts
- * @param {string} opts.source      - Agent name who produced this (e.g. 'KRIPA')
+ * @param {string} opts.source      - Agent name who produced this (e.g. 'AUDITOR')
  * @param {string} opts.taskId      - The dispatch task ID
  * @returns {object} PhaseEnvelope with type='finding'
  */

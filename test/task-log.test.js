@@ -93,7 +93,7 @@ async function main() {
 
   test('appendToTaskLog + readTaskLog: single entry round-trip', () => {
     const id = uniqueId('single')
-    const entry = { ts: '2026-04-19T00:00:00Z', agent: 'ARJUN', action: 'Recon complete', taskId: id }
+    const entry = { ts: '2026-04-19T00:00:00Z', agent: 'SCOUT', action: 'Recon complete', taskId: id }
     tl.appendToTaskLog(id, entry)
     const out = tl.readTaskLog(id)
     assert.strictEqual(out.length, 1)

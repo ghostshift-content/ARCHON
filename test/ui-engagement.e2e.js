@@ -19,7 +19,7 @@ const seedFindings = (tid, arr) => fs.writeFileSync(F(`VALIDATED-FINDINGS-${tid}
 
 function seed() {
   const tasks = JSON.parse(fs.readFileSync(tasksFile, 'utf8'))
-  tasks.push({ id: E, squad: 'pentest-squad', assignee: 'KRISHNA', status: 'awaiting-triage', progress: 90, title: 'E2E Engagement', goal: 'Pentest http://eng.e2e/', createdAt: '2026-01-01T00:00:00Z', lastUpdate: '2026-01-01T00:00:00Z' })
+  tasks.push({ id: E, squad: 'pentest-squad', assignee: 'ATLAS', status: 'awaiting-triage', progress: 90, title: 'E2E Engagement', goal: 'Pentest http://eng.e2e/', createdAt: '2026-01-01T00:00:00Z', lastUpdate: '2026-01-01T00:00:00Z' })
   fs.writeFileSync(tasksFile, JSON.stringify(tasks, null, 2))
   fs.writeFileSync(F(`engagement-${E}.json`), JSON.stringify({
     engagementId: E, targetUrl: 'http://eng.e2e/', inScope: ['eng.e2e'], outOfScope: [], credentials: [], severityProfile: 'comprehensive', triageGate: true,

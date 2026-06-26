@@ -15,7 +15,7 @@
 // Round-8 regression (2026-05-09):
 //   Title "...validation on motorola.com" + config {target_url:
 //   "https://support.motorola.com"} previously extracted bare 'motorola.com'
-//   from the title, EKLAVYA crawled the wrong host, wasted ~15 min.
+//   from the title, TRACER crawled the wrong host, wasted ~15 min.
 //   Now config.target_url wins. Title extraction is a fallback only.
 //
 // Trailing punctuation (`,`, `)`, `.`) is stripped from the matched URL.

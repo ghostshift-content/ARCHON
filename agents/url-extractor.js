@@ -1,7 +1,7 @@
 // agents/url-extractor.js
 //
 // Single-purpose: extract first http(s) URL from arbitrary text.
-// Used by Phase 3.05 kripa-validated-builder (producer) and Phase 3.06
+// Used by Phase 3.05 auditor-validated-builder (producer) and Phase 3.06
 // scope-validator (consumer fallback). Pentest squad-policy keeps its
 // own inline regex for now — gate-covered, not worth churn.
 //

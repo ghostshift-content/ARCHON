@@ -21,7 +21,7 @@ module.exports = {
     }
     const res = await fetchImpl(url, {
       method: 'GET',
-      headers: { 'User-Agent': 'kurukshetra-cloud-poc/1.0' },
+      headers: { 'User-Agent': 'archon-cloud-poc/1.0' },
     })
     const body_preview = String(res.body || '').slice(0, 800)
     const isAccessDenied = res.status === 403 && /AccessDenied/i.test(body_preview)

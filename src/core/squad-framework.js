@@ -50,14 +50,14 @@ If you cannot answer YES to all three → mark as SUSPECTED or DISPROVEN, not CO
 - If a lesson says "CORS works on domain X" and you're testing domain Y, verify CORS on Y independently — don't copy the conclusion
 - Past lessons help you know WHAT to test, not WHAT the result will be
 
-**GATE-11 [CHAIN-COMPLETE]:** Before claiming any CRITICAL or HIGH severity finding, trace the evidence chain end-to-end in your squad's domain. Local-only evidence (single file, single config value, single packet, single line) is INSUFFICIENT for CRITICAL/HIGH. The chain must cover: input source → every defense layer the input passes through → the sink where the vulnerability manifests. If ANY layer was not inspected, downgrade severity and emit \`evidence_completeness\` metadata (values: "full", "partial", "local_only") plus \`pipeline_trace\` (array of layer names inspected). Squad-specific chain examples live in each squad's skill files. KRIPA auto-caps severity: full→Critical OK, partial→max Medium, local_only→max Low.
+**GATE-11 [CHAIN-COMPLETE]:** Before claiming any CRITICAL or HIGH severity finding, trace the evidence chain end-to-end in your squad's domain. Local-only evidence (single file, single config value, single packet, single line) is INSUFFICIENT for CRITICAL/HIGH. The chain must cover: input source → every defense layer the input passes through → the sink where the vulnerability manifests. If ANY layer was not inspected, downgrade severity and emit \`evidence_completeness\` metadata (values: "full", "partial", "local_only") plus \`pipeline_trace\` (array of layer names inspected). Squad-specific chain examples live in each squad's skill files. AUDITOR auto-caps severity: full→Critical OK, partial→max Medium, local_only→max Low.
 
-**GATE-12 [THREAT-MODEL]:** Before claiming CRITICAL or HIGH severity, state the realistic attacker model as structured metadata on the candidate: what privilege level does the attacker need (unauth / authenticated / privileged / admin / superuser)? What trust boundary (if any) does the attack cross? Are required runtime dependencies (binaries, services, config flags) verified present? Is this behavior documented as intentional by the target? Severity must match the realistic attack path, not worst-case theoretical impact. KRIPA applies stacked caps: admin-only → max Medium; working-as-designed → −1 tier; toolchain not verified → max Low; no trust boundary crossed → −1 tier. Cap composition: worst ceiling among applied rules. Missing threat_model field → SAFE defaults that downgrade.
+**GATE-12 [THREAT-MODEL]:** Before claiming CRITICAL or HIGH severity, state the realistic attacker model as structured metadata on the candidate: what privilege level does the attacker need (unauth / authenticated / privileged / admin / superuser)? What trust boundary (if any) does the attack cross? Are required runtime dependencies (binaries, services, config flags) verified present? Is this behavior documented as intentional by the target? Severity must match the realistic attack path, not worst-case theoretical impact. AUDITOR applies stacked caps: admin-only → max Medium; working-as-designed → −1 tier; toolchain not verified → max Low; no trust boundary crossed → −1 tier. Cap composition: worst ceiling among applied rules. Missing threat_model field → SAFE defaults that downgrade.
 
 **GATE-13 [CONFIDENCE + REPRODUCTION]:** Every finding logged to live-findings MUST include TWO fields:
 - \`"confidence": "high|medium|low"\` — high = I ran the exploit and saw the impact; medium = I reproduced the condition but impact is inferred; low = I saw signals but didn't fully confirm
 - \`"reproduction": "EXACT curl command or steps"\` — the specific command you ran that produced evidence
-Without these fields, KRIPA and DHARMARAJ cannot evaluate your finding properly. A finding with confidence="high" and a concrete reproduction command gets priority validation. Low confidence findings get deprioritized. This is not optional.
+Without these fields, AUDITOR and ARBITER cannot evaluate your finding properly. A finding with confidence="high" and a concrete reproduction command gets priority validation. Low confidence findings get deprioritized. This is not optional.
 `;
 
 const MUST_GATES_STOCKS = `
@@ -121,18 +121,18 @@ function saveBudgetConfig(config) {
 // files (in addition to the canonical /root/intel/reports/<taskId>.md). Used by
 // saveAgentReport() / extractAndSaveSquadReport() / grader fallback scan to
 // locate dossiers when an agent writes to a file rather than to stdout.
-// finalReportName: optional well-known filename the leader writes (e.g. VYASA's
+// finalReportName: optional well-known filename teamleader writes (e.g. SCRIBE's
 // FINAL-REPORT.md for pentest). Absent = canonical /reports/<taskId>.md only.
 const SQUAD_TYPES = {
   'pentest': {
     type: 'security-testing',
-    leaderAgent: 'krishna',       // who runs chain analysis + coordinates
+    leaderAgent: 'atlas',       // who runs chain analysis + coordinates
     gateStyle: 'security',        // 'security' = MUST_GATES / 'analysis' = MUST_GATES_STOCKS
     memoryNamespace: 'pentest',   // drives /root/intel/squad-memory-<ns>.json
     dispatchType: 'parallel-phases', // 'parallel-phases' = pentest flow, 'parallel-challenger' = stocks flow
     validationModel: 'multi-stage',
     chainAnalysis: true,
-    dharmarajVerification: true,
+    arbiterVerification: true,
     costBudget: 50,
     phases: ['recon', 'exploit', 'validate', 'chain', 'report', 'verify'],
     reportFormat: 'pentest-report',
@@ -150,7 +150,7 @@ const SQUAD_TYPES = {
     dispatchType: 'parallel-challenger',
     validationModel: 'challenger',
     chainAnalysis: true,
-    dharmarajVerification: false, // Skip — SELF_EVAL + grading sufficient for stocks, saves 15-22 min
+    arbiterVerification: false, // Skip — SELF_EVAL + grading sufficient for stocks, saves 15-22 min
     costBudget: 50,
     phases: ['research', 'analyze', 'challenge', 'synthesize', 'report', 'verify'],
     reportFormat: 'stock-analysis',
@@ -168,7 +168,7 @@ const SQUAD_TYPES = {
     dispatchType: 'parallel-phases', // same as pentest for now; override when red-team flow diverges
     validationModel: 'multi-stage',
     chainAnalysis: true,
-    dharmarajVerification: true,
+    arbiterVerification: true,
     costBudget: 50,
     phases: ['recon', 'exploit', 'lateral', 'validate', 'chain', 'report', 'verify'],
     reportFormat: 'pentest-report',
@@ -186,7 +186,7 @@ const SQUAD_TYPES = {
     dispatchType: 'cloud-security',
     validationModel: 'multi-stage',
     chainAnalysis: true,
-    dharmarajVerification: true,
+    arbiterVerification: true,
     costBudget: 50,
     phases: ['enumerate', 'assess', 'validate', 'chain', 'report', 'verify'],
     reportFormat: 'cloud-security-report',
@@ -204,7 +204,7 @@ const SQUAD_TYPES = {
     dispatchType: 'network-pentest',
     validationModel: 'multi-stage',
     chainAnalysis: true,
-    dharmarajVerification: true,
+    arbiterVerification: true,
     costBudget: 50,
     phases: ['discovery', 'enumerate', 'exploit', 'validate', 'chain', 'report', 'verify'],
     reportFormat: 'pentest-report',
@@ -216,13 +216,13 @@ const SQUAD_TYPES = {
   },
   'code-review': {
     type: 'security-testing',
-    leaderAgent: 'vibhishana',
+    leaderAgent: 'curator',
     gateStyle: 'security',
     memoryNamespace: 'code-review',
     dispatchType: 'code-review',
     validationModel: 'multi-stage',
     chainAnalysis: true,
-    dharmarajVerification: true,
+    arbiterVerification: true,
     costBudget: 50,
     phases: ['blueprint', 'trace', 'deploy', 'validate', 'chain', 'report', 'verify'],
     reportFormat: 'code-review-report',
@@ -234,13 +234,13 @@ const SQUAD_TYPES = {
   },
   'ai-security': {
     type: 'security-testing',
-    leaderAgent: 'krishna', // reuse until ai-security gets its own leader
+    leaderAgent: 'atlas', // reuse until ai-security gets its own leader
     gateStyle: 'security',
     memoryNamespace: 'ai-security',
     dispatchType: 'parallel-phases',
     validationModel: 'multi-stage',
     chainAnalysis: true,
-    dharmarajVerification: true,
+    arbiterVerification: true,
     costBudget: 50,
     phases: ['probe', 'inject', 'validate', 'chain', 'report', 'verify'],
     reportFormat: 'ai-security-report',
@@ -255,13 +255,13 @@ const SQUAD_TYPES = {
 // Default config for unknown/new squads — inherits everything
 const DEFAULT_SQUAD_TYPE = {
   type: 'general',
-  leaderAgent: 'krishna',
+  leaderAgent: 'atlas',
   gateStyle: 'security',
   memoryNamespace: 'general',
   dispatchType: 'parallel-phases',
   validationModel: 'multi-stage',
   chainAnalysis: true,
-  dharmarajVerification: true,
+  arbiterVerification: true,
   costBudget: 50,
   phases: ['analyze', 'validate', 'report', 'verify'],
   reportFormat: 'general-report',
@@ -286,7 +286,7 @@ function getSquadType(squadId) {
 // to SQUAD_TYPES above automatically gets correct behavior without code changes.
 
 function getSquadLeader(squadId) {
-  return getSquadConfig(squadId).leaderAgent || 'krishna'
+  return getSquadConfig(squadId).leaderAgent || 'atlas'
 }
 
 function getSquadGateStyle(squadId) {
@@ -338,10 +338,10 @@ function getSquadTaskReportPath(squadId, taskId) {
 
 // Canonical-author ROLE per squad (2026-06-09 canonical-selection fix).
 // analysis squads (stocks) → the squad LEADER writes the dossier (CHANAKYA).
-// security squads → the universal REPORTER (VYASA) writes it, NOT the leader.
+// security squads → the universal REPORTER (SCRIBE) writes it, NOT teamleader.
 // The dossier-selector + saveAgentReport use this to pick/stamp the right
 // author's file. Resolving by ROLE (not getSquadLeader) closes the latent trap
-// where the security-squad leader (KRISHNA/VARUNA/...) writes side artifacts.
+// where the security-squad leader (ATLAS/VARUNA/...) writes side artifacts.
 function canonicalReportRole(squadId) {
   return getSquadType(squadId) === 'analysis' ? 'leader' : 'reporter'
 }
@@ -395,8 +395,8 @@ function shouldRunChainAnalysis(squadId) {
   return getSquadConfig(squadId).chainAnalysis;
 }
 
-function shouldRunDharmaraj(squadId) {
-  return getSquadConfig(squadId).dharmarajVerification;
+function shouldRunarbiter(squadId) {
+  return getSquadConfig(squadId).arbiterVerification;
 }
 
 function getCostBudget(squadId) {
@@ -473,7 +473,7 @@ module.exports = {
   getSquadConfig,
   getSquadType,
   shouldRunChainAnalysis,
-  shouldRunDharmaraj,
+  shouldRunarbiter,
   getCostBudget,
   setCostBudget,
   setGlobalBudget,

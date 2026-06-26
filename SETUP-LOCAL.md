@@ -1,6 +1,6 @@
 # Local Development Setup
 
-Kurukshetra was written for a server deployment at `/root/agents` (code) + `/root/intel`
+ARCHON was written for a server deployment at `/root/agents` (code) + `/root/intel`
 (data). This guide gets it running **as a normal user, anywhere on disk** — so you can
 develop and build on it without `sudo` or `/root` access.
 
@@ -66,7 +66,7 @@ Everything else — schema/config gates, routing, classifier, phase-wire, judge,
 canonical-selection, learning-loop, safety-perimeter gates — passes against the seeded
 local data layer.
 
-The **daemon itself boots cleanly** (`npm start` → "SANJAY v3 active"), reads/writes the
+The **daemon itself boots cleanly** (`npm start` → "NEXUS v3 active"), reads/writes the
 local `var/intel`, and routes models from the seeded config. That's the foundation to
 build on.
 

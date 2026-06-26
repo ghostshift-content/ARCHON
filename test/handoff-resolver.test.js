@@ -64,7 +64,7 @@ test('processHandoff: dispatch returns verdict → markCompleted', async () => {
   const tmpBase = path.join(os.tmpdir(), `resolver-success-${Date.now()}`)
   try {
     const r = createHandoff({
-      sourceTaskId: 'T1', sourceSquad: 'pentest', sourceAgent: 'ASHWATTHAMA',
+      sourceTaskId: 'T1', sourceSquad: 'pentest', sourceAgent: 'FORGE',
       sourceFindingId: 'F1', targetSquad: 'cloud-security',
       targetCapability: 'data-residency',
       request: { question: 'GDPR?', evidence: { x: 1 } },

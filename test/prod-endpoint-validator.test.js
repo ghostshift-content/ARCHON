@@ -2,7 +2,7 @@
 //
 // Validates that findings claiming PROD impact actually validated against
 // production endpoints (not sandbox/test/uat). Q#8 (2026-05-15) shipped
-// "F-002 PROD PayPal CRITICAL" where KRIPA validated against
+// "F-002 PROD PayPal CRITICAL" where AUDITOR validated against
 // api.sandbox.paypal.com — confirmed false-positive once Jay tested PROD
 // (invalid_client). This validator catches that mismatch programmatically.
 

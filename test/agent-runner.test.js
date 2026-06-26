@@ -365,7 +365,7 @@ test('missing userPrompt throws immediately', async () => {
 test('accepts optional agentName, taskId, model, timeoutMs', async () => {
   const result = await runAgent({
     userPrompt: 'Hello',
-    agentName: 'ARJUN',
+    agentName: 'SCOUT',
     taskId: 'task-123',
     model: 'claude-haiku-4-6',
     timeoutMs: 30000,
@@ -394,7 +394,7 @@ test('times out after timeoutMs and rejects with agent label in message', async 
     await assert.rejects(
       () => runAgent({
         userPrompt: 'Hello',
-        agentName: 'BHEEM',
+        agentName: 'RELAY',
         taskId: 'task-timeout-99',
         timeoutMs: 50,
         adapter: 'cli', _spawn: makeHangingSpawn(),
@@ -404,7 +404,7 @@ test('times out after timeoutMs and rejects with agent label in message', async 
           e.message.toLowerCase().includes('timed out'),
           `error message should mention "timed out", got: ${e.message}`)
         assert.ok(
-          e.message.includes('BHEEM') || e.message.includes('task-timeout-99'),
+          e.message.includes('RELAY') || e.message.includes('task-timeout-99'),
           `error message should include agent label, got: ${e.message}`)
         return true
       }

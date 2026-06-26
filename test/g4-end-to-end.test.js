@@ -27,14 +27,14 @@ test('full G4 pipeline: 3 target pairs → renderReport → ADOPT decision', () 
   for (let i = 1; i <= 3; i++) {
     for (const profile of ['default', 'G4_test_sonnet']) {
       const taskId = `T${i}-${profile}`
-      const krishna = profile === 'default' ? 'claude-opus-4-7' : 'claude-sonnet-4-6'
+      const atlas = profile === 'default' ? 'claude-opus-4-7' : 'claude-sonnet-4-6'
       const cost = profile === 'default' ? 140 : 30
       tasks.push({
         id: taskId,
         title: `Target-${i}`,
         status: 'done',
         model_profile: profile,
-        krishna_model: krishna,
+        atlas_model: atlas,
         cost_usd: cost,
         duration_seconds: 3000,
       })
@@ -64,8 +64,8 @@ test('full G4 pipeline: 3 target pairs → renderReport → ADOPT decision', () 
   assert.strictEqual(pairs.length, 3, 'pairs by target — 3 complete pairs')
 
   for (const { opus, sonnet } of pairs) {
-    assert.strictEqual(opus.krishna_model, 'claude-opus-4-7', 'opus identified')
-    assert.strictEqual(sonnet.krishna_model, 'claude-sonnet-4-6', 'sonnet identified')
+    assert.strictEqual(opus.atlas_model, 'claude-opus-4-7', 'opus identified')
+    assert.strictEqual(sonnet.atlas_model, 'claude-sonnet-4-6', 'sonnet identified')
     assert.strictEqual(opus.target, sonnet.target, 'pair shares target name')
   }
 
@@ -96,13 +96,13 @@ test('full G4 pipeline: cost regression on 1 target → REJECT', () => {
   for (let i = 1; i <= 3; i++) {
     for (const profile of ['default', 'G4_test_sonnet']) {
       const taskId = `T${i}-${profile}`
-      const krishna = profile === 'default' ? 'claude-opus-4-7' : 'claude-sonnet-4-6'
+      const atlas = profile === 'default' ? 'claude-opus-4-7' : 'claude-sonnet-4-6'
       // T2 has only 30% cost reduction — fails C3
       const sonnetCost = i === 2 ? 100 : 30
       const cost = profile === 'default' ? 140 : sonnetCost
       tasks.push({
         id: taskId, title: `Target-${i}`, status: 'done',
-        model_profile: profile, krishna_model: krishna,
+        model_profile: profile, atlas_model: atlas,
         cost_usd: cost, duration_seconds: 3000,
       })
       const findings = [{ id: '1', severity: 'Critical' }]
@@ -130,12 +130,12 @@ test('full G4 pipeline: VALIDATED-FINDINGS missing for one dispatch → 0 findin
   const tasks = [
     {
       id: 'T1-default', title: 'TargetA', status: 'done',
-      model_profile: 'default', krishna_model: 'claude-opus-4-7',
+      model_profile: 'default', atlas_model: 'claude-opus-4-7',
       cost_usd: 140, duration_seconds: 3000,
     },
     {
       id: 'T1-G4_test_sonnet', title: 'TargetA', status: 'done',
-      model_profile: 'G4_test_sonnet', krishna_model: 'claude-sonnet-4-6',
+      model_profile: 'G4_test_sonnet', atlas_model: 'claude-sonnet-4-6',
       cost_usd: 30, duration_seconds: 3000,
     },
   ]

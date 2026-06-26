@@ -34,7 +34,7 @@ test('exports CHAIN_OUTPUT_SCHEMA', () => {
   assert.ok(cv.CHAIN_OUTPUT_SCHEMA.required.includes('chains'))
 })
 
-// Sprint B Task B3.5: companion to the VYASA chain-orphan guard.
+// Sprint B Task B3.5: companion to the SCRIBE chain-orphan guard.
 // Constructor must populate finding_ids with the IDs of the underlying
 // confirmed findings being chained. Without this, the guard drops every
 // chain because there is nothing to cross-check against VALIDATED-FINDINGS.

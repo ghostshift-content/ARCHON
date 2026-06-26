@@ -4,7 +4,7 @@
 // claim MUST downgrade to Low at the severity-cap layer.
 //
 // This test does NOT invoke real LLM specialists — it constructs the exact
-// candidate that the pre-discipline DHRISHTADYUMNA emitted in the 2026-04-23
+// candidate that the pre-discipline MARSHAL emitted in the 2026-04-23
 // GitLab run and asserts the cap logic catches it.
 
 const ec = require('../src/pipeline/evidence-completeness')
@@ -14,7 +14,7 @@ function ok(l, c, extra = '') { if (c) { console.log('  ✓ ' + l); passed++ } e
 
 console.log('GitLab DH-AC-001 BFLA regression test:')
 
-// The candidate that 2026-04-23 DHRISHTADYUMNA actually emitted
+// The candidate that 2026-04-23 MARSHAL actually emitted
 // (paraphrased from FINAL-REPORT-crv2-1776935900.md).
 const candidateV1 = {
   id: 'DH-AC-001',

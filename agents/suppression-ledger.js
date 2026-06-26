@@ -2,7 +2,7 @@
 //
 // 2026-06-05: Suppression visibility ledger — GATE-SUPPRESSION-VISIBLE.
 //
-// PROBLEM: 4 down-weight-only filters (oracle-can't-confirm, KRIPA-skeptical,
+// PROBLEM: 4 down-weight-only filters (oracle-can't-confirm, AUDITOR-skeptical,
 // judge-needs-quote, severity-cap) have no counterweight. A genuine CRITICAL
 // with no quotable string silently gets downgraded to Low. For a pentest
 // framework, that's a bounty missed.

@@ -9,26 +9,26 @@ const __roots = require('../../paths') // portable roots (KURU_*_ROOT) — see p
 //   Phase 0   sourceDir validation
 //   Phase 0a  Inventories — scripted enumeration (routes/api/graphql/workers/
 //             services/finders/policies/serializers/downloads/search/tokens)
-//   Phase 0b  Feature discovery — gitlab preset (43) | generic (VIBHISHANA) | meta.features
+//   Phase 0b  Feature discovery — gitlab preset (43) | generic (CURATOR) | meta.features
 //   Phase 1   Feature mapping — ONE agent per feature, in RAM-safe waves; each
 //             builds features/<slug>.md (Endpoint/Action Ledger + auth/actor/data/
 //             worker/same-functionality maps + ranked Phase-2 leads + depth status)
-//   Phase 1c  Consolidation — VIBHISHANA aggregates coverage matrices + review queue + gate
+//   Phase 1c  Consolidation — CURATOR aggregates coverage matrices + review queue + gate
 //   Phase 2   Vuln assessment — per feature × per class, routed to the class specialist
 //             with that class's module + pattern catalog (access-control/IDOR, XSS, …)
-//   Phase 2v  KRIPA reverse-check verdicts (+ UTTARA runtime validation if deployUrl)
-//   Phase 3   VYASA merges per-feature reports into the final report (CVSS)
+//   Phase 2v  AUDITOR reverse-check verdicts (+ PROBER runtime validation if deployUrl)
+//   Phase 3   SCRIBE merges per-feature reports into the final report (CVSS)
 //
-// Agents (current env, working together): VIBHISHANA (discovery+consolidation),
-// the 6 specialists (per-feature mappers → per-class assessors), KRIPA (verify),
-// UTTARA (runtime), VYASA (report).
+// Agents (current env, working together): CURATOR (discovery+consolidation),
+// the 6 specialists (per-feature mappers → per-class assessors), AUDITOR (verify),
+// PROBER (runtime), SCRIBE (report).
 //
 // dispatch.meta:
 //   sourceDir   (required, absolute) — the source tree to review
 //   preset      'gitlab' | 'generic'  (default: auto-detect gitlab markers, else generic)
 //   features    string[] (optional)   — explicit feature-slug queue (overrides discovery)
 //   vulnClasses string[] (optional)   — default ['access-control','xss']
-//   deployUrl   (optional)            — enables UTTARA runtime validation
+//   deployUrl   (optional)            — enables PROBER runtime validation
 //   testAccounts(optional)            — { attacker, victim } creds for runtime probing
 //   outputDir   (optional)            — default <INTEL>/code-review/<taskId>
 //   maxFeatures (optional)            — cap mapped features (default: gitlab=43, generic=10)
@@ -44,14 +44,14 @@ const PRESET_GITLAB = path.join(METH, 'presets/gitlab-features.json')
 
 // vuln class → { specialist, phase-2 module, pattern catalog }
 const CLASS = {
-  'access-control': { agent: 'dhrishtadyumna', module: 'phase2_access_control_idor_v1.md', catalog: 'access_control_40_pattern_catalog.md' },
-  'xss':            { agent: 'virata',         module: 'phase2_xss_html_injection_v1.md',  catalog: 'xss_50_pattern_catalog.md' },
-  'sqli':           { agent: 'jayadratha',     module: null, catalog: null },
-  'ssrf':           { agent: 'barbarika',      module: null, catalog: null },
-  'rce':            { agent: 'drupada',        module: null, catalog: null },
-  'account-takeover': { agent: 'vikarna',      module: null, catalog: null },
+  'access-control': { agent: 'marshal', module: 'phase2_access_control_idor_v1.md', catalog: 'access_control_40_pattern_catalog.md' },
+  'xss':            { agent: 'cipher',         module: 'phase2_xss_html_injection_v1.md',  catalog: 'xss_50_pattern_catalog.md' },
+  'sqli':           { agent: 'quill',     module: null, catalog: null },
+  'ssrf':           { agent: 'beacon',      module: null, catalog: null },
+  'rce':            { agent: 'breaker',        module: null, catalog: null },
+  'account-takeover': { agent: 'siphon',      module: null, catalog: null },
 }
-const MAPPER_POOL = ['dhrishtadyumna', 'vikarna', 'virata', 'jayadratha', 'barbarika', 'drupada']
+const MAPPER_POOL = ['marshal', 'siphon', 'cipher', 'quill', 'beacon', 'breaker']
 const PHASES = ['inventories', 'discovery', 'mapping', 'consolidate', 'phase2', 'verify', 'report']
 const WAVE = 3 // RAM-safe parallelism (mirrors GATE-134 stocks batching)
 
@@ -161,7 +161,7 @@ Use bash (rg/grep/cat/sed) to enumerate and read source. This is MAPPING + EVIDE
 
 function featureMapPrompt(agent, feature, taskId, sourceDir, outDir, invDir) {
   const outFile = `${outDir}/phase1-maps/features/${feature.slug}.md`
-  return `You are ${agent.toUpperCase()}, a Phase-1 feature-mapping agent on the code-review squad (leader VIBHISHANA).
+  return `You are ${agent.toUpperCase()}, a Phase-1 feature-mapping agent on the code-review squad (leader CURATOR).
 
 ${commonHeader(taskId, sourceDir, outDir, invDir)}
 
@@ -191,7 +191,7 @@ Write the complete markdown file with bash (mkdir -p the dir first). Then reply 
 }
 
 function discoveryPrompt(taskId, sourceDir, outDir, invDir, cap) {
-  return `You are VIBHISHANA, code-review squad leader. Discover the FEATURE QUEUE for a Phase-1 white-box review.
+  return `You are CURATOR, code-review squad leader. Discover the FEATURE QUEUE for a Phase-1 white-box review.
 
 ${commonHeader(taskId, sourceDir, outDir, invDir)}
 
@@ -206,7 +206,7 @@ Then reply with the JSON array only (no prose) so the orchestrator can parse it.
 }
 
 function consolidationPrompt(taskId, outDir, features) {
-  return `You are VIBHISHANA, code-review squad leader. Consolidate Phase 1.
+  return `You are CURATOR, code-review squad leader. Consolidate Phase 1.
 
 Read every feature map in ${outDir}/phase1-maps/features/*.md (${features.length} features: ${features.map(f => f.slug).join(', ')}).
 Read the consolidated templates: ${METH}/templates/phase1_consolidated_templates.md and the gate ${METH}/checklists/phase1_completion_gate.md.
@@ -246,23 +246,23 @@ Report template + CVSS: ${METH}/templates/phase2_feature_report_template.md , ${
 Write the report to: ${outFile} (mkdir -p first). Then reply one line: rows reverse-checked, findings (by severity), residual gaps.`
 }
 
-function kripaPrompt(taskId, outDir, features, classes) {
-  return `You are KRIPA, the independent verifier. Reverse-check the Phase-2 code-review findings — never trust the assessor's claim.
+function auditorPrompt(taskId, outDir, features, classes) {
+  return `You are AUDITOR, the independent verifier. Reverse-check the Phase-2 code-review findings — never trust the assessor's claim.
 
 Read the Phase-2 reports under ${outDir}/phase2/**/*.md (classes: ${classes.join(', ')}; features: ${features.map(f => f.slug).join(', ')}).
 For each reported finding: re-read the cited source path, confirm the auth/object-lookup/sink claim is real, and issue a verdict
 (CONFIRMED / NEEDS-LIVE / DISPROVEN) with a one-line evidence reason. Demote anything you cannot substantiate from source.
 
-Write verdicts to ${outDir}/phase2/KRIPA-VERDICTS.md (a table: feature | class | finding | verdict | evidence). Reply one line: confirmed/needs-live/disproven counts.`
+Write verdicts to ${outDir}/phase2/AUDITOR-VERDICTS.md (a table: feature | class | finding | verdict | evidence). Reply one line: confirmed/needs-live/disproven counts.`
 }
 
-function vyasaPrompt(taskId, projectId, squad, sourceDir, outDir, features, classes) {
-  return `You are VYASA, the reporter. Merge the per-feature Phase-2 reports into ONE final code-review report.
+function scribePrompt(taskId, projectId, squad, sourceDir, outDir, features, classes) {
+  return `You are SCRIBE, the reporter. Merge the per-feature Phase-2 reports into ONE final code-review report.
 
 Inputs (read all):
 - ${outDir}/phase1-maps/consolidated/phase1_completion_gate.md and phase2_review_queue.md
 - ${outDir}/phase2/**/*.md  (per-feature reports, classes: ${classes.join(', ')})
-- ${outDir}/phase2/KRIPA-VERDICTS.md  (only report KRIPA-CONFIRMED or NEEDS-LIVE findings as findings; note disproven separately)
+- ${outDir}/phase2/AUDITOR-VERDICTS.md  (only report AUDITOR-CONFIRMED or NEEDS-LIVE findings as findings; note disproven separately)
 
 Produce an executive white-box code-review report: scope + coverage (features mapped, depth-status rollup), confirmed findings
 ordered by CVSS (each with file:line trace, impact, fix), a recurring-pattern section (same-functionality classes), and honest gaps.
@@ -288,7 +288,7 @@ async function runCodeReview(dispatch, deps) {
   const p0 = validateSourceDir(sourceDir)
   if (!p0.ok) {
     log(`🚫 Phase 0 failed: ${p0.reason}`)
-    logActivity('SANJAY', `🚫 Phase 0 failed: ${p0.reason}`, { taskId, squad, projectId: projectId || '' })
+    logActivity('NEXUS', `🚫 Phase 0 failed: ${p0.reason}`, { taskId, squad, projectId: projectId || '' })
     return { error: p0.reason, phase: 0 }
   }
   const preset = (meta.preset === 'gitlab' || meta.preset === 'generic') ? meta.preset : detectPreset(sourceDir)
@@ -301,7 +301,7 @@ async function runCodeReview(dispatch, deps) {
   for (const c of vulnClasses) fs.mkdirSync(`${outDir}/phase2/${c}`, { recursive: true })
   const invDir = `${outDir}/phase1-maps/inventories`
   log(`✅ Phase 0: sourceDir=${sourceDir} (${p0.fileCount} code files) · preset=${preset} · classes=${vulnClasses.join(',')}`)
-  logActivity('SANJAY', `✅ Phase 0: source valid (${preset})`, {
+  logActivity('NEXUS', `✅ Phase 0: source valid (${preset})`, {
     taskId, squad, projectId: projectId || '',
     details: `Path: ${sourceDir}\nFiles: ${p0.fileCount}\nPreset: ${preset}\nVuln classes: ${vulnClasses.join(', ')}\nOutput: ${outDir}\nDeploy URL: ${deployUrl || '(none — runtime validation skipped)'}`,
   })
@@ -321,8 +321,8 @@ async function runCodeReview(dispatch, deps) {
     try { features = JSON.parse(fs.readFileSync(PRESET_GITLAB, 'utf8')).features.slice(0, maxFeatures) } catch { features = [] }
     log(`📋 GitLab preset feature queue: ${features.length}`)
   } else if (runPhase('discovery')) {
-    updateProgress(16, 'Phase 0b: VIBHISHANA feature discovery')
-    const dRes = await spawnAgent('vibhishana', taskId, discoveryPrompt(taskId, sourceDir, outDir, invDir, maxFeatures), `task-${taskId}-discovery`, null)
+    updateProgress(16, 'Phase 0b: CURATOR feature discovery')
+    const dRes = await spawnAgent('curator', taskId, discoveryPrompt(taskId, sourceDir, outDir, invDir, maxFeatures), `task-${taskId}-discovery`, null)
     trackCosts([dRes])
     try {
       const qf = `${outDir}/phase1-maps/feature-queue.json`
@@ -340,7 +340,7 @@ async function runCodeReview(dispatch, deps) {
   // Phase 1 — per-feature mapping (one agent per feature, RAM-safe waves)
   if (runPhase('mapping')) {
     updateProgress(25, `Phase 1: mapping ${features.length} features (waves of ${WAVE})`)
-    logActivity('VIBHISHANA', `🗺️ Phase 1: ${features.length} feature-mapping agents`, { taskId, squad, projectId: projectId || '', details: features.map(f => f.slug).join(', ') })
+    logActivity('CURATOR', `🗺️ Phase 1: ${features.length} feature-mapping agents`, { taskId, squad, projectId: projectId || '', details: features.map(f => f.slug).join(', ') })
     const results = await runWaves(features, WAVE, async (feature, idx) => {
       const agent = MAPPER_POOL[idx % MAPPER_POOL.length]
       const r = await spawnAgent(agent, taskId, featureMapPrompt(agent, feature, taskId, sourceDir, outDir, invDir), `task-${taskId}-map-${feature.slug}`, null)
@@ -351,8 +351,8 @@ async function runCodeReview(dispatch, deps) {
 
   // Phase 1c — consolidation
   if (runPhase('consolidate')) {
-    updateProgress(55, 'Phase 1c: VIBHISHANA consolidation')
-    const cRes = await spawnAgent('vibhishana', taskId, consolidationPrompt(taskId, outDir, features), `task-${taskId}-consolidate`, null)
+    updateProgress(55, 'Phase 1c: CURATOR consolidation')
+    const cRes = await spawnAgent('curator', taskId, consolidationPrompt(taskId, outDir, features), `task-${taskId}-consolidate`, null)
     trackCosts([cRes])
   }
 
@@ -370,24 +370,24 @@ async function runCodeReview(dispatch, deps) {
     trackCosts(results)
   }
 
-  // Phase 2v — KRIPA verify (+ UTTARA runtime if deployUrl)
+  // Phase 2v — AUDITOR verify (+ PROBER runtime if deployUrl)
   if (runPhase('verify')) {
     if (deployUrl) {
-      updateProgress(82, 'Phase 2v: UTTARA runtime validation')
-      const uRes = await spawnAgent('uttara', taskId,
-        `You are UTTARA, runtime validator. Probe the deployed instance at ${deployUrl} (testAccounts: ${JSON.stringify(meta.testAccounts || null)}) to confirm/refute the Phase-2 candidates under ${outDir}/phase2/. Write runtime verdicts to ${outDir}/phase2/UTTARA-RUNTIME.md.`,
-        `task-${taskId}-uttara`, null)
+      updateProgress(82, 'Phase 2v: PROBER runtime validation')
+      const uRes = await spawnAgent('prober', taskId,
+        `You are PROBER, runtime validator. Probe the deployed instance at ${deployUrl} (testAccounts: ${JSON.stringify(meta.testAccounts || null)}) to confirm/refute the Phase-2 candidates under ${outDir}/phase2/. Write runtime verdicts to ${outDir}/phase2/PROBER-RUNTIME.md.`,
+        `task-${taskId}-prober`, null)
       trackCosts([uRes])
     }
-    updateProgress(86, 'Phase 2v: KRIPA reverse-check')
-    const kRes = await spawnAgent('kripa', taskId, kripaPrompt(taskId, outDir, p2Features, vulnClasses), `task-${taskId}-kripa`, null)
+    updateProgress(86, 'Phase 2v: AUDITOR reverse-check')
+    const kRes = await spawnAgent('auditor', taskId, auditorPrompt(taskId, outDir, p2Features, vulnClasses), `task-${taskId}-auditor`, null)
     trackCosts([kRes])
   }
 
-  // Phase 3 — VYASA report
+  // Phase 3 — SCRIBE report
   if (runPhase('report')) {
-    updateProgress(94, 'Phase 3: VYASA final report')
-    const vRes = await spawnAgent('vyasa', taskId, vyasaPrompt(taskId, projectId, squad, sourceDir, outDir, p2Features, vulnClasses), `task-${taskId}-vyasa`, null)
+    updateProgress(94, 'Phase 3: SCRIBE final report')
+    const vRes = await spawnAgent('scribe', taskId, scribePrompt(taskId, projectId, squad, sourceDir, outDir, p2Features, vulnClasses), `task-${taskId}-scribe`, null)
     trackCosts([vRes])
   }
 

@@ -21,7 +21,7 @@ const inboxActionsFor = (action) => { try { return fs.readdirSync(inboxDir).map(
 
 function seed() {
   const tasks = JSON.parse(fs.readFileSync(tasksFile, 'utf8'))
-  tasks.push({ id: TID, squad: 'pentest-squad', assignee: 'KRISHNA', status: 'awaiting-triage', progress: 90, title: 'E2E Flow Test', goal: 'Pentest http://flow.test/ — verify flows', costByAgent: { KRISHNA: 0.5, ARJUN: 0.3 }, costs: [{ agent: 'KRISHNA', model: 'opus', totalCost: 0.5 }, { agent: 'ARJUN', model: 'haiku', totalCost: 0.3 }], totalCost: 0.8, createdAt: '2026-01-01T00:00:00Z', lastUpdate: '2026-01-01T00:00:00Z' })
+  tasks.push({ id: TID, squad: 'pentest-squad', assignee: 'ATLAS', status: 'awaiting-triage', progress: 90, title: 'E2E Flow Test', goal: 'Pentest http://flow.test/ — verify flows', costByAgent: { ATLAS: 0.5, SCOUT: 0.3 }, costs: [{ agent: 'ATLAS', model: 'opus', totalCost: 0.5 }, { agent: 'SCOUT', model: 'haiku', totalCost: 0.3 }], totalCost: 0.8, createdAt: '2026-01-01T00:00:00Z', lastUpdate: '2026-01-01T00:00:00Z' })
   fs.writeFileSync(tasksFile, JSON.stringify(tasks, null, 2))
   fs.writeFileSync(vfFile, JSON.stringify({ id: 'FL-1', taskId: TID, severity: 'Medium', cvss_score: 5.3, cvss_vector: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N', title: 'Flow finding', url: 'http://flow.test/x', method: 'GET' }) + '\n')
   fs.mkdirSync(path.dirname(reportFile), { recursive: true })
@@ -51,7 +51,7 @@ function cleanup() {
     const ovText = await p.$eval('#td-overview', el => el.textContent)
     ok('Overview renders run info (squad)', /pentest/.test(ovText))
     ok('Overview renders the goal', /verify flows/.test(ovText))
-    ok('Overview shows cost table (agents)', /KRISHNA/.test(ovText) && /ARJUN/.test(ovText))
+    ok('Overview shows cost table (agents)', /ATLAS/.test(ovText) && /SCOUT/.test(ovText))
     ok('Overview shows Amend button (awaiting-triage)', !!(await p.$('#tdAmend')))
     await sub('report')
     const repText = await p.$eval('#tdReportBody', el => el.textContent)

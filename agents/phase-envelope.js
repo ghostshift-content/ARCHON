@@ -3,7 +3,7 @@
 // B2: Typed Inter-Phase Envelope (2026-06-05)
 //
 // Root-cause fix for the silent-drop/stale-field class of phase-seam bugs:
-//   - KRIPA→judge VERDICT_RE breakage (May 11 + May 15, silently starved Phase 3.075+3.9)
+//   - AUDITOR→judge VERDICT_RE breakage (May 11 + May 15, silently starved Phase 3.075+3.9)
 //   - Gulf Oil dashboard bug (May 15, wrong field names crossed a seam)
 //   - 22 distinct key signatures across 48 findings (finding-schema audit)
 //
@@ -32,7 +32,7 @@ const VALID_TYPES = new Set([
   'finding',
   'recon',
   'specialist-output',
-  'kripa-result',
+  'auditor-result',
   'judge-verdict',
   'chain',
 ])
@@ -54,7 +54,7 @@ class PhaseEnvelopeError extends Error {
  * @param {string} type        - One of VALID_TYPES
  * @param {object} payload     - The content to carry
  * @param {object} opts
- * @param {string} opts.source - Agent name who produced this (e.g. 'KRIPA')
+ * @param {string} opts.source - Agent name who produced this (e.g. 'AUDITOR')
  * @param {string} opts.taskId - The dispatch task ID
  * @returns {object} PhaseEnvelope
  */

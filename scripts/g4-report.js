@@ -56,7 +56,7 @@ function pairBySource(metrics) {
   for (const m of metrics) {
     const targetKey = m.target
     if (!byTarget.has(targetKey)) byTarget.set(targetKey, {})
-    const isOpus = m.model_profile === 'default' || m.krishna_model === 'claude-opus-4-7'
+    const isOpus = m.model_profile === 'default' || m.atlas_model === 'claude-opus-4-7'
     if (isOpus) {
       byTarget.get(targetKey).opus = m
     } else {

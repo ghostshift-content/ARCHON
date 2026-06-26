@@ -1,7 +1,7 @@
 {
   "squad": "code-review",
   "version": "1",
-  "leader": "VIBHISHANA",
+  "leader": "CURATOR",
   "modelTier": "balanced",
   "effort": "high",
   "severityProfile": "comprehensive",
@@ -11,6 +11,6 @@
     "maxChains": 20,
     "maxCostUsd": 50
   },
-  "evalPath": "agents/VIBHISHANA/eval/",
+  "evalPath": "agents/CURATOR/eval/",
   "description": "White-box code security review — 6 per-framework specialists, runtime analysis, chain synthesis"
 }

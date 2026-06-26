@@ -1,6 +1,6 @@
-# Kurukshetra — PROGRESS (living doc)
+# ARCHON — PROGRESS (living doc)
 
-> **New session? Start here.** Ye file framework ki current haalat, kya ban chuka hai, aur aage kya karna hai — sab ek jagah. Jab bhi koi bada item complete/start ho, ise update karo (stale progress doc < no progress doc).
+> **New session? Start here.** Ye file framework ki current haalat, kya ban chuka hai, aur aage kya drill hai — sab ek jagah. Jab bhi koi bada item complete/start ho, ise update karo (stale progress doc < no progress doc).
 
 **Last updated:** 2026-06-08 · **Gates:** 139/139 green · **Daemon:** event-bus live on pure-SDK · **Layout:** personas nested in squads, state evicted
 
@@ -62,7 +62,7 @@ Sab main branch pe pushed. Quality proof: ITC run (SDK) 62/70 vs old framework 6
 | 112 | Adaptive 2-wave batching | 4 sequential → 2 parallel waves (~65min → ~35min wall time) |
 | 113 | Prompt caching | --exclude-dynamic-system-prompt-sections default ON, cache savings in ledger |
 | 114 | 6 bug fixes (architecture review) | Conditional reflexion, gold-set replay fix, auto-applier ceiling fallback, episode waveNumber, high-suppression pattern |
-| 115 | 5 new systems (final sprint) | Per-agent override, Phase 2.5 fast-verify, zero-finding alert, dashboard sync, grade-KRIPA correlation |
+| 115 | 5 new systems (final sprint) | Per-agent override, Phase 2.5 fast-verify, zero-finding alert, dashboard sync, grade-AUDITOR correlation |
 
 **commit `6e45060` — 115/115 gates — daemon restart 369 — both repos pushed**
 
@@ -72,11 +72,11 @@ Sab main branch pe pushed. Quality proof: ITC run (SDK) 62/70 vs old framework 6
 
 | Gate | System | What |
 |---|---|---|
-| 116 | Quality sprint | DHARMARAJ evidence fix, confidence+reproduction fields, challenger agent (Phase 3.055), contradiction detector (Phase 2.9) |
-| 117 | Multi-judge consensus | 3-judge majority vote for High/Critical DHARMARAJ decisions (+17.9% proven by research) |
-| 118 | Agent SOUL quality | All key agents full SOUL.md (not identity cards) — NAKUL identity fix, ABHIMANYU/EKLAVYA upgraded from placeholders, ASHWATTHAMA SSTI chains, RUDRA WebSocket/CSP |
+| 116 | Quality sprint | ARBITER evidence fix, confidence+reproduction fields, challenger agent (Phase 3.055), contradiction detector (Phase 2.9) |
+| 117 | Multi-judge consensus | 3-judge majority vote for High/Critical ARBITER decisions (+17.9% proven by research) |
+| 118 | Agent SOUL quality | All key agents full SOUL.md (not identity cards) — VIPER identity fix, VAULT/TRACER upgraded from placeholders, FORGE SSTI chains, RANGER WebSocket/CSP |
 | 119 | Failure-content-aware distill | Learning loop classifies failure cause → targeted lessons, not generic strings + watchdog silent-pass fix |
-| 120 | Chain-evidence bridge | Phase 3.6 curl results annotate VALIDATED-FINDINGS (`chain_verified`/`chain_evidence`) → DHARMARAJ Stage C judges on real HTTP evidence, not text alone |
+| 120 | Chain-evidence bridge | Phase 3.6 curl results annotate VALIDATED-FINDINGS (`chain_verified`/`chain_evidence`) → ARBITER Stage C judges on real HTTP evidence, not text alone |
 
 Also: hardcoded fallback model opus-4-7 → opus-4-8 in model-router.js (`4f1359e`).
 
@@ -86,7 +86,7 @@ Also: hardcoded fallback model opus-4-7 → opus-4-8 in model-router.js (`4f1359
 
 ## ✅ Restructure COMPLETE (2026-06-07/08, GATE-121+122) — personas nested in squads, state evicted
 
-Design doc: `docs/research/2026-06-07-kurukshetra-restructure-design.md` (3 designers + 3 adversarial judges, winner: state-separation). Target: personas → `squads/<sq>/agents/`, universals → `_universal/`, runtime state → `var/state/agents/`.
+Design doc: `docs/research/2026-06-07-archon-restructure-design.md` (3 designers + 3 adversarial judges, winner: state-separation). Target: personas → `squads/<sq>/agents/`, universals → `_universal/`, runtime state → `var/state/agents/`.
 
 | Phase | Status | What |
 |---|---|---|
@@ -96,7 +96,7 @@ Design doc: `docs/research/2026-06-07-kurukshetra-restructure-design.md` (3 desi
 | 3 Squad nesting | ✅ | 49 personas `git mv` → `squads/<sq>/agents/<name>` + universals → `_universal/agents/`. `personaMode: nested` via `ownership.json`. GATE-122 (no-dup + plugin shape). |
 | 4 Seal | ✅ | GATE-122, empty `shared/` removed, STRUCTURE.md rewritten, mc resolver (`lib/agent-paths.ts`) + 6 readers repointed + rebuilt. |
 
-**mission-control:** rebuilt with shared resolver `lib/agent-paths.ts` (mirrors paths.js, reads same runtime config). 6 readers repointed (agent-versioning, agents/[id] route, memory, skill-health, feedback, pentest page). Dashboard resolves personas at new squad homes — verified (12 compiled chunks read ownership.json; daemon reads SOUL from `squads/pentest/agents/arjun`).
+**mission-control:** rebuilt with shared resolver `lib/agent-paths.ts` (mirrors paths.js, reads same runtime config). 6 readers repointed (agent-versioning, agents/[id] route, memory, skill-health, feedback, pentest page). Dashboard resolves personas at new squad homes — verified (12 compiled chunks read ownership.json; daemon reads SOUL from `squads/pentest/agents/scout`).
 
 **Cutover model (the win):** physical layout is now driven by `layout.config.json` (personaMode/stateMode) + `ownership.json`, read at RUNTIME by both daemon + dashboard. Moving the layout again = a config flip + `pm2 reload`, no code change, fail-soft fallback to flat. `pre-restructure` git tag = rollback floor.
 
@@ -112,7 +112,7 @@ Design doc: `docs/research/2026-06-07-kurukshetra-restructure-design.md` (3 desi
 |---|---|---|
 | 123 | Adapter-label truth | recordRunQuality logged `\|\| 'cli'` but runner defaults `'sdk'` → every SDK run mislabeled cli, corrupting June-15 billing signal. Single source: `resolvedAdapterName()`. |
 | 124 | Suppression counterweight LIVE | `logManualReviewNeeded` was built but never called. Phase 3.075 now logs every downgrade + escalates high-conviction/low-evidence (by ORIGINAL severity) to manual-review-queue. |
-| 125 | phase-envelope wired | Had ZERO prod call sites. KRIPA→VALIDATED seam now typed + quarantines LOUD when KRIPA had verdicts but 0 reached VALIDATED-FINDINGS (the VERDICT_RE silent-drop class). |
+| 125 | phase-envelope wired | Had ZERO prod call sites. AUDITOR→VALIDATED seam now typed + quarantines LOUD when AUDITOR had verdicts but 0 reached VALIDATED-FINDINGS (the VERDICT_RE silent-drop class). |
 | 126 | Auto-apply safety perimeter | Full-auto loop (GATE-106) could write any path. Now structurally barred (fail-closed) from judge/verifier/gates/reward/eval + judge persona. Does NOT remove auto-apply. |
 | 127 | Suppression recall MEASURED | No number for "how often is a planted real bug suppressed?". `scripts/recall-probe.js` + `eval/recall-fixtures.jsonl` → **100% recall, 0 silent drops** across all 3 profiles. The quality metric of record (deterministic suppression layer). |
 
@@ -122,10 +122,10 @@ Also: `scripts/backup-agent-state.sh` (var/state off-git floor, cron-ready) · m
 
 5-auditor adversarial sweep → fixed the real findings:
 - **P1 (real regression from restructure):** repair/learning prompts READ `memory/*` from `personaCode` (squads/.../memory — empty under evicted) while writes LAND in `personaState` (var/state). Skill-repair agents were reading empty memory + patching blind. Fixed event-bus.js:6917/7189 → personaState. **GATE-128** locks read==write.
-- **P2:** `paths.js personaCode('ARJUN')` → broken `/root/agents/ARJUN` (daemon/dashboard diverged on uppercase). Lowercased paths.js to match agent-paths.ts + ownership. GATE-128 casing probe.
+- **P2:** `paths.js personaCode('SCOUT')` → broken `/root/agents/SCOUT` (daemon/dashboard diverged on uppercase). Lowercased paths.js to match agent-paths.ts + ownership. GATE-128 casing probe.
 - **P3:** cloud/network dispatchers silently swallowed malformed chain JSON (looked like 0 chains). Now logs LOUD.
 - **P4:** `manual-review-queue.jsonl` was write-only (escalations piled up unread). Built `agents/review-queue.js` (list/count/resolve). GATE-124 extended to require the reader.
-- **Doc drift:** gate counts → 128 (CLAUDE.md ×2, STRUCTURE.md), `grade` schema scalar→object in intel/CLAUDE.md (Gulf Oil bug class), pentest persona row (+4 agents, GHATOTKACHA→network only, DHARMA=pentest not universal), MAYA scaffolded, dashboard-spec Inbox-B → correct file.
+- **Doc drift:** gate counts → 128 (CLAUDE.md ×2, STRUCTURE.md), `grade` schema scalar→object in intel/CLAUDE.md (Gulf Oil bug class), pentest persona row (+4 agents, GHATOTKACHA→network only, SENTRY=pentest not universal), MAYA scaffolded, dashboard-spec Inbox-B → correct file.
 
 **Jay — paste to enable the 2 dormant jobs (cron blocked from auto-add):**
 ```
@@ -146,11 +146,11 @@ Also: `scripts/backup-agent-state.sh` (var/state off-git floor, cron-ready) · m
 - **June-15 billing (7 days):** adapter labeling now truthful + ledger fresh → re-run `meter-probe probe` near June-15 and decide API-key vs subscription. *(data now trustworthy)*
 - **Auto-apply (GATE-106):** perimeter added, but full-auto-without-human-tap is still your deliberate call — flagged, your decision.
 - **Phase 3b (deferred):** squad.json + squad-policy consolidation into `squads/<sq>/` — optional tidy, real GATE-64/101/81/84 coupling, held off (risk > reward right now).
-- **LLM-layer recall:** GATE-127 covers the deterministic suppression layer; KRIPA/judge-layer recall needs real planted-bug dispatches (future).
+- **LLM-layer recall:** GATE-127 covers the deterministic suppression layer; AUDITOR/judge-layer recall needs real planted-bug dispatches (future).
 
 ## 🔜 NEXT — priority order
 
-### 1. Dashboard redesign IMPLEMENT karna (biggest pending item)
+### 1. Dashboard redesign IMPLEMENT drill (biggest pending item)
 - Spec ready: `docs/research/2026-06-04-dashboard-redesign-spec.md` (v2)
 - **Flow:** Jay spec ka "Ask for Claude.ai" section Claude.ai design session mein le jayega → design banega → wapas laake `/root/mission-control/` mein code karenge
 - 6 views: Home, Task View, **Inbox (human-tap)**, Squads, History, Health
@@ -163,7 +163,7 @@ Also: `scripts/backup-agent-state.sh` (var/state off-git floor, cron-ready) · m
 
 ### 3. June-15 billing change watch
 - `node agents/runner/meter-probe.js probe` se cli-vs-sdk pool data already recording
-- June-15 ke baad probe दोबारा chala ke compare karna — pool inference shift hua ya nahi
+- June-15 ke baad probe दोबारा chala ke compare drill — pool inference shift hua ya nahi
 
 ### 4. Deferred (jaan-bujh ke, bugs nahi)
 - **Dashboard sync gap** — direct queue drops `tasks.json`/`projects.json` backfill nahi karte (manual recipe documented in memory)
@@ -178,7 +178,7 @@ Also: `scripts/backup-agent-state.sh` (var/state off-git floor, cron-ready) · m
 | Kya | Kahan |
 |---|---|
 | Framework root | `/root/agents/` (event-bus.js = main daemon, ~10K lines) |
-| Architecture docs | `docs/research/2026-06-03-kurukshetra-START-HERE.md` → THE-FRAMEWORK.md |
+| Architecture docs | `docs/research/2026-06-03-archon-START-HERE.md` → THE-FRAMEWORK.md |
 | Dashboard spec v2 | `docs/research/2026-06-04-dashboard-redesign-spec.md` |
 | Subtree rules | `/root/agents/CLAUDE.md` (orchestrator) + `/root/intel/CLAUDE.md` (data schemas) |
 | Design system | `/root/mission-control/DESIGN.md` |
@@ -198,7 +198,7 @@ Also: `scripts/backup-agent-state.sh` (var/state off-git floor, cron-ready) · m
 
 ## 📜 Changelog (recent → old)
 
-- **2026-06-08 (ITC-run fixes):** GATE-132→135 from a live ITC validation run — (132) activity-stall watchdog kills "streaming-but-no-output" hangs at 22min not 45 (BHISHMA's recurring hang); (133) ungraded runs record null not grade-0 (was poisoning quality baseline + learning loop with fake failures); (134) stocks 2 waves of 3 (RAM-safe); (135) **recovery-loop cap** — auto-recover was re-running a completed task FOREVER (one ITC scan ran 6×, ~$100+ burned) because its tasks.json status stayed in-progress; now blocked if a report exists or after 2 attempts. 135/135.
+- **2026-06-08 (ITC-run fixes):** GATE-132→135 from a live ITC validation run — (132) activity-stall watchdog kills "streaming-but-no-output" hangs at 22min not 45 (the veteran's recurring hang); (133) ungraded runs record null not grade-0 (was poisoning quality baseline + learning loop with fake failures); (134) stocks 2 waves of 3 (RAM-safe); (135) **recovery-loop cap** — auto-recover was re-running a completed task FOREVER (one ITC scan ran 6×, ~$100+ burned) because its tasks.json status stayed in-progress; now blocked if a report exists or after 2 attempts. 135/135.
 
 - **2026-06-08 (src reorg):** Source tree reorganized — 33 root modules → `src/<category>/` (core/dispatch/pipeline/grading/learning/routing/safety/rendering/integrations/utils) + tools/; 6 anchors stay at root (PM2 entry points + gate harness + resolver). Deterministic migration rewrote 106 require edges; gate harness + 4 tests' non-require paths fixed by hand; GATE-131 locks the layout. 145/145, daemon reloaded clean (all 61 event-bus requires dry-load-verified first). README/STRUCTURE production-ready.
 - **2026-06-08 (fixes):** GATE-123→130 — adapter-label truth, suppression counterweight LIVE, phase-envelope wired, auto-apply perimeter, recall metric, **dead episode pipeline revived** (emitEpisode ReferenceError → episodes.jsonl never written), squad-config wired, memory read/write split + casing parity, manual-review reader

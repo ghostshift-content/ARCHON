@@ -11,7 +11,7 @@ const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see path
 // --create-file modes. Specialists couldn't fire handoffs because the
 // A2A_HANDOFF_SECTION in event-bus.js advertised `--create` but it didn't
 // exist. They silently fell back to dropping markdown into /root/intel/
-// (e.g. CLOUD-SECURITY-HANDOFF-1778394458903.md) which VYASA never reads.
+// (e.g. CLOUD-SECURITY-HANDOFF-1778394458903.md) which SCRIBE never reads.
 //
 // Usage:
 //   node scripts/process-handoff.js                  # process all inbox handoffs

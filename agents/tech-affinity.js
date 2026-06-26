@@ -12,7 +12,7 @@
 // minimal blast radius if the fingerprint is incomplete.
 //
 // Off by default at the event-bus integration layer — requires explicit
-// KURUKSHETRA_TECH_GATING=enabled to take effect. This module's pure-fn
+// archon_TECH_GATING=enabled to take effect. This module's pure-fn
 // behavior is unconditional so tests can run without the env flag.
 
 'use strict'
@@ -22,9 +22,9 @@
 // Agents not in this map are treated as universal (no affinity, no demote).
 const AFFINITY_MAP = Object.freeze({
   // PHP-specific specialists
-  karna: { requires_any: ['PHP'], target_family: 'fast' },
+  drill: { requires_any: ['PHP'], target_family: 'fast' },
   // Java-specific specialists
-  bheem: { requires_any: ['Java'], target_family: 'fast' },
+  relay: { requires_any: ['Java'], target_family: 'fast' },
   // Add more as the roster evolves. Conservative bias: only encode CLEAR
   // tech-affinity. When in doubt, leave the agent off the map (universal).
 })
@@ -33,7 +33,7 @@ const AFFINITY_MAP = Object.freeze({
 // modelRouter deny_family_downgrade_for floor. Verification/validation
 // agents need full Sonnet/Opus reasoning to keep error rates down.
 const PROTECTED_AGENTS = new Set([
-  'dharma', 'dharmaraj', 'kripa', 'vyasa', 'krishna', 'sanjay',
+  'sentry', 'arbiter', 'auditor', 'scribe', 'atlas', 'nexus',
 ])
 
 function _norm(s) { return String(s || '').toLowerCase().trim() }

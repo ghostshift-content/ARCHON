@@ -1,12 +1,12 @@
 // Strip baseline/comparison language from task goal text before it reaches
 // specialists/validator/report-writer. Prevents sycophantic mirroring of
-// baseline numbers in squad outputs (Apr-21 Run 1: VYASA spawn prompt said
+// baseline numbers in squad outputs (Apr-21 Run 1: SCRIBE spawn prompt said
 // "Apr-20 baseline = 19 findings (2 CRIT/7 HIGH/...). Goal: match or exceed"
-// and VYASA's executive summary then wrote exactly "19 / 2C/7H/5M/5L" even
+// and SCRIBE's executive summary then wrote exactly "19 / 2C/7H/5M/5L" even
 // though the body had 8 High and 4 Low.
 //
-// Rule: only the orchestrator (KRISHNA chain analysis) and SANJAY (grader)
-// should see the raw goal. Specialists, KRIPA, VYASA must work blind to
+// Rule: only the orchestrator (ATLAS chain analysis) and NEXUS (grader)
+// should see the raw goal. Specialists, AUDITOR, SCRIBE must work blind to
 // baseline numbers.
 
 function scrubBaselineFromGoal(goal) {

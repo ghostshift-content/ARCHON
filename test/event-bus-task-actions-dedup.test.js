@@ -6,10 +6,10 @@
 // rename to /root/intel/inbox/processed/ failed (transient ENOENT or fs.watch
 // re-firing), because the source file stayed in the inbox and the next watcher
 // tick re-read it. Two pending dispatches for the same taskId then led to
-// two concurrent dispatchPentestParallel runs, two EKLAVYA crawls, and the
+// two concurrent dispatchPentestParallel runs, two TRACER crawls, and the
 // SECOND crawl overwriting the first run's endpoint map.
 //
-// Evidence: round-7 logged "EKLAVYA complete: 16716 URLs" at 06:39:45 but the
+// Evidence: round-7 logged "TRACER complete: 16716 URLs" at 06:39:45 but the
 // endpoint file's crawledAt was 06:41:26 with totalUrls=160 — a second crawl
 // overwrote the first.
 //
@@ -85,12 +85,12 @@ test('processTaskActionsInbox always cleans up source file (no silent loop)', ()
     'must have an unlinkSync fallback so processing/ never accumulates orphans on rename failure')
 })
 
-test('runEklavyaAgent has in-flight de-duplication (same taskId returns same promise)', () => {
+test('runtracerAgent has in-flight de-duplication (same taskId returns same promise)', () => {
   // The wrapper should track pending crawls so a second concurrent call for the
   // same taskId returns the in-flight promise, NOT spawn a new crawl that
   // overwrites the first run's endpoint file.
-  const wrapperStart = SRC.indexOf('async function runEklavyaAgent(target, taskId) {')
-  assert.ok(wrapperStart > 0, 'runEklavyaAgent must exist')
+  const wrapperStart = SRC.indexOf('async function runtracerAgent(target, taskId) {')
+  assert.ok(wrapperStart > 0, 'runtracerAgent must exist')
   // Find function body
   let depth = 0, end = wrapperStart, inFn = false
   for (let i = wrapperStart; i < wrapperStart + 5000; i++) {
@@ -100,16 +100,16 @@ test('runEklavyaAgent has in-flight de-duplication (same taskId returns same pro
   const wrapperBody = SRC.slice(wrapperStart, end + 1)
 
   // Must reference an in-flight map / cache for de-dup
-  assert.match(wrapperBody, /_inFlightCrawls|_eklavyaInFlight|inFlight\w*\.has|inFlight\w*\.get|inFlight\w*\.set/i,
-    'runEklavyaAgent wrapper must track in-flight crawls per-taskId to prevent concurrent duplicate runs')
+  assert.match(wrapperBody, /_inFlightCrawls|_tracerInFlight|inFlight\w*\.has|inFlight\w*\.get|inFlight\w*\.set/i,
+    'runtracerAgent wrapper must track in-flight crawls per-taskId to prevent concurrent duplicate runs')
 })
 
-test('_runEklavyaAgentInner emits a low-coverage warning when crawl returns < 500 URLs', () => {
+test('_runtracerAgentInner emits a low-coverage warning when crawl returns < 500 URLs', () => {
   // Regression guard: if discovered.size is suspiciously small, log a warning.
-  // This catches future EKLAVYA failures that silently overwrite richer prior
+  // This catches future TRACER failures that silently overwrite richer prior
   // results, instead of letting specialists silently get a 160-URL map.
-  const innerStart = SRC.indexOf('async function _runEklavyaAgentInner(')
-  assert.ok(innerStart > 0, '_runEklavyaAgentInner must exist')
+  const innerStart = SRC.indexOf('async function _runtracerAgentInner(')
+  assert.ok(innerStart > 0, '_runtracerAgentInner must exist')
   // Find closing brace
   let depth = 0, end = innerStart, inFn = false
   for (let i = innerStart; i < SRC.length; i++) {
@@ -120,15 +120,15 @@ test('_runEklavyaAgentInner emits a low-coverage warning when crawl returns < 50
 
   // Must emit a warning for suspicious low coverage
   assert.match(innerBody, /low[-_ ]?coverage|suspicious.*URL|coverage.*warning|too.*few.*URL/i,
-    '_runEklavyaAgentInner must emit a warning when discovered.size is suspiciously low (< 500)')
+    '_runtracerAgentInner must emit a warning when discovered.size is suspiciously low (< 500)')
 })
 
-test('_runEklavyaAgentInner refuses to overwrite a larger pre-existing endpoint map', () => {
+test('_runtracerAgentInner refuses to overwrite a larger pre-existing endpoint map', () => {
   // The most direct fix: if outFile already exists with totalUrls >> current
   // discovered.size, log a warning and keep the larger file. This prevents
-  // the round-7 scenario where a second EKLAVYA run silently overwrote a
+  // the round-7 scenario where a second TRACER run silently overwrote a
   // 16716-URL map with a 160-URL map.
-  const innerStart = SRC.indexOf('async function _runEklavyaAgentInner(')
+  const innerStart = SRC.indexOf('async function _runtracerAgentInner(')
   let depth = 0, end = innerStart, inFn = false
   for (let i = innerStart; i < SRC.length; i++) {
     if (SRC[i] === '{') { depth++; inFn = true }
@@ -137,5 +137,5 @@ test('_runEklavyaAgentInner refuses to overwrite a larger pre-existing endpoint 
   const innerBody = SRC.slice(innerStart, end + 1)
 
   assert.match(innerBody, /(existing\w*Map|priorMap|previousTotalUrls|existingTotalUrls)/i,
-    '_runEklavyaAgentInner must read any existing endpoint map and refuse to overwrite if the prior crawl was much larger')
+    '_runtracerAgentInner must read any existing endpoint map and refuse to overwrite if the prior crawl was much larger')
 })

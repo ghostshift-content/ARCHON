@@ -186,10 +186,10 @@ function markFailed(srcPath, reason, { baseDir = HANDOFFS_BASE_DIR } = {}) {
   return { path: newPath, record }
 }
 
-// ── Sprint C.2 Task 8 (2026-05-10): VYASA cross-squad corroboration ──
+// ── Sprint C.2 Task 8 (2026-05-10): SCRIBE cross-squad corroboration ──
 // Scan handoffs/done/ for verdicts matching `taskId` and build a markdown
 // section grouped by source_finding_id. Returns '' when no matches exist
-// (so VYASA never injects a fake/empty CROSS-SQUAD section).
+// (so SCRIBE never injects a fake/empty CROSS-SQUAD section).
 function buildCrossSquadCorroborationSection(taskId, { baseDir = HANDOFFS_BASE_DIR } = {}) {
   if (!taskId) return ''
   const doneDir = path.join(baseDir, 'done')

@@ -25,7 +25,7 @@ test('buildHandoffDispatchPrompt: includes the source finding evidence + questio
   const handoff = {
     handoff_id: 'h-test-1',
     source_squad: 'pentest',
-    source_agent: 'ASHWATTHAMA',
+    source_agent: 'FORGE',
     source_finding_id: 'F-42',
     target_squad: 'cloud-security',
     target_capability: 'data-residency',
@@ -56,7 +56,7 @@ test('buildHandoffDispatchPrompt: anti-sycophancy — does NOT include source-ag
   const handoff = {
     handoff_id: 'h-test-2',
     source_squad: 'pentest',
-    source_agent: 'ASHWATTHAMA',
+    source_agent: 'FORGE',
     source_finding_id: 'F-100',
     target_squad: 'cloud-security',
     target_capability: 'data-residency',

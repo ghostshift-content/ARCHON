@@ -1,9 +1,0 @@
-{
-  "projectId": "32319a76-7f20-40a9-a0e0-ebabc4eb98b2",
-  "shape": "package",
-  "offScript": true,
-  "note": "Off-script export: the repo is a vanilla SPA (ui/), not a React component lib. The bundle is a tokens + preview-card design-language export built by scripts/build-ds-export.js from ui/app.css. styles.css is the design-language source; cards are self-contained @dsCard HTML. No _ds_bundle.js (no compiled React components to bind).",
-  "localDir": "ds-bundle",
-  "readmeHeader": ".design-sync/conventions.md",
-  "build": "node scripts/build-ds-export.js"
-}

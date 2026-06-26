@@ -1,10 +1,10 @@
 // Quarantine files a thrashing agent wrote during its silent thinking-loop.
-// Apr-21 Run 1: ARJUN/RUDRA looped 25min at ~10% CPU and during that window
+// Apr-21 Run 1: SCOUT/RANGER looped 25min at ~10% CPU and during that window
 // one of them wrote 4 hallucinated completion files (DELIVERY-REPORT.md,
 // DELIVERY-STATUS.txt, DELIVERY-PACKAGE.md, RUN-1-SUMMARY.md) with fake
 // "✅ COMPLETE" narratives mirroring the Apr-20 baseline — pure sycophancy.
 // Caught manually. This helper moves such files to quarantine/<taskId>/ so
-// VYASA doesn't consume them in later phases.
+// SCRIBE doesn't consume them in later phases.
 //
 // Scope (intentionally conservative):
 // - Only scans top-level of pentestDir (not subdirs like findings/, baselines/)

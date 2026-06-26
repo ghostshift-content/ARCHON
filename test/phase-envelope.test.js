@@ -26,12 +26,12 @@ const {
 
 test('wrap: produces envelope with correct schemaVersion, type, source, taskId, ts, payload', () => {
   const payload = { url: 'https://example.com', status: 200 }
-  const env = wrap('recon', payload, { source: 'ARJUN', taskId: 'task-abc123' })
+  const env = wrap('recon', payload, { source: 'SCOUT', taskId: 'task-abc123' })
 
   assert.equal(env.schemaVersion, SCHEMA_VERSION)
   assert.equal(env.schemaVersion, '1')
   assert.equal(env.type, 'recon')
-  assert.equal(env.source, 'ARJUN')
+  assert.equal(env.source, 'SCOUT')
   assert.equal(env.taskId, 'task-abc123')
   assert.ok(typeof env.ts === 'string' && env.ts.length > 0, 'ts should be a non-empty string')
   // ts should be a valid ISO date
@@ -40,7 +40,7 @@ test('wrap: produces envelope with correct schemaVersion, type, source, taskId, 
 })
 
 test('wrap: all valid types are accepted', () => {
-  const types = ['finding', 'recon', 'specialist-output', 'kripa-result', 'judge-verdict', 'chain']
+  const types = ['finding', 'recon', 'specialist-output', 'auditor-result', 'judge-verdict', 'chain']
   for (const t of types) {
     const env = wrap(t, { x: 1 }, { source: 'TEST', taskId: 'tid' })
     assert.equal(env.type, t)
@@ -69,7 +69,7 @@ test('wrap: throws PhaseEnvelopeError when payload is not a plain object', () =>
 
 test('wrap: payload is not mutated (fresh envelope object)', () => {
   const payload = { a: 1 }
-  const env = wrap('chain', payload, { source: 'VYASA', taskId: 't1' })
+  const env = wrap('chain', payload, { source: 'SCRIBE', taskId: 't1' })
   payload.b = 2
   // payload mutation does NOT affect the envelope's stored payload
   // (wrap does not deep-clone, but the reference is the same; this test
@@ -80,10 +80,10 @@ test('wrap: payload is not mutated (fresh envelope object)', () => {
 // ─── PhaseEnvelope class ──────────────────────────────────────────────────────
 
 test('PhaseEnvelope class: constructor produces correct envelope shape', () => {
-  const env = new PhaseEnvelope('judge-verdict', { verdict: 'CONFIRMED' }, { source: 'DHARMARAJ', taskId: 'jv-1' })
+  const env = new PhaseEnvelope('judge-verdict', { verdict: 'CONFIRMED' }, { source: 'ARBITER', taskId: 'jv-1' })
   assert.equal(env.schemaVersion, '1')
   assert.equal(env.type, 'judge-verdict')
-  assert.equal(env.source, 'DHARMARAJ')
+  assert.equal(env.source, 'ARBITER')
   assert.equal(env.taskId, 'jv-1')
   assert.deepEqual(env.payload, { verdict: 'CONFIRMED' })
 })
@@ -91,8 +91,8 @@ test('PhaseEnvelope class: constructor produces correct envelope shape', () => {
 // ─── validate ─────────────────────────────────────────────────────────────────
 
 test('validate: passes on correct type and schemaVersion', () => {
-  const env = wrap('kripa-result', { status: 'VALIDATED' }, { source: 'KRIPA', taskId: 't2' })
-  const result = validate(env, 'kripa-result')
+  const env = wrap('auditor-result', { status: 'VALIDATED' }, { source: 'AUDITOR', taskId: 't2' })
+  const result = validate(env, 'auditor-result')
   assert.equal(result, env) // returns same reference
 })
 
@@ -103,21 +103,21 @@ test('validate: passes when no expectedType given', () => {
 })
 
 test('validate: throws PhaseEnvelopeError on type mismatch', () => {
-  const env = wrap('finding', { id: 'F-2' }, { source: 'KARNA', taskId: 't4' })
+  const env = wrap('finding', { id: 'F-2' }, { source: 'DRILL', taskId: 't4' })
   assert.throws(
-    () => validate(env, 'kripa-result'),
+    () => validate(env, 'auditor-result'),
     (e) => {
       assert.ok(e instanceof PhaseEnvelopeError, 'must be PhaseEnvelopeError')
       // Error message must include BOTH the expected and actual type
       assert.ok(/finding/.test(e.message), `message must mention 'finding', got: ${e.message}`)
-      assert.ok(/kripa-result/.test(e.message), `message must mention 'kripa-result', got: ${e.message}`)
+      assert.ok(/auditor-result/.test(e.message), `message must mention 'auditor-result', got: ${e.message}`)
       return true
     }
   )
 })
 
 test('validate: throws PhaseEnvelopeError on wrong schemaVersion', () => {
-  const env = wrap('recon', { data: 'ok' }, { source: 'RUDRA', taskId: 't5' })
+  const env = wrap('recon', { data: 'ok' }, { source: 'RANGER', taskId: 't5' })
   const tampered = { ...env, schemaVersion: '99' }
   assert.throws(
     () => validate(tampered, 'recon'),
@@ -126,7 +126,7 @@ test('validate: throws PhaseEnvelopeError on wrong schemaVersion', () => {
 })
 
 test('validate: throws PhaseEnvelopeError when payload is missing', () => {
-  const env = wrap('specialist-output', { text: 'ok' }, { source: 'BHEEM', taskId: 't6' })
+  const env = wrap('specialist-output', { text: 'ok' }, { source: 'RELAY', taskId: 't6' })
   const noPayload = { ...env }
   delete noPayload.payload
   assert.throws(
@@ -136,7 +136,7 @@ test('validate: throws PhaseEnvelopeError when payload is missing', () => {
 })
 
 test('validate: throws PhaseEnvelopeError when payload is null', () => {
-  const env = wrap('finding', { id: 'F-3' }, { source: 'NAKUL', taskId: 't7' })
+  const env = wrap('finding', { id: 'F-3' }, { source: 'VIPER', taskId: 't7' })
   const nullPayload = { ...env, payload: null }
   assert.throws(
     () => validate(nullPayload, 'finding'),
@@ -236,7 +236,7 @@ test('quarantine: uses quarantine.jsonl (no taskId suffix) when taskId is empty'
 // ─── End-to-end: wrap → validate → quarantine on failure ─────────────────────
 
 test('e2e: wrap → validate passes on matching type', () => {
-  const env = wrap('finding', { id: 'F-e2e', severity: 'High' }, { source: 'BHEEM', taskId: 'e2e-1' })
+  const env = wrap('finding', { id: 'F-e2e', severity: 'High' }, { source: 'RELAY', taskId: 'e2e-1' })
   const validated = validate(env, 'finding')
   assert.equal(validated.payload.id, 'F-e2e')
   assert.equal(validated.type, 'finding')
@@ -246,8 +246,8 @@ test('e2e: wrap → validate mismatch → quarantine on failure flow', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pe-e2e-'))
   const taskId = 'e2e-flow'
 
-  // Producer wraps as 'kripa-result'
-  const env = wrap('kripa-result', { verdict: 'CONFIRMED', score: 9 }, { source: 'KRIPA', taskId })
+  // Producer wraps as 'auditor-result'
+  const env = wrap('auditor-result', { verdict: 'CONFIRMED', score: 9 }, { source: 'AUDITOR', taskId })
 
   // Consumer expects 'judge-verdict' — type mismatch
   let validationError = null
@@ -273,7 +273,7 @@ test('e2e: wrap → validate mismatch → quarantine on failure flow', () => {
   assert.ok(fs.existsSync(file))
   const record = JSON.parse(fs.readFileSync(file, 'utf-8').trim())
   assert.equal(record.source, 'phase-envelope')
-  assert.ok(/judge-verdict/.test(record.reason) || /kripa-result/.test(record.reason))
+  assert.ok(/judge-verdict/.test(record.reason) || /auditor-result/.test(record.reason))
 
   fs.rmSync(tmpDir, { recursive: true, force: true })
 })
@@ -287,14 +287,14 @@ test('wrapFinding: bridges finding-schema.js → phase-envelope wrapping', () =>
     title: 'CORS misconfiguration',
     severity: 'CRITICAL', // uppercase — normalizeFinding should title-case it
     validation_status: 'VALIDATED',
-    original_agent: 'ARJUN',
+    original_agent: 'SCOUT',
     taskId: 'bridge-task-1',
   }
-  const env = wrapFinding(finding, { source: 'KRIPA', taskId: 'bridge-task-1' })
+  const env = wrapFinding(finding, { source: 'AUDITOR', taskId: 'bridge-task-1' })
 
   assert.equal(env.schemaVersion, '1')
   assert.equal(env.type, 'finding')
-  assert.equal(env.source, 'KRIPA')
+  assert.equal(env.source, 'AUDITOR')
   assert.equal(env.taskId, 'bridge-task-1')
   // Severity should be normalized by normalizeFinding
   assert.equal(env.payload.severity, 'Critical')

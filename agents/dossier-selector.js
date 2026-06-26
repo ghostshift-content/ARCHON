@@ -5,24 +5,24 @@
 //
 // 2026-06-09 (canonical-selection fix + hardening): the published report must be
 // the CANONICAL AUTHOR's output — the squad LEADER for analysis squads (CHANAKYA),
-// the universal REPORTER (VYASA) for security squads — NOT whichever analyst
+// the universal REPORTER (SCRIBE) for security squads — NOT whichever analyst
 // happened to stuff the taskId into its FILENAME. Canonical-ness is a DECLARED
 // FACT (sidecar + marker, both stamped only by saveAgentReport), with corrected,
 // AUTHOR-BOUND heuristics as fallback so the back-catalog degrades to a CORRECT
 // pick. Selection priority (highest first):
 //   P0a  Sidecar  /root/intel/reports/<taskId>.canonical {path} — honored only if
 //        its taskId matches AND its author matches the resolved canonical author
-//   P0b  Marker   <!-- KURUKSHETRA-CANONICAL taskId=<taskId> author=<A> --> — honored
+//   P0b  Marker   <!-- ARCHON-CANONICAL taskId=<taskId> author=<A> --> — honored
 //        only if its author matches the resolved canonical author (or has none)
 //   F1   canonical-author file + taskId in FILENAME (race-safe across tasks)
 //   F2   canonical-author file + taskId in CONTENT (matches "Internal Ref")
 //   F3   canonical-author file, best in window
-//   F4   ANY filename has taskId   F5 ANY filename has the leader param
+//   F4   ANY filename has taskId   F5 ANY filename has teamleader param
 //   F6   ANY content has taskId    F7 best in window
 //
 // "canonical-author" (opts.canonicalSpec) matches by FILENAME PREFIX (startsWith),
-// not substring — so NARAD-CHANAKYA-FINAL or KRISHNA-FINAL-REPORT-NOTES can no
-// longer impersonate the leader/reporter. security squads: filename starts with the
+// not substring — so NARAD-CHANAKYA-FINAL or ATLAS-FINAL-REPORT-NOTES can no
+// longer impersonate teamleader/reporter. security squads: filename starts with the
 // finalReportName token (FINAL-REPORT); analysis squads (finalReportName null):
 // filename starts with leaderName (CHANAKYA) AND contains a FINAL/DOSSIER marker.
 // Within a tier, ties prefer the materially LARGER file (a stale 1KB draft can't
@@ -75,14 +75,14 @@ function _headerHasTaskId(header, taskIdStr) {
 // no author= field (older markers — accepted, not author-bound).
 function _markerAuthorFor(header, taskIdStr) {
   if (!header || !taskIdStr) return undefined
-  const m = header.match(new RegExp(`<!--\\s*KURUKSHETRA-CANONICAL\\b[^>]*\\btaskId=${taskIdStr}\\b[^>]*-->`, 'i'))
+  const m = header.match(new RegExp(`<!--\\s*ARCHON-CANONICAL\\b[^>]*\\btaskId=${taskIdStr}\\b[^>]*-->`, 'i'))
   if (!m) return undefined
   const a = m[0].match(/\bauthor=([^\s>]+)/i)
   return a ? a[1].toUpperCase() : ''
 }
 
 // Canonical-author matcher from the spec. PREFIX match (startsWith), not substring,
-// so an analyst can't impersonate the leader by embedding the name mid-filename.
+// so an analyst can't impersonate teamleader by embedding the name mid-filename.
 function _makeCanonMatcher(spec) {
   if (!spec) return () => false
   const finalTok = spec.finalReportName ? String(spec.finalReportName).replace(/\.md$/i, '').toUpperCase() : ''
@@ -116,7 +116,7 @@ function selectBestDossierFile(scanDirs, taskId, leader, cutoffMs, opts = {}) {
   const sidecarDir = (opts && opts.sidecarDir) || DEFAULT_SIDECAR_DIR
   const isCanon = _makeCanonMatcher(spec)
   // The author a declared/canonical signal must belong to. From the spec's
-  // leaderName (the role-resolved canonical author) or the leader param.
+  // leaderName (the role-resolved canonical author) or teamleader param.
   const expectedAuthor = String((spec && spec.leaderName) || leader || '').toUpperCase()
   const _authorOk = (a) => !a || !expectedAuthor || a.toUpperCase() === expectedAuthor
 

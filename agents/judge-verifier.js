@@ -13,12 +13,12 @@
 // Failing ANY stage downgrades to a stage-specific severity floor.
 //
 // Anti-sycophancy: the judge sees ONLY the finding + target context + rubric.
-// It does NOT see the originating analyst agent name, KRISHNA's framing,
+// It does NOT see the originating analyst agent name, ATLAS's framing,
 // or prior verdicts (chain-verifier, browser-verifier). Forces independent
 // reasoning — matches existing goal-scrub pattern.
 //
 // Spec: docs/superpowers/specs/2026-05-06-G1-judge-verifier-design.md
-// Architecture: docs/architecture/2026-05-06-kurukshetra-quality-architecture.md (Layer A)
+// Architecture: docs/architecture/2026-05-06-archon-quality-architecture.md (Layer A)
 
 const STAGE_DOWNGRADE = Object.freeze({
   A: 'Info',     // pattern noise → not a real vulnerability
@@ -140,7 +140,7 @@ function extractEvidence(f) {
  */
 function buildJudgePrompt(finding, target, opts = {}) {
   const f = finding || {}
-  // Anti-sycophancy: include only RAW EVIDENCE/FACTS, never the analyst's CLAIMS.
+  // Anti-sycophancy: include only RAW EVIDENCE/FACTS, never analyst's CLAIMS.
   // Specifically EXCLUDED:
   //   - f.impact            — analyst's severity assertion ("Attacker CAN...")
   //                           primes Stage B/C to defer
@@ -160,7 +160,7 @@ function buildJudgePrompt(finding, target, opts = {}) {
   if (opts.promotionMode) return buildPromotionPrompt(f, target, evidenceText, bypassLine)
 
   // Chain-verifier evidence bridge (2026-06-06): if Phase 3.6 ran real curl requests
-  // and confirmed/denied reachability, surface that DETERMINISTIC evidence to DHARMARAJ.
+  // and confirmed/denied reachability, surface that DETERMINISTIC evidence to ARBITER.
   // Anti-sycophancy is about not seeing the LLM agent's verdict — not about hiding curl output.
   // Real HTTP responses from chain-verifier are ground truth, not prior opinion.
   const chainEvidenceLine = f.chain_verified === true

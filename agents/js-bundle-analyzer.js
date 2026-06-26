@@ -1,8 +1,8 @@
 // agents/js-bundle-analyzer.js
 //
 // 2026-05-12: Closes the endpoint-discovery blind spot surfaced during the
-// 2026-05-11 bounty-PoC session. The framework's recon agents (EKLAVYA +
-// ARJUN) crawled webpages but did NOT reverse-engineer the SPA JS bundles
+// 2026-05-11 bounty-PoC session. The framework's recon agents (TRACER +
+// SCOUT) crawled webpages but did NOT reverse-engineer the SPA JS bundles
 // they referenced — so /api/v1/printLog (a SECOND unauth-write endpoint on
 // the same backend as the known chatLog/sync vuln) was missed entirely.
 // We discovered it manually by grepping the 1.3MB index-C3_5rkBN.js bundle.
@@ -11,7 +11,7 @@
 // + URL constants + hardcoded hosts from any JS source string. Squad-
 // agnostic: works on Vite/Webpack/Rollup/Parcel bundles or hand-rolled JS.
 //
-// Wired into Phase 1.6 (post-EKLAVYA crawl, pre-Phase-2 dispatch) so every
+// Wired into Phase 1.6 (post-TRACER crawl, pre-Phase-2 dispatch) so every
 // discovered .js URL gets analyzed and any new API paths get appended to
 // pentest-endpoints-{taskId}.json for Phase 2 specialists to test.
 
@@ -154,7 +154,7 @@ async function defaultFetchImpl(url, { timeoutMs = DEFAULT_FETCH_TIMEOUT_MS } = 
   try {
     const res = await fetch(url, {
       method: 'GET',
-      headers: { 'User-Agent': 'kurukshetra-js-bundle-analyzer/1.0' },
+      headers: { 'User-Agent': 'archon-js-bundle-analyzer/1.0' },
       signal: controller.signal,
       redirect: 'follow',
     })
@@ -224,7 +224,7 @@ function writeAnalysisForTask({ taskId, analysis, intelDir = INTEL_DIR }) {
   return outPath
 }
 
-// Read JS URLs that EKLAVYA's crawl wrote. The convention (since round-9):
+// Read JS URLs that TRACER's crawl wrote. The convention (since round-9):
 //   /root/intel/crawl-{taskId}/g1-js-urls.txt — one URL per line
 // Returns array of URLs, or empty if file missing.
 function readJsUrlsForTask(taskId, { intelDir = INTEL_DIR } = {}) {

@@ -1,6 +1,6 @@
 // test/event-bus-phase-a3-async.test.js
 //
-// Module-level grep tests confirming Phase A3 of runEklavyaAgent uses the
+// Module-level grep tests confirming Phase A3 of runtracerAgent uses the
 // async runWithHeartbeat wrapper instead of blocking sync subprocess. Catches
 // accidental regression that would re-introduce the supervisor SIGKILL bug.
 //
@@ -13,25 +13,25 @@ const path = require('node:path')
 
 const SRC = fs.readFileSync(path.resolve(__dirname, '..', 'event-bus.js'), 'utf-8')
 
-function sliceRunEklavyaAgent() {
-  const start = SRC.indexOf('async function runEklavyaAgent')
-  assert.ok(start > 0, 'runEklavyaAgent function must be present')
+function sliceRuntracerAgent() {
+  const start = SRC.indexOf('async function runtracerAgent')
+  assert.ok(start > 0, 'runtracerAgent function must be present')
   return SRC.slice(start, start + 8000)
 }
 
 function slicePhaseA3() {
-  const fn = sliceRunEklavyaAgent()
+  const fn = sliceRuntracerAgent()
   // Capture from "Phase A3:" through the next "Phase B" header so all branches
   // of the try block are visible (success log, timeout log, exit-code log,
   // catch handler). Falls back to a generous fixed window if Phase B isn't found.
   const m = fn.match(/Phase A3:[\s\S]{0,4000}?(?:\bPhase B\b|\bdiscovered\s*=\s*new Set)/) ||
             fn.match(/Phase A3:[\s\S]{0,4000}/)
-  assert.ok(m, 'Phase A3 block must be present in runEklavyaAgent')
+  assert.ok(m, 'Phase A3 block must be present in runtracerAgent')
   return m[0]
 }
 
-test('runEklavyaAgent imports runWithHeartbeat from long-running-spawn', () => {
-  const slice = sliceRunEklavyaAgent()
+test('runtracerAgent imports runWithHeartbeat from long-running-spawn', () => {
+  const slice = sliceRuntracerAgent()
   assert.match(slice, /require\(['"]\.\/agents\/long-running-spawn['"]\)/,
     'must require ./agents/long-running-spawn')
   assert.match(slice, /\brunWithHeartbeat\b/,

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Build a claude.ai/design export bundle from the Kurukshetra console design
+// Build a claude.ai/design export bundle from the ARCHON console design
 // system. Off-script (the repo is a vanilla SPA, not a React component lib), so
 // we emit a tokens + preview-card layout: styles.css (the real design system) +
 // self-contained @dsCard preview HTML per component + a conventions README.
@@ -112,9 +112,9 @@ cards.push(card('Data Display', 'Badge', `<div class="demo-col">
 // ── Data: avatars ──
 cards.push(card('Data Display', 'Avatar', `<div class="demo-col">
   <div><div class="lbl">Persona avatars (deterministic color)</div>
-    <div class="demo">${['KRISHNA', 'CHANAKYA', 'NARAD', 'SURYA', 'KRIPA', 'VYASA'].map(n => av(n, 40)).join('')}</div></div>
+    <div class="demo">${['ATLAS', 'CHANAKYA', 'NARAD', 'SURYA', 'AUDITOR', 'SCRIBE'].map(n => av(n, 40)).join('')}</div></div>
   <div><div class="lbl">Stack</div>
-    <div class="avs">${['NARAD', 'SURYA', 'LAKSHMI', 'VAYU', 'DRONA'].map(n => av(n)).join('')}<span class="av more">+3</span></div></div>
+    <div class="avs">${['NARAD', 'SURYA', 'LAKSHMI', 'VAYU', 'analyst'].map(n => av(n)).join('')}<span class="av more">+3</span></div></div>
 </div>`, { w: 560, h: 220 }))
 
 // ── Data: stat tiles ──
@@ -148,7 +148,7 @@ cards.push(card('Components', 'TaskCard', `<div style="max-width:480px"><div cla
     <div class="tid">t-1781669666367-012f</div>
     <div class="row"><span class="badge squad">stocks</span><span class="badge">analysis</span></div>
     ${stepper(['research', 'analyze', 'challenge', 'synthesize', 'report', 'verify'], 2, 2)}
-    <div style="margin-top:13px"><div class="avs">${['NARAD', 'SURYA', 'LAKSHMI', 'VAYU', 'DRONA'].map(n => av(n)).join('')}<span class="av more">+2</span></div></div>
+    <div style="margin-top:13px"><div class="avs">${['NARAD', 'SURYA', 'LAKSHMI', 'VAYU', 'analyst'].map(n => av(n)).join('')}<span class="av more">+2</span></div></div>
     <div class="sep-line"></div>
     <div class="footgrid">
       <div class="metric"><span class="mk">cost</span><span class="mv cost">$0.95</span></div>
@@ -163,17 +163,17 @@ cards.push(card('Components', 'TaskCard', `<div style="max-width:480px"><div cla
 cards.push(card('Components', 'SquadCard', `<div style="max-width:320px"><div class="squad" style="--sq:#ff5d8f">
   <div class="banner"><span class="name">pentest</span></div>
   <div class="body">
-    <div class="lead">${av('KRISHNA', 26)} <b>KRISHNA</b><span style="color:#5d6b88;font-size:11px">leads</span></div>
+    <div class="lead">${av('ATLAS', 26)} <b>ATLAS</b><span style="color:#5d6b88;font-size:11px">leads</span></div>
     <div class="type">security-testing · budget $50 · 16 personas</div>
     ${stepper(['recon', 'exploit', 'validate', 'chain', 'report', 'verify'], 0, -1)}
-    <div class="chips">${['ARJUN', 'RUDRA', 'BHEEM', 'NAKUL', 'KARNA', 'SAHDEV', 'DRAUPADI'].map(a => `<span class="chip">${a}</span>`).join('')}</div>
+    <div class="chips">${['SCOUT', 'RANGER', 'RELAY', 'VIPER', 'DRILL', 'GATEWAY', 'WARDEN'].map(a => `<span class="chip">${a}</span>`).join('')}</div>
   </div>
 </div></div>`, { w: 380, h: 360 }))
 
 // ── Forms ──
 cards.push(card('Forms', 'FormControls', `<div style="max-width:420px">
   <div class="field"><label>Squad <span class="req">*</span></label>
-    <select class="select"><option>pentest — leader KRISHNA</option></select></div>
+    <select class="select"><option>pentest — leader ATLAS</option></select></div>
   <div class="field"><label>Goal / target <span class="req">*</span></label>
     <textarea class="textarea" placeholder="In-scope target, e.g. *.example.com"></textarea></div>
   <div class="row2">
@@ -185,7 +185,7 @@ cards.push(card('Forms', 'FormControls', `<div style="max-width:420px">
 </div>`, { w: 480, h: 460 }))
 
 // ── styles.css (the design-language closure designs receive) ──
-w('styles.css', `/* Kurukshetra console — design system tokens + component styles.
+w('styles.css', `/* ARCHON console — design system tokens + component styles.
    The single source of truth for the visual language. Imported by every preview
    card; the design agent reads this for tokens + class vocabulary. */
 ${CSS}`)

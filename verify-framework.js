@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // /root/agents/verify-framework.js
 //
-// THE ROUGH LOOP — "future-proof" exit criteria for Kurukshetra.
+// THE ROUGH LOOP — "future-proof" exit criteria for ARCHON.
 //
 // Each gate is a check. If any gate fails, the loop exits non-zero and prints what to fix.
 // The gates encode Jay's north star: everything config-driven, works across all squads,
@@ -30,7 +30,7 @@ function gate(name, fn) {
 
 function runGates() {
   console.log('═'.repeat(72))
-  console.log('KURUKSHETRA FUTURE-PROOF VERIFICATION — ' + new Date().toISOString())
+  console.log('ARCHON FUTURE-PROOF VERIFICATION — ' + new Date().toISOString())
   console.log('═'.repeat(72))
   console.log()
 
@@ -124,7 +124,7 @@ gate('GATE-5: no hardcoded squad branching in event-bus (getSquadGates/Leader/Me
   if (remaining > 0) {
     throw new Error(`${remaining} places still use hardcoded MUST_GATES_STOCKS : MUST_GATES — should call getSquadGates()`)
   }
-  const leaderHardcode = (codeOnly.match(/squad === 'pentest-squad' \? 'KRISHNA' : 'CHANAKYA'/g) || []).length
+  const leaderHardcode = (codeOnly.match(/squad === 'pentest-squad' \? 'ATLAS' : 'CHANAKYA'/g) || []).length
   if (leaderHardcode > 0) {
     throw new Error(`${leaderHardcode} places still hardcode leader agent — should call getConfiguredSquadLeader()`)
   }
@@ -223,9 +223,9 @@ gate('GATE-13: Telegram outbox relay is PM2-managed + responsive', () => {
   return 'relay online, outbox dir present'
 })
 
-gate('GATE-14: critical agents (kripa/vyasa/krishna/chanakya/dharmaraj) are in deny_family_downgrade_for', () => {
+gate('GATE-14: critical agents (auditor/scribe/atlas/chanakya/arbiter) are in deny_family_downgrade_for', () => {
   const cfg = JSON.parse(fs.readFileSync((agentPaths.INTEL_ROOT + '/model-config.json'), 'utf-8'))
-  const required = ['kripa', 'vyasa', 'krishna', 'chanakya', 'dharmaraj']
+  const required = ['auditor', 'scribe', 'atlas', 'chanakya', 'arbiter']
   const missing = required.filter(a => !cfg.deny_family_downgrade_for?.includes(a))
   if (missing.length > 0) {
     throw new Error(`unprotected critical agents: ${missing.join(', ')}`)
@@ -233,10 +233,10 @@ gate('GATE-14: critical agents (kripa/vyasa/krishna/chanakya/dharmaraj) are in d
   return required.join(', ') + ' protected'
 })
 
-gate('GATE-15: recon agents (arjun, rudra) stay on fast family at all complexity levels', () => {
+gate('GATE-15: recon agents (scout, ranger) stay on fast family at all complexity levels', () => {
   const r = require((agentPaths.AGENTS_ROOT + '/src/routing/model-router'))
   r.resetCache()
-  for (const agent of ['arjun', 'rudra']) {
+  for (const agent of ['scout', 'ranger']) {
     for (const score of [0, 4, 5, 6, 8]) {
       const result = r.getModelForAgent(agent, { complexityScore: score })
       if (result.family !== 'fast') {
@@ -276,7 +276,7 @@ gate('GATE-17: every event-bus prompt that injects profile carries the disclaime
   // without going through the helper.
   const fragmentUses = (src.match(/targetClassifier\.buildPromptFragment/g) || []).length
   if (fragmentUses < 3) {
-    throw new Error(`expected ≥3 buildPromptFragment call sites (specialist, chain, kripa), found ${fragmentUses}`)
+    throw new Error(`expected ≥3 buildPromptFragment call sites (specialist, chain, auditor), found ${fragmentUses}`)
   }
   // Forbid any codepath using profile to filter/skip specialists
   const banned = /if\s*\(\s*profile\.\w+[^)]*\)\s*\{[^}]*(return|skip|continue|specialists\s*=\s*\[\]|remove)/g
@@ -440,14 +440,14 @@ gate('GATE-32: cost-route dedups on stable agent+cost key (not drift-prone times
   if (/a\.agent === String\(c\.agent \|\| ''\)\.toUpperCase\(\) && a\.timestamp === c\.timestamp/.test(src)) {
     throw new Error('cost route still uses timestamp-based dedup — will double-count')
   }
-  // Must have SANJAY exclusion + stable-key approach
-  if (!src.includes("EXCLUDE_AGENTS") || !src.includes("'SANJAY'")) {
-    throw new Error('cost route does not exclude SANJAY summary totals')
+  // Must have NEXUS exclusion + stable-key approach
+  if (!src.includes("EXCLUDE_AGENTS") || !src.includes("'NEXUS'")) {
+    throw new Error('cost route does not exclude NEXUS summary totals')
   }
   if (!src.includes('seenKeys') || !src.includes('cost.toFixed(4)')) {
     throw new Error('cost route missing stable-key dedup (agent+cost)')
   }
-  return 'dedup uses stable key + excludes SANJAY totals'
+  return 'dedup uses stable key + excludes NEXUS totals'
 })
 
 gate('GATE-33: mission-control write endpoints use atomic tmp+rename', () => {
@@ -892,17 +892,17 @@ gate('GATE-53: browser-recipe-validator enforces ALLOWED_ACTIONS whitelist with 
   return 'ALLOWED_ACTIONS defined + rejection branch present'
 })
 
-gate('GATE-54: VYASA report prompt body references BROWSER-VERIFICATION-${taskId}', () => {
+gate('GATE-54: SCRIBE report prompt body references BROWSER-VERIFICATION-${taskId}', () => {
   const src = fs.readFileSync(path.resolve(__dirname, 'event-bus.js'), 'utf-8')
-  const idx = src.indexOf('function buildVyasaReportPrompt')
+  const idx = src.indexOf('function buildscribeReportPrompt')
   if (idx === -1) {
-    throw new Error('function buildVyasaReportPrompt not found in event-bus.js — VYASA prompt builder missing')
+    throw new Error('function buildscribeReportPrompt not found in event-bus.js — SCRIBE prompt builder missing')
   }
   const slice = src.slice(idx, idx + 8000)
   if (!slice.includes('BROWSER-VERIFICATION-${taskId}')) {
-    throw new Error('VYASA prompt body does not reference BROWSER-VERIFICATION-${taskId} — VYASA cannot consume browser-verifier evidence')
+    throw new Error('SCRIBE prompt body does not reference BROWSER-VERIFICATION-${taskId} — SCRIBE cannot consume browser-verifier evidence')
   }
-  return 'VYASA prompt references BROWSER-VERIFICATION-${taskId}'
+  return 'SCRIBE prompt references BROWSER-VERIFICATION-${taskId}'
 })
 
 gate('GATE-55: latest FINAL report citing browser-side findings carries BROWSER-VERIFICATION evidence', () => {
@@ -987,29 +987,29 @@ gate('GATE-57: judge-verifier downgrade table maps each stage to a severity floo
   return `STAGE_DOWNGRADE: A=${STAGE_DOWNGRADE.A}, B=${STAGE_DOWNGRADE.B}, C=${STAGE_DOWNGRADE.C}, D=${STAGE_DOWNGRADE.D}`
 })
 
-gate('GATE-59: VYASA report prompt body references JUDGED-FINDINGS-${taskId}', () => {
+gate('GATE-59: SCRIBE report prompt body references JUDGED-FINDINGS-${taskId}', () => {
   const src = fs.readFileSync(path.resolve(__dirname, 'event-bus.js'), 'utf-8')
-  const idx = src.indexOf('function buildVyasaReportPrompt')
+  const idx = src.indexOf('function buildscribeReportPrompt')
   if (idx === -1) {
-    throw new Error('function buildVyasaReportPrompt not found in event-bus.js — VYASA prompt builder missing')
+    throw new Error('function buildscribeReportPrompt not found in event-bus.js — SCRIBE prompt builder missing')
   }
   const slice = src.slice(idx, idx + 12000)
   if (!slice.includes('JUDGED-FINDINGS-${taskId}')) {
-    throw new Error('VYASA prompt body does not reference JUDGED-FINDINGS-${taskId} — VYASA cannot consume judge-verifier evidence (Phase 3.9)')
+    throw new Error('SCRIBE prompt body does not reference JUDGED-FINDINGS-${taskId} — SCRIBE cannot consume judge-verifier evidence (Phase 3.9)')
   }
   if (!/judge_verdict/.test(slice)) {
-    throw new Error('VYASA prompt body does not teach how to interpret judge_verdict — Phase 3.9 evidence will be ignored')
+    throw new Error('SCRIBE prompt body does not teach how to interpret judge_verdict — Phase 3.9 evidence will be ignored')
   }
-  return 'VYASA prompt references JUDGED-FINDINGS-${taskId} + interprets judge_verdict'
+  return 'SCRIBE prompt references JUDGED-FINDINGS-${taskId} + interprets judge_verdict'
 })
 
 gate('GATE-62: Phase 3.9 reads per-task VALIDATED-FINDINGS (post Phase 3.05 build)', () => {
-  // 2026-05-11 update: GATE was protecting an UNTRUE assumption that KRIPA
-  // wrote to /root/intel/pentest/VALIDATED-FINDINGS.jsonl. KRIPA never wrote
+  // 2026-05-11 update: GATE was protecting an UNTRUE assumption that AUDITOR
+  // wrote to /root/intel/pentest/VALIDATED-FINDINGS.jsonl. AUDITOR never wrote
   // there — that file was a fossil from a previous prompt design. Phase 3.9
   // was reading stale data across runs (round-9 88% was partial luck from
   // motorola entries matching the target). Sprint May-11 fixes the gap with
-  // kripa-validated-builder (GATE-72) which converts KRIPA's ACTIVITY-LOG
+  // auditor-validated-builder (GATE-72) which converts AUDITOR's ACTIVITY-LOG
   // verdicts into per-task VALIDATED-FINDINGS-{taskId}.jsonl at Phase 3.05.
   // Phase 3.9 now reads that per-task file. The original concern that drove
   // the old GATE-62 (Phase 3.9 always skipping because file didn't exist)
@@ -1030,7 +1030,7 @@ gate('GATE-62: Phase 3.9 reads per-task VALIDATED-FINDINGS (post Phase 3.05 buil
     throw new Error('Phase 3.9 must NOT read fossil shared /root/intel/pentest/VALIDATED-FINDINGS.jsonl (Sprint May-11)')
   }
   if (!/outputDir\s*:\s*[`'"]?\/root\/intel[`'"]?|judgeOutputDir/.test(slice)) {
-    throw new Error('Phase 3.9 must pass outputDir=/root/intel so JUDGED-FINDINGS lands where VYASA reads')
+    throw new Error('Phase 3.9 must pass outputDir=/root/intel so JUDGED-FINDINGS lands where SCRIBE reads')
   }
   return 'Phase 3.9 reads per-task VALIDATED-FINDINGS-{taskId}.jsonl + writes JUDGED-FINDINGS to /root/intel/'
 })
@@ -1091,34 +1091,34 @@ gate('GATE-63: trajectory-observer module exists with full API + wired into even
   return 'trajectory-observer module + universal spawnAgent wiring + canonical log path verified'
 })
 
-gate('GATE-61: runEklavyaAgent wraps the entire eklavya phase in checkpoint.verifying=true', () => {
+gate('GATE-61: runtracerAgent wraps the entire tracer phase in checkpoint.verifying=true', () => {
   // Round-2 architectural lock: Phase A3 fix alone was insufficient — Phase G3
   // (200 sequential synchronous curls) ALSO blocks the event loop and triggers
-  // supervisor SIGKILL. Setting verifying=true at the start of runEklavyaAgent
-  // makes supervisor use its existing 15-min threshold for the whole eklavya
+  // supervisor SIGKILL. Setting verifying=true at the start of runtracerAgent
+  // makes supervisor use its existing 15-min threshold for the whole tracer
   // phase. try/finally guarantees the flag is cleared on exception.
   // Spec: docs/superpowers/plans/2026-05-08-supervisor-heartbeat-fix.md (Round 2)
   const ebSrc = fs.readFileSync(path.resolve(__dirname, 'event-bus.js'), 'utf-8')
-  const wrapperStart = ebSrc.indexOf('async function runEklavyaAgent(target, taskId) {')
+  const wrapperStart = ebSrc.indexOf('async function runtracerAgent(target, taskId) {')
   if (wrapperStart < 0) {
-    throw new Error('runEklavyaAgent function missing in event-bus.js')
+    throw new Error('runtracerAgent function missing in event-bus.js')
   }
   // Slice generously to find the wrapper body
   const wrapperSlice = ebSrc.slice(wrapperStart, wrapperStart + 2000)
   if (!/persistCheckpointNow\s*\(\s*\{\s*verifying\s*:\s*true\s*\}/.test(wrapperSlice)) {
-    throw new Error('runEklavyaAgent must call persistCheckpointNow({ verifying: true }) at entry')
+    throw new Error('runtracerAgent must call persistCheckpointNow({ verifying: true }) at entry')
   }
   if (!/finally\s*\{[\s\S]{0,400}?persistCheckpointNow\s*\(\s*\{\s*verifying\s*:\s*(?:false|undefined)/.test(wrapperSlice)) {
-    throw new Error('runEklavyaAgent must clear verifying flag in a finally block')
+    throw new Error('runtracerAgent must clear verifying flag in a finally block')
   }
-  if (!/await\s+_runEklavyaAgentInner\s*\(/.test(wrapperSlice)) {
-    throw new Error('runEklavyaAgent must call await _runEklavyaAgentInner(...)')
+  if (!/await\s+_runtracerAgentInner\s*\(/.test(wrapperSlice)) {
+    throw new Error('runtracerAgent must call await _runtracerAgentInner(...)')
   }
   // Inner function must exist with the actual recon logic
-  if (!ebSrc.includes('async function _runEklavyaAgentInner(target, taskId)')) {
-    throw new Error('_runEklavyaAgentInner function missing — eklavya recon body not preserved')
+  if (!ebSrc.includes('async function _runtracerAgentInner(target, taskId)')) {
+    throw new Error('_runtracerAgentInner function missing — tracer recon body not preserved')
   }
-  return 'runEklavyaAgent wraps eklavya phase in verifying=true (15-min supervisor threshold)'
+  return 'runtracerAgent wraps tracer phase in verifying=true (15-min supervisor threshold)'
 })
 
 gate('GATE-60: Phase A3 (crawl4ai browser crawl) uses async runWithHeartbeat, NOT blocking sync subprocess', () => {
@@ -1136,15 +1136,15 @@ gate('GATE-60: Phase A3 (crawl4ai browser crawl) uses async runWithHeartbeat, NO
     throw new Error('long-running-spawn.js missing runWithHeartbeat export')
   }
   const ebSrc = fs.readFileSync(path.resolve(__dirname, 'event-bus.js'), 'utf-8')
-  const fnStart = ebSrc.indexOf('async function runEklavyaAgent')
+  const fnStart = ebSrc.indexOf('async function runtracerAgent')
   if (fnStart < 0) {
-    throw new Error('runEklavyaAgent function missing in event-bus.js')
+    throw new Error('runtracerAgent function missing in event-bus.js')
   }
   const fnSlice = ebSrc.slice(fnStart, fnStart + 8000)
   const phaseA3Match = fnSlice.match(/Phase A3:[\s\S]{0,4000}?(?:\bPhase B\b|\bdiscovered\s*=\s*new Set)/) ||
                        fnSlice.match(/Phase A3:[\s\S]{0,4000}/)
   if (!phaseA3Match) {
-    throw new Error('Phase A3 block not found in runEklavyaAgent')
+    throw new Error('Phase A3 block not found in runtracerAgent')
   }
   const phaseA3 = phaseA3Match[0]
   if (/\b(?:execSync|spawnSync)\s*\(/.test(phaseA3)) {
@@ -1220,7 +1220,7 @@ gate('GATE-64: every active squad has a valid capabilities.json', () => {
 })
 
 gate('GATE-65: handoff-resolver wired into event-bus.js with fail-soft watcher', () => {
-  // Sprint C.2 Task 9 (2026-05-10): the watcher must be wired at SANJAY
+  // Sprint C.2 Task 9 (2026-05-10): the watcher must be wired at NEXUS
   // startup so handoffs actually drain. Three checks: require, invocation,
   // fail-soft pattern.
   const ebSrc = fs.readFileSync(path.resolve(__dirname, 'event-bus.js'), 'utf-8')
@@ -1248,15 +1248,15 @@ gate('GATE-65: handoff-resolver wired into event-bus.js with fail-soft watcher',
   return 'handoff-resolver required + processInboxOnce invoked + fail-soft polling'
 })
 
-gate('GATE-66: Sprint C.2 prompt integration — specialists know HANDOFF, VYASA reads verdicts, CLI --create exists', () => {
+gate('GATE-66: Sprint C.2 prompt integration — specialists know HANDOFF, SCRIBE reads verdicts, CLI --create exists', () => {
   // Sprint C.2 Tasks 6 + 8 (2026-05-10): catch accidental regression where
-  // buildSpecialistPrompt drops the HANDOFF section, OR buildVyasaReportPrompt
+  // buildSpecialistPrompt drops the HANDOFF section, OR buildscribeReportPrompt
   // loses the CROSS-SQUAD CORROBORATION read path. Both are required for
   // Sprint C.2 to actually fire end-to-end in production.
   // Sprint C.2 follow-up (2026-05-10): A2A_HANDOFF_SECTION advertised
   // `process-handoff.js --create` to specialists, but the flag never existed.
   // Specialists silently fell back to writing markdown (e.g.
-  // CLOUD-SECURITY-HANDOFF-1778394458903.md) which VYASA never reads. Lock
+  // CLOUD-SECURITY-HANDOFF-1778394458903.md) which SCRIBE never reads. Lock
   // in that the CLI exposes --create / --create-stdin / --create-file so the
   // promise the prompt makes is actually deliverable.
   const eb = fs.readFileSync(path.resolve(__dirname, 'event-bus.js'), 'utf-8')
@@ -1277,13 +1277,13 @@ gate('GATE-66: Sprint C.2 prompt integration — specialists know HANDOFF, VYASA
   if (!/\$\{A2A_HANDOFF_SECTION\}/.test(spBody) && !/handoffs\/inbox/.test(spBody)) {
     throw new Error('buildSpecialistPrompt does not interpolate A2A_HANDOFF_SECTION (or name the inbox path inline)')
   }
-  // VYASA reads handoffs
-  const vp = eb.indexOf('function buildVyasaReportPrompt')
-  if (vp < 0) throw new Error('buildVyasaReportPrompt not found')
+  // SCRIBE reads handoffs
+  const vp = eb.indexOf('function buildscribeReportPrompt')
+  if (vp < 0) throw new Error('buildscribeReportPrompt not found')
   const vpEnd = eb.indexOf('\nfunction ', vp + 50)
   const vpBody = eb.slice(vp, vpEnd > 0 ? vpEnd : vp + 8000)
   if (!/handoffs\/done|cross-squad|CROSS-SQUAD|buildCrossSquadCorroborationSection/.test(vpBody)) {
-    throw new Error('buildVyasaReportPrompt does not read cross-squad handoffs')
+    throw new Error('buildscribeReportPrompt does not read cross-squad handoffs')
   }
   // Sub-check: process-handoff.js CLI implements --create modes the prompt advertises
   const cli = fs.readFileSync(path.resolve(__dirname, 'scripts', 'process-handoff.js'), 'utf-8')
@@ -1295,7 +1295,7 @@ gate('GATE-66: Sprint C.2 prompt integration — specialists know HANDOFF, VYASA
   if (!/createHandoff/.test(cli)) {
     throw new Error('scripts/process-handoff.js does not call createHandoff (the protocol drop site)')
   }
-  return 'specialist HANDOFF section present + VYASA reads handoffs/done/ + CLI --create modes wired'
+  return 'specialist HANDOFF section present + SCRIBE reads handoffs/done/ + CLI --create modes wired'
 })
 
 gate('GATE-68: handoff cost caps actually enforced (constants exported AND read)', () => {
@@ -1336,7 +1336,7 @@ gate('GATE-68: handoff cost caps actually enforced (constants exported AND read)
   if (!/>=\s*MAX_TASK_HANDOFF_BUDGET_USD/.test(resolverSrc)) {
     throw new Error('handoff-resolver.js does not COMPARE against MAX_TASK_HANDOFF_BUDGET_USD — budget cap not enforced')
   }
-  // Sanity: the failure reason must mention "budget" so VYASA / ops can grep it
+  // Sanity: the failure reason must mention "budget" so SCRIBE / ops can grep it
   if (!/budget exceeded/i.test(resolverSrc)) {
     throw new Error('handoff-resolver.js missing "budget exceeded" failure reason text')
   }
@@ -1462,7 +1462,7 @@ gate('GATE-71: rule-based deterministic handoff generator wired into Phase 3.45'
     throw new Error('event-bus.js does not call generateHandoffsForTask')
   }
   if (!/Phase 3\.45|PHASE 3\.45/.test(eb)) {
-    throw new Error('Phase 3.45 hook marker not found in event-bus.js (expected near KRIPA→3.5 transition)')
+    throw new Error('Phase 3.45 hook marker not found in event-bus.js (expected near AUDITOR→3.5 transition)')
   }
   // Smoke: a synthetic high finding with s3 url produces a cloud-security handoff arg
   const args = gen.buildHandoffArgs({
@@ -1481,47 +1481,47 @@ gate('GATE-71: rule-based deterministic handoff generator wired into Phase 3.45'
   return 'rule-based-handoff-generator exports OK + 5 rules + Phase 3.45 wired + anti-sycophancy stripped + severity gate enforced'
 })
 
-gate('GATE-72: kripa-validated-builder bridge wired into Phase 3.05', () => {
+gate('GATE-72: auditor-validated-builder bridge wired into Phase 3.05', () => {
   // 2026-05-11: Locks in the fix for the long-standing Phase 3.9 stale-data
   // bug. Before this fix, Phase 3.9 read /root/intel/pentest/VALIDATED-
-  // FINDINGS.jsonl (a fossil — no process wrote to it after a prior KRIPA
+  // FINDINGS.jsonl (a fossil — no process wrote to it after a prior AUDITOR
   // prompt redesign). Round-9 + round-10 both had the judge classifying
   // stale 26-entry data from an unknown earlier run. Round-9's 88% pass
   // was partially luck because stale data happened to match the round-9
   // motorola target. Round-10 (different target = webvpn) got 0%.
   //
-  // Fix: kripa-validated-builder.js parses KRIPA's ACTIVITY-LOG verdicts
+  // Fix: auditor-validated-builder.js parses AUDITOR's ACTIVITY-LOG verdicts
   // post-Phase 3 and writes per-task VALIDATED-FINDINGS-{taskId}.jsonl
   // that Phase 3.9 + Phase 3.45 + run-judge-verifier all already support
   // as their preferred per-task path.
-  const builderPath = path.resolve(__dirname, 'agents', 'kripa-validated-builder.js')
+  const builderPath = path.resolve(__dirname, 'agents', 'auditor-validated-builder.js')
   if (!fs.existsSync(builderPath)) {
-    throw new Error('agents/kripa-validated-builder.js does not exist')
+    throw new Error('agents/auditor-validated-builder.js does not exist')
   }
   const builder = require(builderPath)
   for (const fn of ['buildFromBuffer', 'buildFromActivityLog',
                     'writeValidatedFindingsFile', 'buildAndWriteForTask',
-                    'parseKripaEntry', 'inferSeverity']) {
+                    'parseauditorEntry', 'inferSeverity']) {
     if (typeof builder[fn] !== 'function') {
-      throw new Error(`agents/kripa-validated-builder.js missing function: ${fn}`)
+      throw new Error(`agents/auditor-validated-builder.js missing function: ${fn}`)
     }
   }
-  // event-bus.js wires the builder at Phase 3.05 (after KRIPA, before 3.4 graph build)
+  // event-bus.js wires the builder at Phase 3.05 (after AUDITOR, before 3.4 graph build)
   const eb = fs.readFileSync(path.resolve(__dirname, 'event-bus.js'), 'utf-8')
-  if (!/require\(['"]\.\/agents\/kripa-validated-builder['"]\)/.test(eb)) {
-    throw new Error("event-bus.js does not require './agents/kripa-validated-builder'")
+  if (!/require\(['"]\.\/agents\/auditor-validated-builder['"]\)/.test(eb)) {
+    throw new Error("event-bus.js does not require './agents/auditor-validated-builder'")
   }
   if (!/buildAndWriteForTask\s*\(/.test(eb)) {
     throw new Error('event-bus.js does not call buildAndWriteForTask')
   }
   if (!/Phase 3\.05/.test(eb)) {
-    throw new Error('Phase 3.05 marker not found in event-bus.js (expected post-KRIPA, pre-3.4)')
+    throw new Error('Phase 3.05 marker not found in event-bus.js (expected post-AUDITOR, pre-3.4)')
   }
   // Phase 3.9 + Phase 3.45 must NOT read the fossil shared file anymore.
   // The pre-fix paths were /root/intel/pentest/VALIDATED-FINDINGS.jsonl
   // (no taskId suffix). They should now interpolate ${taskId}.
   const sharedFossilRe = /['"`]\/root\/intel\/pentest\/VALIDATED-FINDINGS\.jsonl['"`]/
-  // VYASA's auxiliary import at line 453 may still reference the shared
+  // SCRIBE's auxiliary import at line 453 may still reference the shared
   // file for its "ALSO check this if it exists" context — that's fine,
   // it's a soft signal not a primary input. We only care about Phase 3.9
   // + 3.45 hooks. Both should reference the per-task ${taskId} form now.
@@ -1533,20 +1533,20 @@ gate('GATE-72: kripa-validated-builder bridge wired into Phase 3.05', () => {
   if (phase345Block && sharedFossilRe.test(phase345Block[0])) {
     throw new Error('Phase 3.45 still reads fossil shared VALIDATED-FINDINGS.jsonl — must use per-task ${taskId} form')
   }
-  // Smoke: synthetic KRIPA buffer with 1 CONFIRMED + 1 KILLED → 1 record
+  // Smoke: synthetic AUDITOR buffer with 1 CONFIRMED + 1 KILLED → 1 record
   const sample = JSON.stringify({
-    agent: 'KRIPA',
+    agent: 'AUDITOR',
     taskId: 'SMOKE-72',
     action: 'CONFIRMED — F-001: Smoke test finding',
   }) + '\n' + JSON.stringify({
-    agent: 'KRIPA',
+    agent: 'AUDITOR',
     taskId: 'SMOKE-72',
     action: 'KILLED — F-002: Should not appear',
   })
   const smoke = builder.buildFromBuffer(sample, 'SMOKE-72')
   if (smoke.length !== 1) throw new Error(`smoke: expected 1 confirmed, got ${smoke.length}`)
   if (smoke[0].id !== 'F-001') throw new Error('smoke: wrong ID')
-  return `kripa-validated-builder wired at Phase 3.05; Phase 3.9 + Phase 3.45 read per-task VALIDATED-FINDINGS-{taskId}.jsonl (fossil shared path removed)`
+  return `auditor-validated-builder wired at Phase 3.05; Phase 3.9 + Phase 3.45 read per-task VALIDATED-FINDINGS-{taskId}.jsonl (fossil shared path removed)`
 })
 
 gate('GATE-73: poc-evidence-capture wired into Phase 3.07 (universal)', () => {
@@ -1554,7 +1554,7 @@ gate('GATE-73: poc-evidence-capture wired into Phase 3.07 (universal)', () => {
   // response data" gap surfaced during the 2026-05-11 bounty-PoC session.
   // For each CONFIRMED finding with a URL, this module snapshots the live
   // HTTP response body+headers+timing to /root/intel/poc-evidence/
-  // {taskId}/{findingId}.json so VYASA and Bugcrowd reports cite concrete
+  // {taskId}/{findingId}.json so SCRIBE and Bugcrowd reports cite concrete
   // payloads, not summaries. Universal across squads.
   const modPath = path.resolve(__dirname, 'agents', 'poc-evidence-capture.js')
   if (!fs.existsSync(modPath)) {
@@ -1591,7 +1591,7 @@ gate('GATE-73: poc-evidence-capture wired into Phase 3.07 (universal)', () => {
 })
 
 gate('GATE-74: js-bundle-analyzer wired into Phase 1.6 (universal endpoint discovery)', () => {
-  // 2026-05-12: closes the endpoint-discovery blind spot. EKLAVYA crawls .js
+  // 2026-05-12: closes the endpoint-discovery blind spot. TRACER crawls .js
   // URLs but never analyzed their contents, so /api/v1/printLog (a second
   // unauth-write vector on Lenovo's Motorola chatbot infra) was missed.
   // This module regex-extracts API paths + URLs + internal hints + build
@@ -1691,7 +1691,7 @@ gate('GATE-77: active-poc-runner wired into Phase 3.08 with env-gate', () => {
     throw new Error('event-bus.js does not require active-poc-runner')
   }
   if (!/PHASE 3\.08/.test(eb)) throw new Error('Phase 3.08 marker missing')
-  if (!/KURUKSHETRA_ACTIVE_POC/.test(eb)) throw new Error('env-gate not present')
+  if (!/archon_ACTIVE_POC/.test(eb)) throw new Error('env-gate not present')
   return 'active-poc-runner wired at Phase 3.08 + env-gate enforced'
 })
 
@@ -1811,39 +1811,39 @@ gate('GATE-82: dossier-selector picks taskId-match over leader-newest (race fix)
   return 'dossier-selector wired into event-bus.js saveAgentReport'
 })
 
-gate('GATE-83: KRIPA verdict parser handles both new free-text format and legacy F-NNN format', () => {
-  // 2026-05-15: Pre-existing Phase 3.05 KRIPA bridge bug — regex demanded
-  // F-NNN: title format but KRIPA writes free-text "KILLED — title (agent-IDs)".
-  // Caused Phase 3.075 + 3.9 to silently receive 0 findings from KRIPA's
+gate('GATE-83: AUDITOR verdict parser handles both new free-text format and legacy F-NNN format', () => {
+  // 2026-05-15: Pre-existing Phase 3.05 AUDITOR bridge bug — regex demanded
+  // F-NNN: title format but AUDITOR writes free-text "KILLED — title (agent-IDs)".
+  // Caused Phase 3.075 + 3.9 to silently receive 0 findings from AUDITOR's
   // validation. Verified on passport.lenovo.com run 2026-05-15 (15 findings
   // in report, 0 in VALIDATED-FINDINGS due to regex miss).
-  const mod = require(path.resolve(__dirname, 'agents/kripa-validated-builder'))
+  const mod = require(path.resolve(__dirname, 'agents/auditor-validated-builder'))
   if (typeof mod.parseVerdictLine !== 'function') {
-    throw new Error('kripa-validated-builder missing parseVerdictLine export')
+    throw new Error('auditor-validated-builder missing parseVerdictLine export')
   }
   // New format
-  const newFmt = mod.parseVerdictLine('KILLED — crossDomainLogout CSRF (EKLAVYA-025)')
+  const newFmt = mod.parseVerdictLine('KILLED — crossDomainLogout CSRF (TRACER-025)')
   if (!newFmt || newFmt.verdict !== 'KILLED') {
-    throw new Error('parser does not handle new free-text format from KRIPA')
+    throw new Error('parser does not handle new free-text format from AUDITOR')
   }
   // Legacy format
   const legacy = mod.parseVerdictLine('CONFIRMED — F-001: No Lockout')
   if (!legacy || legacy.findingId !== 'F-001') {
     throw new Error('parser broke legacy F-NNN: format compatibility')
   }
-  return 'parseVerdictLine handles both new + legacy KRIPA verdict formats'
+  return 'parseVerdictLine handles both new + legacy AUDITOR verdict formats'
 })
 
-gate('GATE-84: squad-policy cvssOf reads cvss_score (KRIPA actual field) with severity-keyword fallback', () => {
+gate('GATE-84: squad-policy cvssOf reads cvss_score (AUDITOR actual field) with severity-keyword fallback', () => {
   // 2026-05-16: Adapter shipped earlier today (commit 3ab5535) read finding.cvss
-  // but KRIPA writes finding.cvss_score. Caused Phase 3.075 severity filter to
+  // but AUDITOR writes finding.cvss_score. Caused Phase 3.075 severity filter to
   // see 0 CVSS for all pentest findings → all archive under bounty/pentest modes.
   // Fix: read cvss_score ?? cvss, fall back to severity-keyword pseudo-CVSS.
   for (const squad of ['pentest', 'cloud-security', 'network-pentest']) {
     const ap = require(path.resolve(__dirname, `agents/squad-policy/${squad}`))
     // cvss_score takes priority
     if (ap.cvssOf({ cvss_score: 7.5 }) !== 7.5) {
-      throw new Error(`${squad}.cvssOf must read cvss_score field (KRIPA actual)`)
+      throw new Error(`${squad}.cvssOf must read cvss_score field (AUDITOR actual)`)
     }
     // Legacy cvss still works
     if (ap.cvssOf({ cvss: 9.1 }) !== 9.1) {
@@ -1929,7 +1929,7 @@ gate('GATE-69: extractTargetUrl priority — config.target_url > config.target >
   // Regression guard for 2026-05-09 round-8 motorola.com bug:
   //   Title "...validation on motorola.com" + config {target_url:
   //   "https://support.motorola.com"} extracted bare 'motorola.com' from
-  //   title, EKLAVYA crawled wrong host, wasted ~15 min before manual cancel.
+  //   title, TRACER crawled wrong host, wasted ~15 min before manual cancel.
   //
   // Locks in:
   //   1. config.target_url beats title-bare-domain
@@ -2004,18 +2004,18 @@ gate('GATE-85: dossier-selector priority — leader-name beats content-taskId (C
   return 'leader-name in filename beats content-taskId (Chennai regression locked)'
 })
 
-gate('GATE-86: kripa-validated-builder emits canonical url field via url-extractor', () => {
+gate('GATE-86: auditor-validated-builder emits canonical url field via url-extractor', () => {
   // Sprint A Task 1 lock: producer-boundary canonical url emission.
-  // KRIPA validated-findings builder must import url-extractor and call
+  // AUDITOR validated-findings builder must import url-extractor and call
   // extractFirstUrl against details/notes so every finding carries a
   // canonical url field before downstream phases (scope-validator, evidence
   // capture, A2A handoff) consume it.
-  const src = fs.readFileSync(path.join(__dirname, 'agents/kripa-validated-builder.js'), 'utf8')
+  const src = fs.readFileSync(path.join(__dirname, 'agents/auditor-validated-builder.js'), 'utf8')
   if (!/require\([^)]*url-extractor[^)]*\)/.test(src)) {
-    throw new Error('kripa-validated-builder.js missing url-extractor require')
+    throw new Error('auditor-validated-builder.js missing url-extractor require')
   }
   if (!/extractFirstUrl\([^)]*(details|notes)/.test(src)) {
-    throw new Error('kripa-validated-builder.js does not call extractFirstUrl on details/notes')
+    throw new Error('auditor-validated-builder.js does not call extractFirstUrl on details/notes')
   }
   const { extractFirstUrl } = require('./agents/url-extractor')
   if (typeof extractFirstUrl !== 'function') {
@@ -2100,10 +2100,10 @@ gate('GATE-90: browser-verifier cross_origin_fetch + auto-recipe for CORS findin
   return 'browser cross-origin verifier wired'
 })
 
-gate('GATE-91: VYASA chain-orphan guard wired + drops chains without validated backing', () => {
-  const { filterChainsAgainstValidatedFindings } = require('./agents/vyasa-chain-orphan-guard')
+gate('GATE-91: SCRIBE chain-orphan guard wired + drops chains without validated backing', () => {
+  const { filterChainsAgainstValidatedFindings } = require('./agents/scribe-chain-orphan-guard')
   if (typeof filterChainsAgainstValidatedFindings !== 'function') {
-    throw new Error('vyasa-chain-orphan-guard missing filterChainsAgainstValidatedFindings')
+    throw new Error('scribe-chain-orphan-guard missing filterChainsAgainstValidatedFindings')
   }
   const r = filterChainsAgainstValidatedFindings(
     [{ id: 'C-G91', finding_ids: ['F-MISSING'] }],
@@ -2113,7 +2113,7 @@ gate('GATE-91: VYASA chain-orphan guard wired + drops chains without validated b
     throw new Error(`orphan chain not dropped: kept=${r.kept.length} dropped=${r.dropped.length}`)
   }
   const eb = fs.readFileSync(path.join(__dirname, 'event-bus.js'), 'utf8')
-  if (!/filterChainsAgainstValidatedFindings|vyasa-chain-orphan-guard/.test(eb)) {
+  if (!/filterChainsAgainstValidatedFindings|scribe-chain-orphan-guard/.test(eb)) {
     throw new Error('event-bus.js does not call chain-orphan guard')
   }
   return 'chain-orphan guard wired + active'
@@ -2457,7 +2457,7 @@ main().catch(e => { process.stderr.write(e.message + '\\n'); process.exit(1) })
 gate('GATE-98: INTERPHASE-CONTRACT — phase-envelope loads, validate throws on wrong type, quarantine writes JSONL, wrap stamps correctly', () => {
   // Locks the typed inter-phase envelope contract (B2, 2026-06-05).
   // Root-cause fix for the silent-drop/stale-field class:
-  //   - KRIPA→judge VERDICT_RE breakage (May 11 + May 15)
+  //   - AUDITOR→judge VERDICT_RE breakage (May 11 + May 15)
   //   - Gulf Oil dashboard bug (May 15, wrong field names)
   //   - 22 distinct key signatures / 48 findings (finding-schema audit)
   // All checks are via a single spawnSync(-e) offline probe (no I/O side effects
@@ -2474,10 +2474,10 @@ const { wrap, validate, quarantine, PhaseEnvelopeError, SCHEMA_VERSION } =
 if (SCHEMA_VERSION !== '1') throw new Error('SCHEMA_VERSION !== 1, got: ' + SCHEMA_VERSION)
 
 // (b) wrap stamps correct fields
-const env = wrap('finding', { id: 'G98' }, { source: 'KRIPA', taskId: 'gate98' })
+const env = wrap('finding', { id: 'G98' }, { source: 'AUDITOR', taskId: 'gate98' })
 if (env.schemaVersion !== '1') throw new Error('wrap: schemaVersion wrong: ' + env.schemaVersion)
 if (env.type !== 'finding')    throw new Error('wrap: type wrong: ' + env.type)
-if (env.source !== 'KRIPA')   throw new Error('wrap: source wrong: ' + env.source)
+if (env.source !== 'AUDITOR')   throw new Error('wrap: source wrong: ' + env.source)
 if (env.taskId !== 'gate98')  throw new Error('wrap: taskId wrong: ' + env.taskId)
 if (typeof env.ts !== 'string' || !env.ts) throw new Error('wrap: ts missing/wrong')
 if (!env.payload || env.payload.id !== 'G98') throw new Error('wrap: payload wrong')
@@ -2660,7 +2660,7 @@ if (!snapParsed.ts) throw new Error('quality-snapshot.json missing ts field')
 qt.recordRunQuality({
   taskId: 'gate100-task',
   squad: 'pentest',
-  agentName: 'KRISHNA',
+  agentName: 'ATLAS',
   passed: 8,
   total: 10,
   gradeScore: 80,
@@ -2720,11 +2720,11 @@ if (nulled.length > 0) {
 
 // (e) Validate required fields and known leaders
 const expectedLeaders = {
-  pentest: 'KRISHNA',
+  pentest: 'ATLAS',
   stocks: 'CHANAKYA',
   'cloud-security': 'VARUNA',
   'network-pentest': 'SHALYA',
-  'code-review': 'VIBHISHANA',
+  'code-review': 'CURATOR',
 }
 const required = ['squad', 'version', 'leader', 'modelTier', 'effort']
 for (const [squad, cfg] of Object.entries(all)) {
@@ -2978,7 +2978,7 @@ ge.evaluateConvergence({
   return (r.stdout || '').trim().replace(/\n/g, ' | ')
 })
 
-gate('GATE-120: CHAIN-EVIDENCE-BRIDGE — Phase 3.6 curl results annotate VALIDATED-FINDINGS so DHARMARAJ Stage C uses real HTTP evidence not text alone', () => {
+gate('GATE-120: CHAIN-EVIDENCE-BRIDGE — Phase 3.6 curl results annotate VALIDATED-FINDINGS so ARBITER Stage C uses real HTTP evidence not text alone', () => {
   const ebSrc = fs.readFileSync(path.join(__dirname, 'event-bus.js'), 'utf-8')
   const jvSrc = fs.readFileSync(path.join(__dirname, 'agents', 'judge-verifier.js'), 'utf-8')
 
@@ -3035,13 +3035,13 @@ const path = require('path')
 const p = require('${agentPaths.AGENTS_ROOT}/paths.js')
 const cfg = p._config()
 const A = '${agentPaths.AGENTS_ROOT}'
-if (p.soulPath('arjun') !== path.join(p.personaCode('arjun'), 'SOUL.md')) throw new Error('soulPath != personaCode/SOUL.md')
-if (p.skillsDir('dharmaraj') !== path.join(p.personaCode('dharmaraj'), 'skills')) throw new Error('skillsDir != personaCode/skills')
-if (!p.personaCode('arjun').startsWith(A)) throw new Error('personaCode escaped AGENTS_ROOT')
-if (cfg.personaMode === 'legacy' && p.personaCode('arjun') !== path.join(A, 'arjun')) throw new Error('legacy personaCode not flat')
-const stateBase = p.personaState('arjun')
+if (p.soulPath('scout') !== path.join(p.personaCode('scout'), 'SOUL.md')) throw new Error('soulPath != personaCode/SOUL.md')
+if (p.skillsDir('arbiter') !== path.join(p.personaCode('arbiter'), 'skills')) throw new Error('skillsDir != personaCode/skills')
+if (!p.personaCode('scout').startsWith(A)) throw new Error('personaCode escaped AGENTS_ROOT')
+if (cfg.personaMode === 'legacy' && p.personaCode('scout') !== path.join(A, 'scout')) throw new Error('legacy personaCode not flat')
+const stateBase = p.personaState('scout')
 if (cfg.stateMode === 'evicted' && !stateBase.includes(path.join('var','state'))) throw new Error('evicted stateMode not under var/state')
-if (cfg.stateMode === 'inline' && stateBase !== p.personaCode('arjun')) throw new Error('inline state != personaCode')
+if (cfg.stateMode === 'inline' && stateBase !== p.personaCode('scout')) throw new Error('inline state != personaCode')
 if (p.lessonsPath('chanakya') !== path.join(p.memoryDir('chanakya'), 'lessons.md')) throw new Error('lessonsPath != memoryDir/lessons.md')
 if (p.a2aCapsDir() !== path.join(A, 'squads')) throw new Error('a2aCapsDir moved unexpectedly')
 process.stdout.write('paths.js contract holds in mode {persona:'+cfg.personaMode+', state:'+cfg.stateMode+'}\\n')
@@ -3058,7 +3058,7 @@ process.exit(0)
   const governed = ['event-bus.js', 'src/learning/memory-ranker.js', 'src/learning/feedback-loop.js']
   const whitelist = /\/root\/agents\/(squads|agents|prompts|docs|var|node_modules)\b/
   const personaLiteral = /\/root\/agents\/(\$\{|[a-z][a-z0-9_-]*\/(SOUL\.md|skills|memory|sessions))/
-  // bare fixed persona dir, e.g. '/root/agents/dharmaraj' (the addDirs sandbox-grant shape)
+  // bare fixed persona dir, e.g. '/root/agents/arbiter' (the addDirs sandbox-grant shape)
   const barePersonaDir = /\/root\/agents\/[a-z][a-z0-9_-]*['"`]/
   const joinLiteral = /path\.join\(\s*['"`]\/root\/agents['"`]/
   const violations = []
@@ -3109,7 +3109,7 @@ gate('GATE-129: EPISODE-EMISSION-LIVE — the learning loop OBSERVE data actuall
   return 'emitEpisode in-scope + writes episodes.jsonl + LOUD catch — learning loop now has a live data source'
 })
 
-gate('GATE-132: ACTIVITY-STALL-WATCHDOG — a hung agent that keeps streaming/thinking but writes NO real output is killed on activity-log stall (not just the 45min hard cap). The stream-based NO_MOVEMENT could not see this (BHISHMA hung 45min while streaming).', () => {
+gate('GATE-132: ACTIVITY-STALL-WATCHDOG — a hung agent that keeps streaming/thinking but writes NO real output is killed on activity-log stall (not just the 45min hard cap). The stream-based NO_MOVEMENT could not see this (veteran hung 45min while streaming).', () => {
   const ebSrc = fs.readFileSync(path.join(__dirname, 'event-bus.js'), 'utf-8')
   if (!/ACTIVITY_STALL_MS/.test(ebSrc)) throw new Error('no ACTIVITY_STALL watchdog — stream-but-stuck hangs only caught by the 45min cap')
   // it must key off activity-log COUNT progress, not lastDataTime (the stream signal that the hang evaded)
@@ -3211,7 +3211,7 @@ process.stdout.write('ok')
   return 'config/routing proposals human-gated; lesson appends auto-eligible; cost-outlier ignores hung runs'
 })
 
-gate('GATE-140: CANONICAL-SELECTION — a declared (sidecar/marker) OR canonical-author file beats an analyst file that merely embedded the taskId in its FILENAME (the ITC NARAD>CHANAKYA regression: published the sentiment-desk file over the leader synthesis)', () => {
+gate('GATE-140: CANONICAL-SELECTION — a declared (sidecar/marker) OR canonical-author file beats an analyst file that merely embedded the taskId in its FILENAME (the ITC NARAD>CHANAKYA regression: published the sentiment-desk file over teamleader synthesis)', () => {
   const os = require('node:os')
   const sel = require(path.resolve(__dirname, 'agents/dossier-selector'))
   const tid = '1780995101516'
@@ -3227,10 +3227,10 @@ gate('GATE-140: CANONICAL-SELECTION — a declared (sidecar/marker) OR canonical
   const rcLegacy = sel.selectBestDossierFile([d1], tid, 'CHANAKYA', 0)
   if (!rcLegacy || !/NARAD/.test(rcLegacy.name)) throw new Error('(c) legacy 4-arg should still pick NARAD (back-compat sentinel changed)')
 
-  // (b) MARKER: a file self-declaring the canonical marker for this taskId beats the analyst filename-taskId file.
+  // (b) MARKER: a file self-declaring the canonical marker for this taskId beats analyst filename-taskId file.
   const d2 = fs.mkdtempSync(path.join(os.tmpdir(), 'gate140b-'))
   fs.writeFileSync(path.join(d2, `NARAD-INTEL-ITC-${tid}.md`), '# NARAD\n' + 'x'.repeat(400))
-  fs.writeFileSync(path.join(d2, 'CHANAKYA-ITC-FINAL-2026-06-09.md'), `<!-- KURUKSHETRA-CANONICAL taskId=${tid} squad=stocks author=CHANAKYA -->\n# DOSSIER\n` + 'y'.repeat(400))
+  fs.writeFileSync(path.join(d2, 'CHANAKYA-ITC-FINAL-2026-06-09.md'), `<!-- ARCHON-CANONICAL taskId=${tid} squad=stocks author=CHANAKYA -->\n# DOSSIER\n` + 'y'.repeat(400))
   const rb = sel.selectBestDossierFile([d2], tid, 'CHANAKYA', 0, { canonicalSpec: spec })
   if (!rb || rb.via !== 'marker' || !/CHANAKYA/.test(rb.name)) throw new Error(`(b) marker: expected via=marker CHANAKYA, got ${rb && rb.name}/${rb && rb.via}`)
 
@@ -3238,7 +3238,7 @@ gate('GATE-140: CANONICAL-SELECTION — a declared (sidecar/marker) OR canonical
   const d3 = fs.mkdtempSync(path.join(os.tmpdir(), 'gate140a-'))
   const rep = path.join(d3, 'reports'); fs.mkdirSync(rep)
   fs.writeFileSync(path.join(d3, `NARAD-INTEL-ITC-${tid}.md`), '# NARAD\n' + 'x'.repeat(400))
-  const pub = path.join(rep, `${tid}.md`); fs.writeFileSync(pub, `<!-- KURUKSHETRA-CANONICAL taskId=${tid} -->\npublished ` + 'z'.repeat(400))
+  const pub = path.join(rep, `${tid}.md`); fs.writeFileSync(pub, `<!-- ARCHON-CANONICAL taskId=${tid} -->\npublished ` + 'z'.repeat(400))
   fs.writeFileSync(path.join(rep, `${tid}.canonical`), JSON.stringify({ taskId: tid, path: pub }))
   const ra = sel.selectBestDossierFile([d3], tid, 'CHANAKYA', 0, { canonicalSpec: spec, sidecarDir: rep })
   if (!ra || ra.via !== 'sidecar' || ra.path !== pub) throw new Error(`(a) sidecar: expected published via=sidecar, got ${ra && ra.path}/${ra && ra.via}`)
@@ -3263,19 +3263,19 @@ gate('GATE-141: CANONICAL-RACE-PRESERVED — two canonical-author files for diff
   return 'two same-author dossiers disambiguate by taskId (content Internal Ref) — race fix preserved'
 })
 
-gate('GATE-142: COST-OUTLIER-PER-AGENT + DEDUP — an agent is judged a cost outlier only vs its OWN trailing history (not a cross-agent average that the leader and cheap challengers both skew), and identical proposals collapse to one (the 7 spurious "downgrade effort" entries from one ITC run)', () => {
+gate('GATE-142: COST-OUTLIER-PER-AGENT + DEDUP — an agent is judged a cost outlier only vs its OWN trailing history (not a cross-agent average that teamleader and cheap challengers both skew), and identical proposals collapse to one (the 7 spurious "downgrade effort" entries from one ITC run)', () => {
   const ll = require(path.resolve(__dirname, 'agents/learning-loop'))
   const ts = new Date().toISOString()
   const mk = (agent, cost, t) => ({ epVersion: '1', ts, taskId: t, squad: 'stocks', agentName: agent, phase: 'specialist', outcome: 'completed', gradeScore: null, costUsd: cost, durationMs: 1000, adapterUsed: 'sdk', suppressionCount: 0, findingCount: 1 })
   // 1 leader + 5 analysts, each a SINGLE run — no agent has its own ≥3-run baseline → none flagged
-  const eps = [mk('chanakya', 5.0, 't1'), mk('bhishma', 1.0, 't2'), mk('drona', 1.1, 't3'), mk('lakshmi', 0.9, 't4'), mk('surya', 1.0, 't5'), mk('vayu', 1.2, 't6')]
+  const eps = [mk('chanakya', 5.0, 't1'), mk('veteran', 1.0, 't2'), mk('analyst', 1.1, 't3'), mk('lakshmi', 0.9, 't4'), mk('surya', 1.0, 't5'), mk('vayu', 1.2, 't6')]
   const d = ll.distill({ episodes: eps, baseline: {} })
   const co = (d.patterns || []).filter(p => p.type === 'cost-outlier')
   if (co.length !== 0) throw new Error(`single-run agents must NOT be cost-outliers (no own baseline), got ${co.length}`)
   // agent with its OWN 3-run history showing a spike → flagged (per-agent, not cross-agent)
-  const hist = [mk('nakul', 0.1, 'h1'), mk('nakul', 0.12, 'h2'), mk('nakul', 5.0, 'h3')]
+  const hist = [mk('viper', 0.1, 'h1'), mk('viper', 0.12, 'h2'), mk('viper', 5.0, 'h3')]
   const dh = ll.distill({ episodes: hist, baseline: {} })
-  const nco = (dh.patterns || []).filter(p => p.type === 'cost-outlier' && p.agentName === 'nakul')
+  const nco = (dh.patterns || []).filter(p => p.type === 'cost-outlier' && p.agentName === 'viper')
   if (nco.length === 0) throw new Error('agent with its own 3-run history + a 2× spike must be flagged (per-agent baseline)')
   // within-run dedup: 7 identical cost-outlier patterns → exactly 1 proposal
   const dup = Array.from({ length: 7 }, () => ({ type: 'cost-outlier', agentName: 'chanakya', squad: 'stocks', count: 1, description: 'x' }))
@@ -3300,7 +3300,7 @@ gate('GATE-143: CANONICAL-SELECTION-HARDENING — declared/canonical signals are
 
   // (b) MARKER AUTHOR-BIND: a planted marker with author=NARAD must be rejected
   const db = fs.mkdtempSync(path.join(os.tmpdir(), 'g143b-'))
-  fs.writeFileSync(path.join(db, `NARAD-INTEL-${tid}.md`), `<!-- KURUKSHETRA-CANONICAL taskId=${tid} author=NARAD -->\n# fake\n` + 'z'.repeat(400))
+  fs.writeFileSync(path.join(db, `NARAD-INTEL-${tid}.md`), `<!-- ARCHON-CANONICAL taskId=${tid} author=NARAD -->\n# fake\n` + 'z'.repeat(400))
   fs.writeFileSync(path.join(db, 'CHANAKYA-FINAL-x.md'), real)
   const rb = sel.selectBestDossierFile([db], tid, 'CHANAKYA', 0, { canonicalSpec: spec })
   if (!rb || !/CHANAKYA/.test(rb.name)) throw new Error(`(b) planted author=NARAD marker won: ${rb && rb.name}`)
@@ -3354,7 +3354,7 @@ gate('GATE-144: GRADE-SIGNAL-ALIVE — the grader resolves the eval via agentPat
   return 'grader resolves eval via skillsDir (restructure-safe, 37-expectation stocks eval reachable); ungraded episode = null; updateTaskGrade ignores non-finite grades'
 })
 
-gate('GATE-145: STRUCTURED-OUTPUT-JUDGE — the DHARMARAJ judge (standard + High/Critical consensus paths) requests GUARANTEED schema-valid JSON via the CLI --json-schema flag, reading the model output from envelope.structured_output. Retires the regex-extract/markdown-strip fragility in parseJudgeResponse that silently downgraded Critical/High findings to "indeterminate" (a false-negative source) on any LLM formatting wobble.', () => {
+gate('GATE-145: STRUCTURED-OUTPUT-JUDGE — the ARBITER judge (standard + High/Critical consensus paths) requests GUARANTEED schema-valid JSON via the CLI --json-schema flag, reading the model output from envelope.structured_output. Retires the regex-extract/markdown-strip fragility in parseJudgeResponse that silently downgraded Critical/High findings to "indeterminate" (a false-negative source) on any LLM formatting wobble.', () => {
   const jv = require(path.resolve(__dirname, 'agents/judge-verifier'))
   const rj = fs.readFileSync(path.join(__dirname, 'scripts', 'run-judge-verifier.js'), 'utf-8')
   const jvSrc = fs.readFileSync(path.join(__dirname, 'agents', 'judge-verifier.js'), 'utf-8')
@@ -3486,8 +3486,8 @@ process.stdout.write('cap='+cap)
 })
 
 gate('GATE-128: RESOLVER-PARITY — persona name casing is normalized (daemon == dashboard), and repair/learning prompts READ memory from the same place writes LAND (var/state under evicted) — the restructure left no read/write split', () => {
-  // 1. casing: uppercase resolves identically to lowercase (was broken: 'ARJUN' → /root/agents/ARJUN)
-  const probe = `const p=require('${agentPaths.AGENTS_ROOT}/paths.js'); if(p.personaCode('ARJUN')!==p.personaCode('arjun'))throw new Error('personaCode casing split: '+p.personaCode('ARJUN')); if(p.personaState('KRIPA')!==p.personaState('kripa'))throw new Error('personaState casing split'); process.stdout.write('ok')`
+  // 1. casing: uppercase resolves identically to lowercase (was broken: 'SCOUT' → /root/agents/SCOUT)
+  const probe = `const p=require('${agentPaths.AGENTS_ROOT}/paths.js'); if(p.personaCode('SCOUT')!==p.personaCode('scout'))throw new Error('personaCode casing split: '+p.personaCode('SCOUT')); if(p.personaState('AUDITOR')!==p.personaState('auditor'))throw new Error('personaState casing split'); process.stdout.write('ok')`
   const r = spawnSync('node', ['-e', probe], { encoding: 'utf-8', timeout: 8000 })
   if (r.status !== 0) throw new Error(`casing parity probe failed: ${(r.stderr||'').slice(0,200)}`)
   // 2. memory read == write: the repair/learning prompts must base memory/* on personaState, not personaCode
@@ -3529,7 +3529,7 @@ gate('GATE-126: AUTO-APPLY-SAFETY-PERIMETER — the full-auto learning loop is s
   const callCount = (aaSrc.match(/_assertNotPerimeter\(/g) || []).length
   if (callCount < 4) throw new Error(`perimeter guard defined but called only ${callCount}× — must gate every write (soul, squad-config, override) + the definition`)
   // perimeter must cover judge/gates/reward/eval/verifier
-  for (const must of ['verify-framework.js', 'judge-verifier.js', 'grader-config.json', 'dharmaraj', 'kripa', 'eval']) {
+  for (const must of ['verify-framework.js', 'judge-verifier.js', 'grader-config.json', 'arbiter', 'auditor', 'eval']) {
     if (!aaSrc.includes(must)) throw new Error(`SAFETY_PERIMETER missing '${must}'`)
   }
   // behavioral probe: the guard actually throws on a perimeter path and passes a persona path
@@ -3544,10 +3544,10 @@ let blocked=false
 try{_assertNotPerimeter('${agentPaths.AGENTS_ROOT}/agents/judge-verifier.js')}catch(_){blocked=true}
 if(!blocked)throw new Error('guard did NOT block judge-verifier.js')
 let blockedJudge=false
-try{_assertNotPerimeter('${agentPaths.AGENTS_ROOT}/_universal/agents/dharmaraj/SOUL.md')}catch(_){blockedJudge=true}
+try{_assertNotPerimeter('${agentPaths.AGENTS_ROOT}/_universal/agents/arbiter/SOUL.md')}catch(_){blockedJudge=true}
 if(!blockedJudge)throw new Error('guard did NOT block the judge persona SOUL')
 let allowed=true
-try{_assertNotPerimeter('${agentPaths.AGENTS_ROOT}/squads/pentest/agents/arjun/SOUL.md')}catch(_){allowed=false}
+try{_assertNotPerimeter('${agentPaths.AGENTS_ROOT}/squads/pentest/agents/scout/SOUL.md')}catch(_){allowed=false}
 if(!allowed)throw new Error('guard wrongly blocked a normal persona SOUL')
 process.stdout.write('ok')
 `
@@ -3556,22 +3556,22 @@ process.stdout.write('ok')
   return `perimeter guard called ${callCount}× — blocks judge/gates/reward/eval, allows normal personas`
 })
 
-gate('GATE-125: PHASE-ENVELOPE-WIRED — the KRIPA→VALIDATED seam (broke twice via VERDICT_RE) uses a typed envelope + quarantines LOUD when KRIPA had verdicts but 0 reached VALIDATED-FINDINGS (the silent-drop class is now guarded, not just gate-shaped)', () => {
+gate('GATE-125: PHASE-ENVELOPE-WIRED — the AUDITOR→VALIDATED seam (broke twice via VERDICT_RE) uses a typed envelope + quarantines LOUD when AUDITOR had verdicts but 0 reached VALIDATED-FINDINGS (the silent-drop class is now guarded, not just gate-shaped)', () => {
   const ebSrc = fs.readFileSync(path.join(__dirname, 'event-bus.js'), 'utf-8')
   if (!/require\('\.\/agents\/phase-envelope'\)/.test(ebSrc)) throw new Error('phase-envelope still has ZERO production call sites — built but unwired')
-  // it must be wired at the Phase 3.05 KRIPA seam, not just imported
+  // it must be wired at the Phase 3.05 AUDITOR seam, not just imported
   const p305 = ebSrc.indexOf('PHASE 3.05:')
-  const wrapIdx = ebSrc.indexOf("__env.wrap('kripa-result'")
-  if (wrapIdx < 0) throw new Error('no typed kripa-result envelope at the seam')
-  if (p305 < 0 || wrapIdx < p305 || wrapIdx - p305 > 3000) throw new Error('envelope not wired into the Phase 3.05 KRIPA→VALIDATED block')
+  const wrapIdx = ebSrc.indexOf("__env.wrap('auditor-result'")
+  if (wrapIdx < 0) throw new Error('no typed auditor-result envelope at the seam')
+  if (p305 < 0 || wrapIdx < p305 || wrapIdx - p305 > 3000) throw new Error('envelope not wired into the Phase 3.05 AUDITOR→VALIDATED block')
   // the silent-drop guard: input>0 && output==0 → quarantine
-  if (!/__kripaRawVerdicts\s*>\s*0\s*&&\s*__bw\.count\s*===?\s*0/.test(ebSrc)) throw new Error('missing input>0/output=0 silent-drop guard')
+  if (!/__auditorRawVerdicts\s*>\s*0\s*&&\s*__bw\.count\s*===?\s*0/.test(ebSrc)) throw new Error('missing input>0/output=0 silent-drop guard')
   if (!/__env\.quarantine\(/.test(ebSrc)) throw new Error('no quarantine call — silent-drop would not be LOUD')
   // envelope module contract intact
-  const probe = `const e=require('${agentPaths.AGENTS_ROOT}/agents/phase-envelope'); const w=e.wrap('kripa-result',{a:1},{source:'KRIPA',taskId:'t'}); e.validate(w,'kripa-result'); let threw=false; try{e.quarantine({x:1},'test',{taskId:'__gate125',outDir:'/tmp'})}catch(_){threw=true}; if(!threw)throw new Error('quarantine did not throw'); process.stdout.write('ok')`
+  const probe = `const e=require('${agentPaths.AGENTS_ROOT}/agents/phase-envelope'); const w=e.wrap('auditor-result',{a:1},{source:'AUDITOR',taskId:'t'}); e.validate(w,'auditor-result'); let threw=false; try{e.quarantine({x:1},'test',{taskId:'__gate125',outDir:'/tmp'})}catch(_){threw=true}; if(!threw)throw new Error('quarantine did not throw'); process.stdout.write('ok')`
   const r = spawnSync('node', ['-e', probe], { encoding: 'utf-8', timeout: 8000 })
   if (r.status !== 0) throw new Error(`phase-envelope contract probe failed: ${(r.stderr||'').slice(0,200)}`)
-  return 'phase-envelope wired at KRIPA→VALIDATED seam with LOUD silent-drop quarantine'
+  return 'phase-envelope wired at AUDITOR→VALIDATED seam with LOUD silent-drop quarantine'
 })
 
 gate('GATE-124: SUPPRESSION-COUNTERWEIGHT-WIRED — Phase 3.075 logs every downgrade to the suppression ledger AND escalates high-conviction/low-evidence findings to manual-review-queue (not just logs — the promotion counterweight is LIVE)', () => {
@@ -3621,7 +3621,7 @@ gate('GATE-122: PERSONA-HOMES-INTACT — every persona resolves to exactly ONE p
     if (!fs.existsSync(agentsDir)) throw new Error(`squad home '${home}' missing agents/ container`)
   }
   // 4. universals share exactly one home
-  for (const u of ['kripa', 'vyasa', 'dharmaraj', 'rof']) {
+  for (const u of ['auditor', 'scribe', 'arbiter', 'command']) {
     if (own[u] && own[u] !== '_universal') throw new Error(`universal '${u}' not homed in _universal (got ${own[u]})`)
   }
   return `${names.length} personas, ${homes.length} squad homes, 0 dups, universals in _universal`
@@ -3677,9 +3677,9 @@ gate('GATE-119: FAILURE-CONTENT-AWARE-DISTILL — learning loop classifies failu
 const ll = require('${agentPaths.AGENTS_ROOT}/agents/learning-loop')
 // distill with timeout failure should produce failureCategory='timeout'
 const eps = [
-  { agentName: 'NAKUL', squad: 'pentest', outcome: 'failed', errorMessage: 'timed out after 600000ms', costUsd: 5, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
-  { agentName: 'NAKUL', squad: 'pentest', outcome: 'failed', errorMessage: 'timed out after 600000ms', costUsd: 5, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
-  { agentName: 'NAKUL', squad: 'pentest', outcome: 'failed', errorMessage: 'timed out after 600000ms', costUsd: 5, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
+  { agentName: 'VIPER', squad: 'pentest', outcome: 'failed', errorMessage: 'timed out after 600000ms', costUsd: 5, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
+  { agentName: 'VIPER', squad: 'pentest', outcome: 'failed', errorMessage: 'timed out after 600000ms', costUsd: 5, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
+  { agentName: 'VIPER', squad: 'pentest', outcome: 'failed', errorMessage: 'timed out after 600000ms', costUsd: 5, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
 ]
 const { patterns } = ll.distill({ episodes: eps, baseline: {} })
 if (patterns.length === 0) throw new Error('no pattern generated for 3 timeouts')
@@ -3691,9 +3691,9 @@ if (!p.specificLesson || p.specificLesson.includes('verify endpoint reachability
 
 // Also test no_findings category
 const noFindEps = [
-  { agentName: 'BHEEM', squad: 'pentest', outcome: 'failed', errorMessage: '', costUsd: 3, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
-  { agentName: 'BHEEM', squad: 'pentest', outcome: 'failed', errorMessage: '', costUsd: 3, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
-  { agentName: 'BHEEM', squad: 'pentest', outcome: 'failed', errorMessage: '', costUsd: 3, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
+  { agentName: 'RELAY', squad: 'pentest', outcome: 'failed', errorMessage: '', costUsd: 3, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
+  { agentName: 'RELAY', squad: 'pentest', outcome: 'failed', errorMessage: '', costUsd: 3, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
+  { agentName: 'RELAY', squad: 'pentest', outcome: 'failed', errorMessage: '', costUsd: 3, gradeScore: 0, suppressionCount: 0, findingCount: 0, ts: new Date().toISOString() },
 ]
 const { patterns: p2 } = ll.distill({ episodes: noFindEps, baseline: {} })
 if (p2[0]?.failureCategory !== 'no_findings') throw new Error('no_findings not detected, got: ' + p2[0]?.failureCategory)
@@ -3710,52 +3710,52 @@ process.exit(0)
 gate('GATE-118: AGENT-SOUL-QUALITY — all key agents have full SOUL.md (not identity card), misaligned identities fixed, challenger mandates enforced', () => {
   const agentsDir = __dirname
 
-  // NAKUL: must no longer say "Social Engineering" as primary role — now Client-Side
-  const nakulSrc = fs.readFileSync(agentPaths.soulPath('nakul'), 'utf-8')
-  if (/Social Engineering.*Specialist/.test(nakulSrc) && !/Client-Side/.test(nakulSrc)) {
-    throw new Error('nakul/SOUL.md still says Social Engineering Specialist without Client-Side fix')
+  // VIPER: must no longer say "Social Engineering" as primary role — now Client-Side
+  const viperSrc = fs.readFileSync(agentPaths.soulPath('viper'), 'utf-8')
+  if (/Social Engineering.*Specialist/.test(viperSrc) && !/Client-Side/.test(viperSrc)) {
+    throw new Error('viper/SOUL.md still says Social Engineering Specialist without Client-Side fix')
   }
-  if (nakulSrc.split('\n').length < 50) {
-    throw new Error(`nakul/SOUL.md too short (${nakulSrc.split('\n').length} lines) — needs full SOUL.md`)
-  }
-
-  // ABHIMANYU: must have php:// wrapper content
-  const abhimanyuSrc = fs.readFileSync(agentPaths.soulPath('abhimanyu'), 'utf-8')
-  if (!abhimanyuSrc.includes('php://filter') && !abhimanyuSrc.includes('php://')) {
-    throw new Error('abhimanyu/SOUL.md missing php:// wrapper techniques')
-  }
-  if (abhimanyuSrc.split('\n').length < 50) {
-    throw new Error(`abhimanyu/SOUL.md too short (${abhimanyuSrc.split('\n').length} lines)`)
+  if (viperSrc.split('\n').length < 50) {
+    throw new Error(`viper/SOUL.md too short (${viperSrc.split('\n').length} lines) — needs full SOUL.md`)
   }
 
-  // EKLAVYA: must have WAF detection tools
-  const eklavyaSrc = fs.readFileSync(agentPaths.soulPath('eklavya'), 'utf-8')
-  if (!/wafw00f|whatwaf/.test(eklavyaSrc)) {
-    throw new Error('eklavya/SOUL.md missing WAF detection tools (wafw00f/whatwaf)')
+  // VAULT: must have php:// wrapper content
+  const vaultSrc = fs.readFileSync(agentPaths.soulPath('vault'), 'utf-8')
+  if (!vaultSrc.includes('php://filter') && !vaultSrc.includes('php://')) {
+    throw new Error('vault/SOUL.md missing php:// wrapper techniques')
+  }
+  if (vaultSrc.split('\n').length < 50) {
+    throw new Error(`vault/SOUL.md too short (${vaultSrc.split('\n').length} lines)`)
   }
 
-  // ASHWATTHAMA: must have per-engine RCE chains
-  const ashwatthamaSrc = fs.readFileSync(agentPaths.soulPath('ashwatthama'), 'utf-8')
-  if (!/Jinja2|jinja2/.test(ashwatthamaSrc)) {
-    throw new Error('ashwatthama/SOUL.md missing Jinja2 RCE chain')
-  }
-  if (!/FreeMarker|freemarker/.test(ashwatthamaSrc)) {
-    throw new Error('ashwatthama/SOUL.md missing FreeMarker chain')
+  // TRACER: must have WAF detection tools
+  const tracerSrc = fs.readFileSync(agentPaths.soulPath('tracer'), 'utf-8')
+  if (!/wafw00f|whatwaf/.test(tracerSrc)) {
+    throw new Error('tracer/SOUL.md missing WAF detection tools (wafw00f/whatwaf)')
   }
 
-  // RUDRA: must have WebSocket testing
-  const rudraSrc = fs.readFileSync(agentPaths.soulPath('rudra'), 'utf-8')
-  if (!/WebSocket|wscat/.test(rudraSrc)) {
-    throw new Error('rudra/SOUL.md missing WebSocket testing section')
+  // FORGE: must have per-engine RCE chains
+  const forgeSrc = fs.readFileSync(agentPaths.soulPath('forge'), 'utf-8')
+  if (!/Jinja2|jinja2/.test(forgeSrc)) {
+    throw new Error('forge/SOUL.md missing Jinja2 RCE chain')
+  }
+  if (!/FreeMarker|freemarker/.test(forgeSrc)) {
+    throw new Error('forge/SOUL.md missing FreeMarker chain')
   }
 
-  // KARNA: must have Deserialization + Prototype Pollution
-  const karnaSrc = fs.readFileSync(agentPaths.soulPath('karna'), 'utf-8')
-  if (!karnaSrc.includes('Deserialization') && !karnaSrc.includes('ysoserial')) {
-    throw new Error('karna/SOUL.md missing Deserialization section')
+  // RANGER: must have WebSocket testing
+  const rangerSrc = fs.readFileSync(agentPaths.soulPath('ranger'), 'utf-8')
+  if (!/WebSocket|wscat/.test(rangerSrc)) {
+    throw new Error('ranger/SOUL.md missing WebSocket testing section')
   }
-  if (!karnaSrc.includes('Prototype Pollution') && !karnaSrc.includes('__proto__')) {
-    throw new Error('karna/SOUL.md missing Prototype Pollution section')
+
+  // DRILL: must have Deserialization + Prototype Pollution
+  const drillSrc = fs.readFileSync(agentPaths.soulPath('drill'), 'utf-8')
+  if (!drillSrc.includes('Deserialization') && !drillSrc.includes('ysoserial')) {
+    throw new Error('drill/SOUL.md missing Deserialization section')
+  }
+  if (!drillSrc.includes('Prototype Pollution') && !drillSrc.includes('__proto__')) {
+    throw new Error('drill/SOUL.md missing Prototype Pollution section')
   }
 
   // VISHNU: must have Challenger Mandate
@@ -3776,10 +3776,10 @@ gate('GATE-118: AGENT-SOUL-QUALITY — all key agents have full SOUL.md (not ide
     throw new Error('chanakya/SOUL.md Synthesis Rules missing FCF vs PAT distinction')
   }
 
-  return 'SOUL.md quality: NAKUL client-side fix, ABHIMANYU/EKLAVYA/ASHWATTHAMA/RUDRA upgraded, KARNA+deserialization+prototype-pollution, VISHNU challenger mandate, CHANAKYA synthesis accuracy rules'
+  return 'SOUL.md quality: VIPER client-side fix, VAULT/TRACER/FORGE/RANGER upgraded, DRILL+deserialization+prototype-pollution, VISHNU challenger mandate, CHANAKYA synthesis accuracy rules'
 })
 
-gate('GATE-117: MULTI-JUDGE-CONSENSUS — 3-judge majority vote for High/Critical DHARMARAJ decisions (+17.9% proven by research)', () => {
+gate('GATE-117: MULTI-JUDGE-CONSENSUS — 3-judge majority vote for High/Critical ARBITER decisions (+17.9% proven by research)', () => {
   const jvSrc = fs.readFileSync(path.join(__dirname, 'agents', 'judge-verifier.js'), 'utf-8')
   const rjSrc = fs.readFileSync(path.join(__dirname, 'scripts', 'run-judge-verifier.js'), 'utf-8')
 
@@ -3812,20 +3812,20 @@ gate('GATE-117: MULTI-JUDGE-CONSENSUS — 3-judge majority vote for High/Critica
   return '3-judge consensus for High/Critical: CONSENSUS_LENSES + majority vote + consensus_confidence + wired in Phase 3.9'
 })
 
-gate('GATE-116: QUALITY-SPRINT — DHARMARAJ evidence fix, confidence+reproduction fields, challenger agent, contradiction detector', () => {
+gate('GATE-116: QUALITY-SPRINT — ARBITER evidence fix, confidence+reproduction fields, challenger agent, contradiction detector', () => {
   const ebSrc = fs.readFileSync(path.join(__dirname, 'event-bus.js'), 'utf-8')
-  const kbSrc = fs.readFileSync(path.join(__dirname, 'agents', 'kripa-validated-builder.js'), 'utf-8')
+  const kbSrc = fs.readFileSync(path.join(__dirname, 'agents', 'auditor-validated-builder.js'), 'utf-8')
   const sfSrc = fs.readFileSync(path.join(__dirname, 'src/core/squad-framework.js'), 'utf-8')
 
-  // DHARMARAJ evidence fix: reproduction_method + reproduction_result populated
+  // ARBITER evidence fix: reproduction_method + reproduction_result populated
   if (!kbSrc.includes('reproduction_method')) {
-    throw new Error('kripa-validated-builder.js missing reproduction_method field')
+    throw new Error('auditor-validated-builder.js missing reproduction_method field')
   }
   if (!kbSrc.includes('reproduction_result')) {
-    throw new Error('kripa-validated-builder.js missing reproduction_result field')
+    throw new Error('auditor-validated-builder.js missing reproduction_result field')
   }
   if (!kbSrc.includes('proof:')) {
-    throw new Error('kripa-validated-builder.js missing proof field for DHARMARAJ')
+    throw new Error('auditor-validated-builder.js missing proof field for ARBITER')
   }
 
   // Per-finding confidence + reproduction in MUST_GATES
@@ -3860,10 +3860,10 @@ gate('GATE-116: QUALITY-SPRINT — DHARMARAJ evidence fix, confidence+reproducti
     throw new Error('event-bus.js missing challenger_verdict annotation on findings')
   }
 
-  return 'DHARMARAJ evidence fix (reproduction_method/proof populated) + GATE-13 confidence + Phase 2.9 contradiction + Phase 3.055 challenger'
+  return 'ARBITER evidence fix (reproduction_method/proof populated) + GATE-13 confidence + Phase 2.9 contradiction + Phase 3.055 challenger'
 })
 
-gate('GATE-115: FINAL-SPRINT — per-agent override, phase-2.5 fast-verify, stuck-agent zero-finding alert, dashboard sync, grade-KRIPA', () => {
+gate('GATE-115: FINAL-SPRINT — per-agent override, phase-2.5 fast-verify, stuck-agent zero-finding alert, dashboard sync, grade-AUDITOR', () => {
   const ebSrc = fs.readFileSync(path.join(__dirname, 'event-bus.js'), 'utf-8')
   const aaSrc = fs.readFileSync(path.join(__dirname, 'agents', 'auto-applier.js'), 'utf-8')
   const llSrc = fs.readFileSync(path.join(__dirname, 'agents', 'learning-loop.js'), 'utf-8')
@@ -3910,15 +3910,15 @@ gate('GATE-115: FINAL-SPRINT — per-agent override, phase-2.5 fast-verify, stuc
     throw new Error('event-bus.js backfill missing source marker')
   }
 
-  // Grade-KRIPA correlation
-  if (!ebSrc.includes('kripaCorrelation')) {
-    throw new Error('event-bus.js missing kripaCorrelation in gradeTask')
+  // Grade-AUDITOR correlation
+  if (!ebSrc.includes('auditorCorrelation')) {
+    throw new Error('event-bus.js missing auditorCorrelation in gradeTask')
   }
   if (!ebSrc.includes('VALIDATED-FINDINGS-${taskId}')) {
     throw new Error('event-bus.js missing VALIDATED-FINDINGS per-specialist read in gradeTask')
   }
 
-  return 'per-agent override + phase-2.5 fast-verify + zero-finding alert + dashboard sync + grade-KRIPA correlation'
+  return 'per-agent override + phase-2.5 fast-verify + zero-finding alert + dashboard sync + grade-AUDITOR correlation'
 })
 
 gate('GATE-114: BUG-FIXES-2 — conditional reflexion, gold-set replay, auto-applier ceiling fallback, episode waveNumber, high-suppression pattern', () => {

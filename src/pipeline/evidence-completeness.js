@@ -9,17 +9,17 @@
 //     following the 3-tier policy: full=Critical OK, partial=max Medium,
 //     local_only=max Low.
 //   - downgradeReason(claimed, capped, evidenceCompleteness): human string
-//     explaining why KRIPA downgraded — for audit + VYASA report rendering.
+//     explaining why AUDITOR downgraded — for audit + SCRIBE report rendering.
 //   - pipelineTraceMeetsMinimum(trace, squad): checks layer count ≥ min.
 //
-// No I/O. Safe to import from event-bus.js prompt builders, KRIPA verdict logic,
+// No I/O. Safe to import from event-bus.js prompt builders, AUDITOR verdict logic,
 // and tests. Do not add side effects.
 
 const VALID_EC_VALUES = new Set(['full', 'partial', 'local_only'])
 const VALID_SEVERITIES = ['Critical', 'High', 'Medium', 'Low', 'Informational']
 
 // Tunable per-squad minimum layers a 'full' pipeline_trace must cover before
-// KRIPA accepts the specialist's 'full' claim. Values from spec §5.
+// AUDITOR accepts the specialist's 'full' claim. Values from spec §5.
 const PIPELINE_MIN_LAYERS = {
   'code-review': 3,
   'cloud-security': 2,
@@ -30,7 +30,7 @@ const PIPELINE_MIN_LAYERS = {
   'ai-security': 3,
 }
 
-// 3-tier severity cap per spec §3 (KRIPA severity cap table).
+// 3-tier severity cap per spec §3 (AUDITOR severity cap table).
 const SEVERITY_CAPS = {
   full: 'Critical',
   partial: 'Medium',
@@ -84,7 +84,7 @@ function capSeverity(claimed, evidenceCompleteness, opts = {}) {
 }
 
 function downgradeReason(claimed, capped, ec, extras = {}) {
-  const parts = [`evidence_completeness=${ec}`, `specialist_claimed=${claimed}`, `kripa_capped_to=${capped}`]
+  const parts = [`evidence_completeness=${ec}`, `specialist_claimed=${claimed}`, `auditor_capped_to=${capped}`]
   if (extras.trace_too_short) parts.push(`trace_too_short=${extras.minLayers}_required_got_${extras.actualLayers}`)
   if (extras.missing_verification_command) parts.push('missing_runtime_verification_command')
   if (extras.unverifiable_by_design) parts.push('unverifiable_by_design')
@@ -100,7 +100,7 @@ function pipelineTraceMeetsMinimum(pipelineTrace, squad) {
 
 // ─── v2 (2026-04-23): Threat-model discipline ─────────────────────────────
 // Stacked sub-rule caps that compose with v1's evidence_completeness cap.
-// Per spec §3 Layer 4 — each rule returns an independent ceiling; KRIPA
+// Per spec §3 Layer 4 — each rule returns an independent ceiling; AUDITOR
 // applies MIN(all ceilings) as the final effective severity.
 
 // Per-privilege maximum severity. null = no cap (unauth and authenticated
@@ -249,7 +249,7 @@ function validateThreatModelSchema(threatModel, candidateContext = {}) {
 }
 
 // Compose v1 evidence_completeness cap + v2 threat_model caps.
-// KRIPA calls this at verdict time; MIN of all ceilings wins.
+// AUDITOR calls this at verdict time; MIN of all ceilings wins.
 function composeAllCaps(claimed, evidenceCompleteness, threatModel, opts = {}) {
   const v1 = capSeverity(claimed, evidenceCompleteness)
   const afterV1 = v1.cappedSeverity

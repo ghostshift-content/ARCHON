@@ -2,13 +2,13 @@
 //
 // Round-6 fix (2026-05-09) was based on a flawed premise: it locked Phase 3.9
 // to /root/intel/pentest/VALIDATED-FINDINGS.jsonl (a shared file) thinking
-// KRIPA wrote there. KRIPA never did — that file was a fossil from an even
+// AUDITOR wrote there. AUDITOR never did — that file was a fossil from an even
 // earlier prompt design. Rounds 9 + 10 confirmed: shared file was stale
-// across runs, Phase 3.9 judged old data, DHARMARAJ produced false verdicts.
+// across runs, Phase 3.9 judged old data, ARBITER produced false verdicts.
 //
-// 2026-05-11 update (Sprint May-11): Phase 3.05 was added between KRIPA and
+// 2026-05-11 update (Sprint May-11): Phase 3.05 was added between AUDITOR and
 // Phase 3.4 that builds /root/intel/VALIDATED-FINDINGS-{taskId}.jsonl from
-// KRIPA's ACTIVITY-LOG verdicts (deterministic post-processor, same pattern
+// AUDITOR's ACTIVITY-LOG verdicts (deterministic post-processor, same pattern
 // as rule-based-handoff-generator). Phase 3.9 now reads THAT per-task file.
 // This test now validates the new contract.
 
@@ -34,11 +34,11 @@ test('Phase 3.9 reads per-task /root/intel/VALIDATED-FINDINGS-{taskId}.jsonl (Sp
     'Phase 3.9 must NOT read fossil /root/intel/pentest/VALIDATED-FINDINGS.jsonl (no producer; stale-data bug)')
 })
 
-test('Phase 3.05 bridge wired: kripa-validated-builder runs after KRIPA', () => {
+test('Phase 3.05 bridge wired: auditor-validated-builder runs after AUDITOR', () => {
   // The bridge is what produces VALIDATED-FINDINGS-{taskId}.jsonl from
-  // KRIPA's ACTIVITY-LOG entries. Without it Phase 3.9 would skip every run.
-  assert.match(SRC, /require\(['"]\.\/agents\/kripa-validated-builder['"]\)/,
-    'event-bus.js must require kripa-validated-builder')
+  // AUDITOR's ACTIVITY-LOG entries. Without it Phase 3.9 would skip every run.
+  assert.match(SRC, /require\(['"]\.\/agents\/auditor-validated-builder['"]\)/,
+    'event-bus.js must require auditor-validated-builder')
   assert.match(SRC, /buildAndWriteForTask\s*\(\s*taskId\s*\)/,
     'event-bus.js must call buildAndWriteForTask(taskId) somewhere')
   // Phase 3.05 marker must exist between Phase 3 complete and Phase 3.4
@@ -51,11 +51,11 @@ test('Phase 3.05 bridge wired: kripa-validated-builder runs after KRIPA', () => 
     `Phase 3.05 must land between Phase 3 (line ${phase3}) and Phase 3.4 (line ${phase34}); got ${phase305}`)
 })
 
-test('Phase 3.9 passes outputDir=/root/intel so VYASA can find JUDGED-FINDINGS', () => {
+test('Phase 3.9 passes outputDir=/root/intel so SCRIBE can find JUDGED-FINDINGS', () => {
   const slice = slicePhase39()
   // Look for outputDir option being passed to runJudge
   assert.match(slice, /outputDir\s*:\s*[`'"]?\/root\/intel[`'"]?|judgeOutputDir/,
-    'Phase 3.9 must pass outputDir=/root/intel so JUDGED-FINDINGS-{taskId}.jsonl lands where VYASA reads')
+    'Phase 3.9 must pass outputDir=/root/intel so JUDGED-FINDINGS-{taskId}.jsonl lands where SCRIBE reads')
 })
 
 test('runJudge accepts outputDir override (round-6)', () => {

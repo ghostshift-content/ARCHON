@@ -61,9 +61,9 @@ test('distill detects recurring-failure pattern when same agent fails ≥3 times
 
   const ts = new Date().toISOString()
   const episodes = [
-    { epVersion: '1', ts, taskId: 't1', squad: 'pentest', agentName: 'ARJUN', phase: 'specialist', outcome: 'failed', gradeScore: 0.2, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: 'error' },
-    { epVersion: '1', ts, taskId: 't2', squad: 'pentest', agentName: 'ARJUN', phase: 'specialist', outcome: 'failed', gradeScore: 0.1, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: 'error' },
-    { epVersion: '1', ts, taskId: 't3', squad: 'pentest', agentName: 'ARJUN', phase: 'specialist', outcome: 'failed', gradeScore: 0.0, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: 'error' },
+    { epVersion: '1', ts, taskId: 't1', squad: 'pentest', agentName: 'SCOUT', phase: 'specialist', outcome: 'failed', gradeScore: 0.2, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: 'error' },
+    { epVersion: '1', ts, taskId: 't2', squad: 'pentest', agentName: 'SCOUT', phase: 'specialist', outcome: 'failed', gradeScore: 0.1, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: 'error' },
+    { epVersion: '1', ts, taskId: 't3', squad: 'pentest', agentName: 'SCOUT', phase: 'specialist', outcome: 'failed', gradeScore: 0.0, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: 'error' },
   ]
 
   const result = ll.distill({ episodes, baseline: { runs: 3 } })
@@ -71,7 +71,7 @@ test('distill detects recurring-failure pattern when same agent fails ≥3 times
 
   const failPattern = result.patterns.find(p => p.type === 'recurring-failure')
   assert.ok(failPattern, 'should detect recurring-failure pattern')
-  assert.strictEqual(failPattern.agentName, 'ARJUN')
+  assert.strictEqual(failPattern.agentName, 'SCOUT')
   assert.strictEqual(failPattern.count, 3)
 })
 
@@ -85,18 +85,18 @@ test('distill detects cost-outlier when an agent cost > 2× its OWN historical a
   const ts = new Date().toISOString()
   const mk = (agent, cost, t) => ({ epVersion: '1', ts, taskId: t, squad: 'pentest', agentName: agent, phase: 'specialist', outcome: 'completed', gradeScore: 0.8, costUsd: cost, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: null })
   const episodes = [
-    // NAKUL's own 3-run history: two normal + one spike (5.00 > 2× its 1.74 avg)
-    mk('NAKUL', 0.10, 't1'), mk('NAKUL', 0.12, 't2'), mk('NAKUL', 5.00, 't3'),
-    // BHEEM: a single (high) run — must NOT be flagged (no own baseline, < min sample)
-    mk('BHEEM', 9.00, 't4'),
+    // VIPER's own 3-run history: two normal + one spike (5.00 > 2× its 1.74 avg)
+    mk('VIPER', 0.10, 't1'), mk('VIPER', 0.12, 't2'), mk('VIPER', 5.00, 't3'),
+    // RELAY: a single (high) run — must NOT be flagged (no own baseline, < min sample)
+    mk('RELAY', 9.00, 't4'),
   ]
 
   const result = ll.distill({ episodes, baseline: {} })
   const costPattern = result.patterns.find(p => p.type === 'cost-outlier')
   assert.ok(costPattern, 'should detect cost-outlier pattern')
-  assert.strictEqual(costPattern.agentName, 'NAKUL')
-  // Per-agent baseline: a single-run agent (BHEEM) cannot be a cost-outlier vs itself.
-  assert.ok(!result.patterns.find(p => p.type === 'cost-outlier' && p.agentName === 'BHEEM'),
+  assert.strictEqual(costPattern.agentName, 'VIPER')
+  // Per-agent baseline: a single-run agent (RELAY) cannot be a cost-outlier vs itself.
+  assert.ok(!result.patterns.find(p => p.type === 'cost-outlier' && p.agentName === 'RELAY'),
     'single-run agent must not be flagged (no own historical baseline)')
 })
 
@@ -121,10 +121,10 @@ test('propose with a recurring-failure pattern produces proposal with structured
 
   const patterns = [{
     type: 'recurring-failure',
-    agentName: 'ARJUN',
+    agentName: 'SCOUT',
     squad: 'pentest',
     count: 3,
-    description: 'ARJUN failed 3 times in the observation window',
+    description: 'SCOUT failed 3 times in the observation window',
   }]
 
   const proposals = ll.propose({ patterns })
@@ -146,9 +146,9 @@ test('propose INVARIANT: all proposals have structuredAction; config/routing cha
   const ll = loadModule()
 
   const patterns = [
-    { type: 'recurring-failure', agentName: 'ARJUN', squad: 'pentest', count: 3, description: 'desc' },
-    { type: 'cost-outlier', agentName: 'NAKUL', squad: 'stocks', count: 1, description: 'desc' },
-    { type: 'low-grade', agentName: 'BHEEM', squad: 'cloud-security', count: 3, description: 'desc' },
+    { type: 'recurring-failure', agentName: 'SCOUT', squad: 'pentest', count: 3, description: 'desc' },
+    { type: 'cost-outlier', agentName: 'VIPER', squad: 'stocks', count: 1, description: 'desc' },
+    { type: 'low-grade', agentName: 'RELAY', squad: 'cloud-security', count: 3, description: 'desc' },
     { type: 'unknown-pattern', agentName: 'X', count: 1, description: 'desc' },
   ]
 
@@ -199,9 +199,9 @@ test('distill is a pure function (deterministic, no I/O side-effects)', async ()
 
   const ts = new Date().toISOString()
   const episodes = [
-    { epVersion: '1', ts, taskId: 't1', squad: 'pentest', agentName: 'ARJUN', phase: 'specialist', outcome: 'failed', gradeScore: 0.2, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: null },
-    { epVersion: '1', ts, taskId: 't2', squad: 'pentest', agentName: 'ARJUN', phase: 'specialist', outcome: 'failed', gradeScore: 0.1, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: null },
-    { epVersion: '1', ts, taskId: 't3', squad: 'pentest', agentName: 'ARJUN', phase: 'specialist', outcome: 'failed', gradeScore: 0.0, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: null },
+    { epVersion: '1', ts, taskId: 't1', squad: 'pentest', agentName: 'SCOUT', phase: 'specialist', outcome: 'failed', gradeScore: 0.2, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: null },
+    { epVersion: '1', ts, taskId: 't2', squad: 'pentest', agentName: 'SCOUT', phase: 'specialist', outcome: 'failed', gradeScore: 0.1, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: null },
+    { epVersion: '1', ts, taskId: 't3', squad: 'pentest', agentName: 'SCOUT', phase: 'specialist', outcome: 'failed', gradeScore: 0.0, costUsd: 0.05, durationMs: 1000, adapterUsed: 'cli', suppressionCount: 0, findingCount: 0, errorMessage: null },
   ]
 
   const result1 = ll.distill({ episodes, baseline: {} })

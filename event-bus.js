@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * SANJAY — THE ALL-SEEING DISPATCHER — Real-time agent dispatcher
+ * NEXUS — THE ALL-SEEING DISPATCHER — Real-time agent dispatcher
  * 
  * v2: Memory System + Parallel Execution for Stocks Squad
  * 
  * Architecture:
  *   - Stocks tasks → Phase 1 (6 analysts parallel) → Phase 2 (CHANAKYA synthesize)
  *                   → Phase 3 (3 challengers parallel) → Phase 4 (CHANAKYA final)
- *   - Pentest tasks → Sequential (KRISHNA leads)
+ *   - Pentest tasks → Sequential (ATLAS leads)
  *   - Post-task: Memory writing (episodes, grades, lessons, squad memory)
  *   - Pre-task: Agents read lessons + episodes + squad memory
  */
@@ -16,7 +16,7 @@ const fs = require('fs')
 const path = require('path')
 const { execSync, spawn } = require('child_process')
 const quotaManager = require('./src/integrations/quota-manager')
-const { MUST_GATES, MUST_GATES_STOCKS, getSquadConfig, shouldRunChainAnalysis, shouldRunDharmaraj, getCostBudget, getPriorityOrder,
+const { MUST_GATES, MUST_GATES_STOCKS, getSquadConfig, shouldRunChainAnalysis, shouldRunarbiter, getCostBudget, getPriorityOrder,
         getSquadLeader: getConfiguredSquadLeader, getSquadGateStyle, getSquadGates, getSquadMemoryFile, getSquadMemoryNamespace, getSquadDispatchType, listKnownSquads,
         getTargetPriorityOrder, getTargetSeverityMultiplier,
         getSquadReportDirs, getSquadFinalReportPath, getSquadTaskReportPath, getAllSquadReportDirs,
@@ -157,12 +157,12 @@ const EVENTS_FILE = INTEL_DIR + '/orchestrator/events.jsonl'
 const CHECKPOINT_FILE = INTEL_DIR + '/orchestrator/checkpoint.json'
 
 // ── A→Z pentest coverage mandate (2026-06-17) — prepended to every pentest agent prompt ──
-// KRISHNA's standing order: comprehensive coverage, report EVERYTHING incl. info-level
+// ATLAS's standing order: comprehensive coverage, report EVERYTHING incl. info-level
 // transport/config hygiene. Full standard lives in the methodology doc (agents read it).
-const PENTEST_COVERAGE = `## 🎯 A→Z COVERAGE MANDATE — KRISHNA's standing order
+const PENTEST_COVERAGE = `## 🎯 A→Z COVERAGE MANDATE — ATLAS's standing order
 Full coverage standard (READ IT): ${agentPaths.AGENTS_ROOT}/squads/pentest/methodology/pentest-coverage.md
 This is a COMPREHENSIVE engagement — report EVERYTHING in scope, including informational transport/config hygiene, not only exploitable bugs. A clean check is reported as "Tested — no issues", never skipped.
-- RECON (ARJUN/RUDRA): run nmap (-sV + default scripts), ffuf content discovery, subdomain+DNS enum. REPORT every open port/service/version, every discovered dir/file/backup/admin panel, and ALL source/secret leaks — especially .js.map sourcemaps (dump → recover source), exposed .git/.env, swagger/openapi, secrets in JS bundles.
+- RECON (SCOUT/RANGER): run nmap (-sV + default scripts), ffuf content discovery, subdomain+DNS enum. REPORT every open port/service/version, every discovered dir/file/backup/admin panel, and ALL source/secret leaks — especially .js.map sourcemaps (dump → recover source), exposed .git/.env, swagger/openapi, secrets in JS bundles.
 - TRANSPORT/CONFIG (every web run): use sslscan + curl -I to test + REPORT TLS versions (flag TLS 1.0/1.1/SSLv3), weak/deprecated ciphers, certificate issues, HSTS, the security-header set (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), and cookie flags (Secure/HttpOnly/SameSite).
 - TOOLING: installed = nmap, ffuf, nikto, sslscan, curl. If a tool you'd prefer is missing, use the installed equivalent (ffuf for content discovery, sslscan for TLS) and continue — do NOT block, do NOT attempt apt/go/pip installs (no root). A missing tool is never a reason to stop; verify manually with curl.
 - ⏱️ RATE OF ENGAGEMENT — do NOT bombard the target. This is an assessment, not a stress test: NO DoS, no high-RPS fuzzing, no thousands of rapid requests. Throttle ALL tooling: ffuf \`-t 10 -rate 20\` (≤20 req/s), nmap \`-T2 --max-rate 50\`, nikto default. In manual curl loops insert a small delay (e.g. \`sleep 0.3\`) and keep concurrency low. On HTTP 429/503 or noticeably slower responses, BACK OFF (exponential wait) — never retry-flood. Stay well under any rate that could degrade the service.
@@ -265,7 +265,7 @@ function broadcastAgentStream(taskId, agent, chunk) {
 
 // Agent session configs — hardcoded fallback
 const FALLBACK_SQUAD_LEADERS = {
-  'pentest': 'KRISHNA', 'pentest-squad': 'KRISHNA',
+  'pentest': 'ATLAS', 'pentest-squad': 'ATLAS',
   'stocks': 'CHANAKYA', 'stocks-squad': 'CHANAKYA',
   'red-team': 'PARASHURAMA', 'red-team-squad': 'PARASHURAMA',
   'network-pentest': 'SHALYA', 'network-pentest-squad': 'SHALYA',
@@ -280,11 +280,11 @@ function getSquadLeader(squad) {
   // Fallback to hardcoded
   return FALLBACK_SQUAD_LEADERS[squad] || FALLBACK_SQUAD_LEADERS[squad.replace(/-squad$/, '')] || null
 }
-// ROF's openclaw agent ID is 'main' (not 'rof')
-const AGENT_ID_MAP = { 'ROF': 'main', 'MAIN': 'main' }
+// COMMAND's openclaw agent ID is 'main' (not 'command')
+const AGENT_ID_MAP = { 'COMMAND': 'main', 'MAIN': 'main' }
 
 // Stocks squad agent roles — hardcoded fallbacks
-const FALLBACK_STOCKS_ANALYSTS = ['narad', 'surya', 'lakshmi', 'vayu', 'drona', 'bhishma']
+const FALLBACK_STOCKS_ANALYSTS = ['narad', 'surya', 'lakshmi', 'vayu', 'analyst', 'veteran']
 const FALLBACK_STOCKS_CHALLENGERS = ['shakuni', 'vidura', 'vishnu']
 
 function getStocksAnalysts() {
@@ -297,8 +297,8 @@ function getStocksChallengers() {
   return dynamic.length > 0 ? dynamic : FALLBACK_STOCKS_CHALLENGERS
 }
 
-// ── DHARMARAJ Verification System (v2) ──
-const VERIFICATION_AGENT = 'dharmaraj'
+// ── ARBITER Verification System (v2) ──
+const VERIFICATION_AGENT = 'arbiter'
 const HANDOFF_DIR = (agentPaths.INTEL_ROOT + '/handoffs')
 const VERIFICATION_LOG = (agentPaths.INTEL_ROOT + '/verification-log.jsonl')
 const MAX_VERIFICATION_RETRIES = 2
@@ -333,7 +333,7 @@ MARKER (verbatim format):
   expected_artifacts: compliance-verdict
   >>
 
-DO NOT write markdown handoff files — VYASA only reads ${agentPaths.INTEL_ROOT}/handoffs/
+DO NOT write markdown handoff files — SCRIBE only reads ${agentPaths.INTEL_ROOT}/handoffs/
 done/*.json. The marker is the ONLY way.
 
 CONSTRAINTS:
@@ -389,7 +389,7 @@ class ConfigCache {
     )
     if (leader) return leader.id || leader.name?.toLowerCase()
     // Hardcoded fallback — NEVER remove
-    const FALLBACK = { 'stocks': 'chanakya', 'stocks-squad': 'chanakya', 'pentest': 'krishna', 'pentest-squad': 'krishna', 'red-team': 'parashurama', 'network-pentest': 'shalya', 'cloud-security': 'varuna' }
+    const FALLBACK = { 'stocks': 'chanakya', 'stocks-squad': 'chanakya', 'pentest': 'atlas', 'pentest-squad': 'atlas', 'red-team': 'parashurama', 'network-pentest': 'shalya', 'cloud-security': 'varuna' }
     return FALLBACK[squad] || FALLBACK[normalSquad] || null
   }
 
@@ -420,7 +420,7 @@ const configCache = new ConfigCache()
 function createHandoffFile(taskId, agentName, squad, findings, techStack, failedApproaches) {
   const handoff = {
     version: '1.0',
-    schema: 'kurukshetra.handoff.v1',
+    schema: 'archon.handoff.v1',
     taskId,
     createdBy: agentName,
     createdAt: new Date().toISOString(),
@@ -437,19 +437,19 @@ function createHandoffFile(taskId, agentName, squad, findings, techStack, failed
 }
 
 /**
- * Dispatch to DHARMARAJ for verification after task completion
+ * Dispatch to ARBITER for verification after task completion
  * Returns verification result: { verdict, details, passRate }
  */
 async function dispatchVerification(taskId, taskTitle, squad, originalAgent, findings) {
-  log(`⚖️ DHARMARAJ: Dispatching verification for task ${taskId}`)
-  logActivity('SANJAY', `⚖️ Verification dispatch: ${taskTitle} → DHARMARAJ`, {
+  log(`⚖️ ARBITER: Dispatching verification for task ${taskId}`)
+  logActivity('NEXUS', `⚖️ Verification dispatch: ${taskTitle} → ARBITER`, {
     type: 'verification-dispatch', squad, taskId,
-    from_agent: originalAgent, to_agent: 'DHARMARAJ'
+    from_agent: originalAgent, to_agent: 'ARBITER'
   })
 
   // Collect all activity for this task (fast path via per-task log)
   const taskEntries = readTaskActivity(taskId)
-    .filter(e => e && e.agent !== 'SANJAY')
+    .filter(e => e && e.agent !== 'NEXUS')
 
   // Only include CONFIRMED/SUSPECTED findings + completion summaries (skip verbose details)
   const findingEntries = taskEntries.filter(e => {
@@ -458,8 +458,8 @@ async function dispatchVerification(taskId, taskTitle, squad, originalAgent, fin
   })
 
   // (2026-04-23) Include truncated details field too — previous version only sent
-  // the action headline (slice 0,200), which stripped evidence DHARMARAJ needs to
-  // reproduce precisely (exact payload, URL, request). Result: DHARMARAJ might
+  // the action headline (slice 0,200), which stripped evidence ARBITER needs to
+  // reproduce precisely (exact payload, URL, request). Result: ARBITER might
   // have been running generic probes instead of the specific vulnerable request.
   const taskActivity = (findingEntries.length > 0 ? findingEntries : taskEntries)
     .map(e => {
@@ -471,11 +471,11 @@ async function dispatchVerification(taskId, taskTitle, squad, originalAgent, fin
     .slice(0, 40000) // Cap raised from 30K to 40K to fit the added details
 
   // (2026-04-23) Also load the pentest-squad's structured findings file (if present)
-  // so DHARMARAJ sees exact url/method/payload/cvss rather than free-form action strings.
+  // so ARBITER sees exact url/method/payload/cvss rather than free-form action strings.
   // 2026-05-11: Switched to per-task file (Sprint May-11 fix). The shared
   // file the original wiring referenced was a fossil that no producer wrote
-  // to — DHARMARAJ would see cross-run stale data and false-negative on
-  // target-switch (round-10 DHARMARAJ 0% pass was THIS bug, not VYASA).
+  // to — ARBITER would see cross-run stale data and false-negative on
+  // target-switch (round-10 ARBITER 0% pass was THIS bug, not SCRIBE).
   let structuredFindings = ''
   try {
     const findingsFile = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
@@ -492,7 +492,7 @@ async function dispatchVerification(taskId, taskTitle, squad, originalAgent, fin
   } catch {}
 
   if (taskActivity.length < 50) {
-    log(`⚖️ DHARMARAJ: Not enough activity to verify for task ${taskId}`)
+    log(`⚖️ ARBITER: Not enough activity to verify for task ${taskId}`)
     return null
   }
 
@@ -509,18 +509,18 @@ async function dispatchVerification(taskId, taskTitle, squad, originalAgent, fin
   const skillName = skillMap[squadNorm] || 'pentest-verification' // fallback to pentest
   let skillContext = ''
   try {
-    const skillPath = `${agentPaths.skillsDir('dharmaraj')}/${skillName}/SKILL.md`
+    const skillPath = `${agentPaths.skillsDir('arbiter')}/${skillName}/SKILL.md`
     if (fs.existsSync(skillPath)) {
       skillContext = fs.readFileSync(skillPath, 'utf-8')
     }
   } catch {}
 
   // Build verification prompt with anti-rationalization + squad-specific skill
-  const verificationPrompt = `You are DHARMARAJ — the independent verification specialist for the ${squad} squad.
+  const verificationPrompt = `You are ARBITER — the independent verification specialist for the ${squad} squad.
 
 ## YOUR IDENTITY
-Read your identity: exec: cat ${agentPaths.soulPath('dharmaraj')}
-Read your verification skill: exec: cat ${agentPaths.skillsDir('dharmaraj')}/${skillName}/SKILL.md
+Read your identity: exec: cat ${agentPaths.soulPath('arbiter')}
+Read your verification skill: exec: cat ${agentPaths.skillsDir('arbiter')}/${skillName}/SKILL.md
 
 ## YOUR TASK
 Independently verify the findings from task "${taskTitle}" (${squad} squad).
@@ -561,31 +561,31 @@ VERDICT: CONFIRMED / FALSE_POSITIVE / PARTIAL
 PASS_RATE: X/Y findings verified`
 
   try {
-    // Run DHARMARAJ as a verification agent
+    // Run ARBITER as a verification agent
     // Write prompt to temp file, then read it safely to avoid shell quoting issues
-    const verifyPromptFile = `/tmp/dharmaraj-verify-${taskId}.md`
+    const verifyPromptFile = `/tmp/arbiter-verify-${taskId}.md`
     fs.writeFileSync(verifyPromptFile, verificationPrompt)
     // Use execFileSync to avoid shell quoting — passes args directly to process
     const { execFileSync } = require('child_process')
     const startTs = Date.now()
     
-    // Read DHARMARAJ SOUL for system prompt
-    const dharmarajSoulContent = readSoulContent('dharmaraj')
+    // Read ARBITER SOUL for system prompt
+    const arbiterSoulContent = readSoulContent('arbiter')
     
     // NEW: Use claude CLI instead of openclaw agent
     // Write checkpoint before sync call — prevents supervisor from thinking we're dead
     try {
-      writeAtomic(CHECKPOINT_FILE, { ts: new Date().toISOString(), runningAgents: ['DHARMARAJ'], runningTasks: [taskId], verifying: true })
+      writeAtomic(CHECKPOINT_FILE, { ts: new Date().toISOString(), runningAgents: ['ARBITER'], runningTasks: [taskId], verifying: true })
     } catch {}
-    log(`⚖️ DHARMARAJ: Starting sync verification (checkpoint updated to prevent supervisor restart)`)
+    log(`⚖️ ARBITER: Starting sync verification (checkpoint updated to prevent supervisor restart)`)
 
-    // (2026-04-21) Resolve DHARMARAJ model via modelRouter instead of hardcoding.
-    // DHARMARAJ is role=verification → family=balanced → still sonnet today, but
+    // (2026-04-21) Resolve ARBITER model via modelRouter instead of hardcoding.
+    // ARBITER is role=verification → family=balanced → still sonnet today, but
     // now one-line config change in model-config.json will auto-propagate when
     // Anthropic bumps sonnet or the verification role is tuned to a different
     // family. Matches the "code never references raw model IDs" architecture rule.
-    const dharmaRouted = modelRouter.getModelForAgent('dharmaraj', {})
-    const dharmaModel = dharmaRouted.model
+    const sentryRouted = modelRouter.getModelForAgent('arbiter', {})
+    const sentryModel = sentryRouted.model
     // (2026-06-04) Migrated to AgentRunner port. runAgent unwraps the JSON envelope
     // (`text` IS parsed.result) and THROWS on timeout/non-zero-exit/parse-fail — all
     // of which collapse into the outer catch below (verdict=null → caller skips/retries),
@@ -596,17 +596,17 @@ PASS_RATE: X/Y findings verified`
     // a SEPARATE setInterval that must run around the await and be cleared on BOTH the
     // success and throw paths — try/finally guarantees that.
     const heartbeat = setInterval(() => {
-      try { writeAtomic(CHECKPOINT_FILE, { ts: new Date().toISOString(), runningAgents: ['DHARMARAJ'], runningTasks: [taskId], verifying: true }) } catch {}
+      try { writeAtomic(CHECKPOINT_FILE, { ts: new Date().toISOString(), runningAgents: ['ARBITER'], runningTasks: [taskId], verifying: true }) } catch {}
     }, 30000)
     let result
     try {
       const { text } = await runAgent({
-        agentName: 'DHARMARAJ',
+        agentName: 'ARBITER',
         taskId,
-        model: dharmaModel,
-        systemPrompt: dharmarajSoulContent,
+        model: sentryModel,
+        systemPrompt: arbiterSoulContent,
         userPrompt: verificationPrompt,
-        addDirs: [agentPaths.personaCode('dharmaraj'), agentPaths.INTEL_ROOT],
+        addDirs: [agentPaths.personaCode('arbiter'), agentPaths.INTEL_ROOT],
         envExtras: { AGENT_TASK_ID: taskId },
         timeoutMs: 900000,
       })
@@ -644,17 +644,17 @@ PASS_RATE: X/Y findings verified`
     }
     fs.appendFileSync(VERIFICATION_LOG, JSON.stringify(verificationEntry) + '\n')
     
-    logActivity('DHARMARAJ', `⚖️ Verification complete: ${verdict} (${passRate}% verified)`, {
+    logActivity('ARBITER', `⚖️ Verification complete: ${verdict} (${passRate}% verified)`, {
       type: 'verification-result', squad, taskId,
       details: `Verdict: ${verdict}\nPass Rate: ${passRate}%\nDuration: ${Math.round(duration/1000)}s`
     })
     
-    log(`⚖️ DHARMARAJ verdict: ${verdict} (${passRate}% pass rate) in ${Math.round(duration/1000)}s`)
+    log(`⚖️ ARBITER verdict: ${verdict} (${passRate}% pass rate) in ${Math.round(duration/1000)}s`)
     
     return { verdict, passRate, duration, output: result }
   } catch (err) {
-    log(`⚖️ DHARMARAJ: Verification failed: ${err.message}`)
-    logActivity('DHARMARAJ', `❌ Verification error: ${err.message}`, {
+    log(`⚖️ ARBITER: Verification failed: ${err.message}`)
+    logActivity('ARBITER', `❌ Verification error: ${err.message}`, {
       type: 'verification-error', squad, taskId
     })
     return null
@@ -685,33 +685,33 @@ async function verificationLoop(taskId, taskTitle, squad, originalAgent, dispatc
     
     if (retries < MAX_VERIFICATION_RETRIES) {
       log(`🔄 Verification failed (${result.verdict}, ${result.passRate}%), retry ${retries + 1}/${MAX_VERIFICATION_RETRIES}`)
-      logActivity('SANJAY', `🔄 Sending back to ${originalAgent} for fixes (attempt ${retries + 1})`, {
+      logActivity('NEXUS', `🔄 Sending back to ${originalAgent} for fixes (attempt ${retries + 1})`, {
         type: 'verification-retry', squad, taskId,
         details: `Verdict: ${result.verdict}, Pass Rate: ${result.passRate}%`
       })
 
-      // (2026-04-19) Re-dispatch to the original agent with DHARMARAJ feedback
+      // (2026-04-19) Re-dispatch to the original agent with ARBITER feedback
       // injected. Feedback becomes the primary steering signal for the retry.
       // If dispatch fails, we log + continue — the watchdog will catch a truly
       // stuck task. Never block the verification loop on a re-dispatch error.
       try {
         const feedback = [
-          result.verdict ? `DHARMARAJ VERDICT: ${result.verdict}` : '',
+          result.verdict ? `ARBITER VERDICT: ${result.verdict}` : '',
           result.passRate != null ? `PASS RATE: ${result.passRate}%` : '',
           result.gaps?.length ? `GAPS:\n${result.gaps.map((g, i) => `  ${i + 1}. ${g}`).join('\n')}` : '',
           result.recommendations?.length ? `RECOMMENDATIONS:\n${result.recommendations.map((r, i) => `  ${i + 1}. ${r}`).join('\n')}` : '',
           result.summary ? `SUMMARY: ${result.summary}` : '',
         ].filter(Boolean).join('\n\n')
 
-        const feedbackPrompt = `## DHARMARAJ VERIFICATION FEEDBACK — RETRY #${retries + 1}
+        const feedbackPrompt = `## ARBITER VERIFICATION FEEDBACK — RETRY #${retries + 1}
 
-You are ${originalAgent.toUpperCase()}. Your previous output for task "${taskTitle}" was verified by DHARMARAJ and did NOT fully pass. Fix the gaps below and re-submit.
+You are ${originalAgent.toUpperCase()}. Your previous output for task "${taskTitle}" was verified by ARBITER and did NOT fully pass. Fix the gaps below and re-submit.
 
 ${feedback}
 
 ## YOUR JOB
 1. Re-read the previous evidence (activity log for this task).
-2. Address EACH gap DHARMARAJ listed. Not partial — each one.
+2. Address EACH gap ARBITER listed. Not partial — each one.
 3. Re-run ONLY the missing/weak checks; don't redo what already passed.
 4. Append new findings + evidence to the activity log with taskId=${taskId}.
 5. End with a one-line SELF_EVAL and a statement of which gaps are now closed.
@@ -724,7 +724,7 @@ Execute now.`
         // Dispatch using the existing spawnAgent path. Non-blocking — if it
         // fails we move on to the next retry iteration.
         spawnAgent(originalAgent, taskId, feedbackPrompt, `task-${taskId}-retry-${retries + 1}`)
-          .catch(e => log(`⚠️ DHARMARAJ retry dispatch failed: ${e.message}`))
+          .catch(e => log(`⚠️ ARBITER retry dispatch failed: ${e.message}`))
 
         // Small breath before the next verification pass
         await new Promise(resolve => setTimeout(resolve, 2000))
@@ -742,20 +742,20 @@ Execute now.`
 
 /**
  * Sprint B.3 (2026-05-09): publication-status banner.
- * After DHARMARAJ + judge layers run, prepend a status banner to the published
+ * After ARBITER + judge layers run, prepend a status banner to the published
  * report file when the published Critical/High findings have NOT been fully
  * verified — so a downstream reader (Jay, triager, Bugcrowd reviewer) can
  * tell at-a-glance whether the report is ship-ready or needs manual review.
  *
  * Triggers banner when ANY of:
- *   - DHARMARAJ verdict = FALSE_POSITIVE
- *   - DHARMARAJ verdict = PARTIAL with passRate < 70
+ *   - ARBITER verdict = FALSE_POSITIVE
+ *   - ARBITER verdict = PARTIAL with passRate < 70
  *   - JUDGED-FINDINGS shows indeterminate Critical/High (judge couldn't verify)
  *
  * No-op if no JUDGED-FINDINGS file exists (judge didn't run, no signal to add).
  * No-op if report file missing (nothing to annotate).
  */
-function prependPublicationStatusBanner(taskId, dharmarajResult) {
+function prependPublicationStatusBanner(taskId, arbiterResult) {
   try {
     const reportPath = path.join((agentPaths.INTEL_ROOT + '/reports'), `${taskId}.md`)
     if (!fs.existsSync(reportPath)) return
@@ -778,18 +778,18 @@ function prependPublicationStatusBanner(taskId, dharmarajResult) {
       }
     }
 
-    const verdict = dharmarajResult?.verdict || 'UNKNOWN'
-    const passRate = dharmarajResult?.passRate ?? 0
+    const verdict = arbiterResult?.verdict || 'UNKNOWN'
+    const passRate = arbiterResult?.passRate ?? 0
 
-    const dharmarajWeak = verdict === 'FALSE_POSITIVE' ||
+    const arbiterWeak = verdict === 'FALSE_POSITIVE' ||
                           (verdict === 'PARTIAL' && passRate < 70)
     const judgeWeak = indeterminateCount > 0
 
-    if (!dharmarajWeak && !judgeWeak) return // no banner needed — clean run
+    if (!arbiterWeak && !judgeWeak) return // no banner needed — clean run
 
     const reasons = []
-    if (verdict === 'FALSE_POSITIVE') reasons.push(`DHARMARAJ verdict: FALSE_POSITIVE`)
-    else if (verdict === 'PARTIAL' && passRate < 70) reasons.push(`DHARMARAJ verdict: PARTIAL (${passRate}% < 70% threshold)`)
+    if (verdict === 'FALSE_POSITIVE') reasons.push(`ARBITER verdict: FALSE_POSITIVE`)
+    else if (verdict === 'PARTIAL' && passRate < 70) reasons.push(`ARBITER verdict: PARTIAL (${passRate}% < 70% threshold)`)
     if (judgeWeak) reasons.push(`${indeterminateCount} Critical/High finding(s) flagged INDETERMINATE by judge-verifier (auto-capped at Medium pending manual review)`)
 
     const banner = [
@@ -798,7 +798,7 @@ function prependPublicationStatusBanner(taskId, dharmarajResult) {
       ...reasons.map(r => `> - ${r}`),
       '>',
       '> Do not submit to Bugcrowd / HackerOne / production triage without resolving the above.',
-      '> Confirmed Critical/High findings: ' + confirmedCount + ' (these passed both DHARMARAJ + judge-verifier).',
+      '> Confirmed Critical/High findings: ' + confirmedCount + ' (these passed both ARBITER + judge-verifier).',
       '> Original severities for downgraded items are preserved in JUDGED-FINDINGS-' + taskId + '.jsonl.',
       '',
       '---',
@@ -815,10 +815,10 @@ function prependPublicationStatusBanner(taskId, dharmarajResult) {
 }
 
 /**
- * FIX 1 (2026-05-09): real DHARMARAJ publication GATE.
+ * FIX 1 (2026-05-09): real ARBITER publication GATE.
  *
  * Sprint B.3 added an informational banner; this function makes the gate
- * REAL — when DHARMARAJ verdict is FALSE_POSITIVE OR PARTIAL with passRate < 50,
+ * REAL — when ARBITER verdict is FALSE_POSITIVE OR PARTIAL with passRate < 50,
  * the report is moved out of /root/intel/reports/ into /root/intel/reports-blocked/
  * with a severe banner, and tasks.json is marked status='blocked'.
  *
@@ -826,10 +826,10 @@ function prependPublicationStatusBanner(taskId, dharmarajResult) {
  * gap so PARTIAL 50-69% gets a banner but ships, while PARTIAL <50% is too
  * weak to ship at all.
  */
-function shouldBlockPublication(dharmarajResult) {
-  if (!dharmarajResult || typeof dharmarajResult !== 'object') return false
-  const verdict = dharmarajResult.verdict
-  const passRate = Number(dharmarajResult.passRate)
+function shouldBlockPublication(arbiterResult) {
+  if (!arbiterResult || typeof arbiterResult !== 'object') return false
+  const verdict = arbiterResult.verdict
+  const passRate = Number(arbiterResult.passRate)
   if (verdict === 'FALSE_POSITIVE') return true
   if (verdict === 'PARTIAL' && Number.isFinite(passRate) && passRate < 50) return true
   return false
@@ -840,10 +840,10 @@ function shouldBlockPublication(dharmarajResult) {
  * and update tasks.json to status='blocked'. Idempotent — safe to call twice.
  *
  * @param {string} taskId
- * @param {object} dharmarajResult — { verdict, passRate, ... }
+ * @param {object} arbiterResult — { verdict, passRate, ... }
  * @param {string} reason — human-readable reason (used in banner + task metadata)
  */
-function blockReportPublication(taskId, dharmarajResult, reason) {
+function blockReportPublication(taskId, arbiterResult, reason) {
   try {
     const srcReport = path.join((agentPaths.INTEL_ROOT + '/reports'), `${taskId}.md`)
     const blockedDir = (agentPaths.INTEL_ROOT + '/reports-blocked')
@@ -878,12 +878,12 @@ function blockReportPublication(taskId, dharmarajResult, reason) {
       if (idx > 0) srcContent = srcContent.slice(idx + 5).replace(/^\n+/, '')
     }
 
-    const verdict = dharmarajResult?.verdict || 'UNKNOWN'
-    const passRate = dharmarajResult?.passRate ?? 0
+    const verdict = arbiterResult?.verdict || 'UNKNOWN'
+    const passRate = arbiterResult?.passRate ?? 0
     const banner = [
       `> 🚫 **PUBLICATION BLOCKED — ${reason || 'verification too weak to ship'}**`,
       '>',
-      `> DHARMARAJ verdict: ${verdict} (passRate: ${passRate}%)`,
+      `> ARBITER verdict: ${verdict} (passRate: ${passRate}%)`,
       `> This report has been moved out of ${agentPaths.INTEL_ROOT}/reports/ and into ${agentPaths.INTEL_ROOT}/reports-blocked/.`,
       `> A triager must MANUALLY re-verify findings before promoting back to reports/ for publication.`,
       `> Do NOT submit to Bugcrowd / HackerOne / production triage from this directory.`,
@@ -905,7 +905,7 @@ function blockReportPublication(taskId, dharmarajResult, reason) {
       if (task) {
         task.status = 'blocked'
         task.blockedAt = new Date().toISOString()
-        task.blockReason = reason || `DHARMARAJ ${verdict} (${passRate}%)`
+        task.blockReason = reason || `ARBITER ${verdict} (${passRate}%)`
         writeJSON(TASKS_FILE, tasks)
       }
     } catch (e) {
@@ -913,7 +913,7 @@ function blockReportPublication(taskId, dharmarajResult, reason) {
     }
 
     try {
-      logActivity('SANJAY', `🚫 Publication BLOCKED for task ${taskId}`, {
+      logActivity('NEXUS', `🚫 Publication BLOCKED for task ${taskId}`, {
         type: 'publication-blocked', taskId,
         details: `Reason: ${reason}\nVerdict: ${verdict}\nPassRate: ${passRate}%`
       })
@@ -926,8 +926,8 @@ function blockReportPublication(taskId, dharmarajResult, reason) {
 
 // Pentest squad agent roles — parallel execution
 // Pentest agents — dynamic with hardcoded fallbacks
-// v2: Added ASHWATTHAMA (SSTI), YUYUTSU (Business Logic) to always-run list
-const FALLBACK_PENTEST_SPECIALISTS = ['nakul', 'karna', 'bheem', 'abhimanyu', 'draupadi', 'ashwatthama', 'yuyutsu', 'dharma', 'sahdev']
+// v2: Added FORGE (SSTI), LEDGER (Business Logic) to always-run list
+const FALLBACK_PENTEST_SPECIALISTS = ['viper', 'drill', 'relay', 'vault', 'warden', 'forge', 'ledger', 'sentry', 'gateway']
 // Apply the per-squad operational cap from squad.json (GATE-101 config, now LIVE).
 // Fail-soft: no/invalid config → uncapped (today's behavior). This makes squad.json
 // actually consumed at dispatch and makes auto-applier's squad_config_patch effective
@@ -949,14 +949,14 @@ function getPentestSpecialists() {
   return _applySquadCap('pentest', list)
 }
 function getPentestValidator() {
-  const v = configCache.getAgentsByRole('pentest-squad', 'validator').filter(a => a !== 'dharmaraj')
-  return v[0] || 'kripa'
+  const v = configCache.getAgentsByRole('pentest-squad', 'validator').filter(a => a !== 'arbiter')
+  return v[0] || 'auditor'
 }
 function getPentestReporter() {
-  return (configCache.getAgentsByRole('pentest-squad', 'reporter'))[0] || 'vyasa'
+  return (configCache.getAgentsByRole('pentest-squad', 'reporter'))[0] || 'scribe'
 }
 // Backward-compat constants (dispatch code uses these directly)
-const PENTEST_RECON = ['arjun', 'rudra']
+const PENTEST_RECON = ['scout', 'ranger']
 
 // (2026-04-19 architect review GAP-7) — batches are now BUILT DYNAMICALLY at dispatch
 // time via buildPentestBatches(). The old module-load constants meant a new specialist
@@ -981,12 +981,12 @@ function buildPentestBatches() {
 // Vuln-class → specialist agent(s). Powers the dispatch "focus" option: run a
 // targeted scan (e.g. only access-control) instead of the full A→Z roster.
 const PENTEST_FOCUS_MAP = {
-  'access-control': ['draupadi'], 'idor': ['draupadi'], 'bola': ['draupadi'],
-  'sqli': ['karna'], 'injection': ['karna', 'rudra'], 'command-injection': ['rudra'],
-  'xss': ['nakul'], 'ssrf': ['bheem'], 'ssti': ['ashwatthama'], 'xxe': ['kritavarma'],
-  'csrf': ['shikhandi'], 'lfi': ['abhimanyu'], 'path-traversal': ['abhimanyu'],
-  'api': ['sahdev'], 'jwt': ['sahdev'], 'graphql': ['sahdev'],
-  'business-logic': ['yuyutsu'], 'auth': ['satyaki'], 'session': ['satyaki'],
+  'access-control': ['warden'], 'idor': ['warden'], 'bola': ['warden'],
+  'sqli': ['drill'], 'injection': ['drill', 'ranger'], 'command-injection': ['ranger'],
+  'xss': ['viper'], 'ssrf': ['relay'], 'ssti': ['forge'], 'xxe': ['spectre'],
+  'csrf': ['decoy'], 'lfi': ['vault'], 'path-traversal': ['vault'],
+  'api': ['gateway'], 'jwt': ['gateway'], 'graphql': ['gateway'],
+  'business-logic': ['ledger'], 'auth': ['keyring'], 'session': ['keyring'],
 }
 // Given focus classes, return the de-duped specialist agents to run (intersected
 // with the live roster). Empty/unknown → null (caller runs the full roster).
@@ -1026,7 +1026,7 @@ const CHAIN_PATTERNS = {
       { name: 'Open Redirect → OAuth Token Theft', requires: ['OPENREDIRECT'], severity: 'High' },
       { name: 'IDOR + Info Disclosure → Mass Data Leak', requires: ['IDOR', 'SENSITIVEDATA'], severity: 'Critical' },
     ],
-    leaderAgent: 'krishna',
+    leaderAgent: 'atlas',
   },
   'stocks': {
     patterns: [
@@ -1141,17 +1141,17 @@ function parseChainResults(output) {
 }
 
 const PENTEST_AGENT_ROLES = {
-  arjun: 'Recon & Attack Surface Mapping',
-  rudra: 'Port Scanning & Service Enumeration (nmap)',
-  nakul: 'XSS (Cross-Site Scripting)',
-  karna: 'SQLi (SQL Injection)',
-  bheem: 'SSRF (Server-Side Request Forgery)',
-  abhimanyu: 'LFI & Path Traversal',
-  draupadi: 'IDOR / BOLA / Broken Access Control',
-  dharma: 'Security Headers, TLS, CORS, Cookies',
-  sahdev: 'API Security (REST/GraphQL/JWT)',
-  kripa: 'Finding Validator & False Positive Filter',
-  vyasa: 'Final Report Writer',
+  scout: 'Recon & Attack Surface Mapping',
+  ranger: 'Port Scanning & Service Enumeration (nmap)',
+  viper: 'XSS (Cross-Site Scripting)',
+  drill: 'SQLi (SQL Injection)',
+  relay: 'SSRF (Server-Side Request Forgery)',
+  vault: 'LFI & Path Traversal',
+  warden: 'IDOR / BOLA / Broken Access Control',
+  sentry: 'Security Headers, TLS, CORS, Cookies',
+  gateway: 'API Security (REST/GraphQL/JWT)',
+  auditor: 'Finding Validator & False Positive Filter',
+  scribe: 'Final Report Writer',
 }
 
 const AGENT_ROLES = {
@@ -1159,8 +1159,8 @@ const AGENT_ROLES = {
   surya: 'Technical Analysis & Chart Patterns',
   lakshmi: 'Fundamental Analysis & Valuation',
   vayu: 'Macro Analysis & Sector Rotation',
-  drona: 'Management Quality & Capital Allocation',
-  bhishma: 'Competitive Moat & Durability',
+  analyst: 'Management Quality & Capital Allocation',
+  veteran: 'Competitive Moat & Durability',
   shakuni: "Devil's Advocate & Anti-Thesis",
   vidura: 'Risk Assessment & Monitoring',
   vishnu: 'Portfolio Strategy & Position Sizing',
@@ -1419,12 +1419,12 @@ function logActivity(agent, action, extra = {}) {
 // for pre-migration tasks (tasks that started before this module was deployed).
 // Returns an array of parsed entries.
 //
-// (2026-04-20 architecture fix) Subprocess agents (KRIPA, VYASA, specialists)
+// (2026-04-20 architecture fix) Subprocess agents (AUDITOR, SCRIBE, specialists)
 // write their activity entries directly to the global ACTIVITY-LOG.jsonl via
 // `echo >> ...` in their SOUL.md templates — they don't go through logActivity()
 // so they never hit the per-task log fan-out. This caused Phase 3.5 chain
 // analysis to see 0 CONFIRMED entries and skip, and extractAndSavePentestReport's
-// fallback reconstruction (line 4601, `agent==='KRIPA' && action.startsWith('CONFIRMED')`)
+// fallback reconstruction (line 4601, `agent==='AUDITOR' && action.startsWith('CONFIRMED')`)
 // to never fire. Fix: always merge global-log entries matching this taskId
 // into the per-task view. Dedup by (ts, agent, action) composite key.
 // Cheap now (global log ~100KB post-rotation); if it regrows, add tail-bounded read.
@@ -1858,7 +1858,7 @@ ${passed.slice(0, 8).map(p => `- ✅ "${p.text}"`).join('\n')}
 function getTaskFindings(taskId, agentName) {
   try {
     const entries = readTaskActivity(taskId)
-      .filter(e => e && e.agent !== 'SANJAY' && !String(e.action || '').includes('Quality Score') && !String(e.action || '').includes('cost'))
+      .filter(e => e && e.agent !== 'NEXUS' && !String(e.action || '').includes('Quality Score') && !String(e.action || '').includes('cost'))
 
     return entries.slice(-5).map(e => `- **${e.agent}**: ${(e.action || '').substring(0, 100)}`).join('\n') || 'No findings recorded'
   } catch {
@@ -1876,7 +1876,7 @@ function extractKeyFacts(taskId, taskTitle, squad) {
 
   try {
     const entries = readTaskActivity(taskId)
-      .filter(e => e && e.agent !== 'SANJAY')
+      .filter(e => e && e.agent !== 'NEXUS')
 
     const facts = {}
     const allText = entries.map(e => `${e.details || ''}`).join(' ')
@@ -1930,7 +1930,7 @@ function extractAgentText(output) {
 // agents.json not listed here, we fall back to the agent's `title` field.
 // (2026-04-20) Extended from 12 stocks names to cover all 42 agents across
 // pentest, stocks, network-pentest, red-team, cloud-security, ai-security,
-// and main squads — was leaking pentest names (KRIPA×40, RUDRA, etc) and
+// and main squads — was leaking pentest names (AUDITOR×40, RANGER, etc) and
 // a subset of stocks names in dossiers that wrote to non-default paths.
 const CUSTOM_AGENT_TITLES = {
   // Stocks squad
@@ -1939,35 +1939,35 @@ const CUSTOM_AGENT_TITLES = {
   'LAKSHMI': 'Fundamental Analyst',
   'SURYA': 'Technical Analyst',
   'NARAD': 'Sentiment & News Analyst',
-  'DRONA': 'Management Quality Analyst',
-  'BHISHMA': 'Moat & Durability Analyst',
+  'analyst': 'Management Quality Analyst',
+  'veteran': 'Moat & Durability Analyst',
   'VIDURA': 'Risk Assessment Analyst',
   'VISHNU': 'Portfolio Strategist',
   'SARASWATI': 'Research Analyst',
   'VAYU': 'Macro Analyst',
   // Main squad
-  'SANJAY': 'Dispatch System',
-  'DHARMARAJ': 'Verification Specialist',
-  'ROF': 'Commander',
+  'NEXUS': 'Dispatch System',
+  'ARBITER': 'Verification Specialist',
+  'COMMAND': 'Commander',
   // Pentest squad
-  'KRISHNA': 'Pentest Lead',
-  'VYASA': 'Report Writer',
-  'KRIPA': 'Finding Validator',
-  'ARJUN': 'Recon Specialist',
-  'RUDRA': 'RCE Specialist',
-  'BHEEM': 'SSRF Specialist',
-  'NAKUL': 'XSS Specialist',
-  'KARNA': 'SQLi Specialist',
-  'DRAUPADI': 'IDOR Specialist',
-  'SAHDEV': 'API Security Tester',
-  'ABHIMANYU': 'Path Traversal Specialist',
-  'DHARMA': 'Compliance Analyst',
-  'EKLAVYA': 'Endpoint Discovery Specialist',
-  'SATYAKI': 'Auth & Session Specialist',
-  'YUYUTSU': 'Business Logic Specialist',
-  'ASHWATTHAMA': 'SSTI Specialist',
-  'SHIKHANDI': 'CSRF Specialist',
-  'KRITAVARMA': 'XXE Specialist',
+  'ATLAS': 'Pentest Lead',
+  'SCRIBE': 'Report Writer',
+  'AUDITOR': 'Finding Validator',
+  'SCOUT': 'Recon Specialist',
+  'RANGER': 'RCE Specialist',
+  'RELAY': 'SSRF Specialist',
+  'VIPER': 'XSS Specialist',
+  'DRILL': 'SQLi Specialist',
+  'WARDEN': 'IDOR Specialist',
+  'GATEWAY': 'API Security Tester',
+  'VAULT': 'Path Traversal Specialist',
+  'SENTRY': 'Compliance Analyst',
+  'TRACER': 'Endpoint Discovery Specialist',
+  'KEYRING': 'Auth & Session Specialist',
+  'LEDGER': 'Business Logic Specialist',
+  'FORGE': 'SSTI Specialist',
+  'DECOY': 'CSRF Specialist',
+  'SPECTRE': 'XXE Specialist',
   // Network pentest
   'SHALYA': 'Network Pentest Lead',
   'GHATOTKACHA': 'Network Service Analyst',
@@ -2014,11 +2014,11 @@ function cleanReportForPublish(text) {
   const replacements = getAgentReplacements()
   let cleaned = text
   // (2026-04-20 I7 fix) Case-sensitive uppercase-only match to avoid false
-  // positives on domain names (e.g. "arjun.example.com"), CVE descriptions,
+  // positives on domain names (e.g. "scout.example.com"), CVE descriptions,
   // or quoted user content that happens to share letters with an agent name.
   // Agent IDs are written in UPPERCASE in prompts and SOUL files; lowercase
   // occurrences in target content should NOT be scrubbed.
-  // Sort by name length descending so "KRITAVARMA" is tried before "KARNA" etc.
+  // Sort by name length descending so "SPECTRE" is tried before "DRILL" etc.
   const entries = Object.entries(replacements).sort((a, b) => b[0].length - a[0].length)
   for (const [name, title] of entries) {
     // \b matches word boundaries. Without 'i' flag, only UPPERCASE matches replaced.
@@ -2044,13 +2044,13 @@ function saveAgentReport(taskId, projectId, squad, agentOutput) {
 
   // (2026-06-09 canonical-selection fix) Resolve the CANONICAL AUTHOR by ROLE once —
   // reused for both dossier selection and the canonical marker/sidecar stamp below.
-  // analysis squads (stocks) → leader (CHANAKYA); security squads → reporter (VYASA),
-  // NOT their leader (KRISHNA/VARUNA/... write side artifacts).
+  // analysis squads (stocks) → leader (CHANAKYA); security squads → reporter (SCRIBE),
+  // NOT their leader (ATLAS/VARUNA/... write side artifacts).
   const canonicalAuthor = canonicalReportRole(squad) === 'reporter'
-    ? String(getPentestReporter() || 'VYASA').toUpperCase()
+    ? String(getPentestReporter() || 'SCRIBE').toUpperCase()
     : String(getSquadLeader(squad) || '').toUpperCase()
 
-  // Squad leaders (CHANAKYA / VYASA / PARASHURAMA / VARUNA / SHALYA / ...)
+  // Squad leaders (CHANAKYA / SCRIBE / PARASHURAMA / VARUNA / SHALYA / ...)
   // often write the full dossier to a file instead of stdout. Scan the
   // squad-specific report dirs registered in squad-framework.js — universal,
   // no hardcoded squad names here. Adding a new squad only requires adding
@@ -2098,12 +2098,12 @@ function saveAgentReport(taskId, projectId, squad, agentOutput) {
   //  - sidecar {taskId}.canonical pointer (unspoofable by filename) for direct lookup —
   //    the dossier-selector's P0a checks this FIRST, making re-grades idempotent.
   const reportPath = path.join(INTEL_DIR, 'reports', `${taskId}.md`)
-  const _canonMarker = `<!-- KURUKSHETRA-CANONICAL taskId=${taskId} squad=${squad} author=${canonicalAuthor} -->\n`
+  const _canonMarker = `<!-- ARCHON-CANONICAL taskId=${taskId} squad=${squad} author=${canonicalAuthor} -->\n`
   // Idempotent: strip any pre-existing canonical marker line(s) before re-stamping, so a
   // second saveAgentReport call (which re-reads the already-published file via the sidecar)
   // doesn't accumulate stacked markers. Matches the marker regardless of (possibly
   // cleanReportForPublish-mangled) author/squad values.
-  const _bodyNoMarker = text.replace(/^<!--\s*KURUKSHETRA-CANONICAL\b[^\n]*\n?/gim, '')
+  const _bodyNoMarker = text.replace(/^<!--\s*ARCHON-CANONICAL\b[^\n]*\n?/gim, '')
   try {
     fs.mkdirSync(path.join(INTEL_DIR, 'reports'), { recursive: true })
     fs.writeFileSync(reportPath, _canonMarker + _bodyNoMarker)
@@ -2122,7 +2122,7 @@ function saveAgentReport(taskId, projectId, squad, agentOutput) {
   // (2026-04-20 universal fix) — was attributing every squad's merged dossier
   // to CHANAKYA, which polluted the activity log and broke grader attribution
   // for pentest/red-team/cloud-security dossiers.
-  const leader = String(getConfiguredSquadLeader(squad) || getSquadLeader(squad) || 'SANJAY').toUpperCase()
+  const leader = String(getConfiguredSquadLeader(squad) || getSquadLeader(squad) || 'NEXUS').toUpperCase()
   logActivity(leader, 'Merged Final Dossier [v3.0-golden]', {
     type: 'final-dossier-merged',
     templateVersion: 'v3.0-golden',
@@ -2286,7 +2286,7 @@ function _getTaskComplexityScore(taskId) {
 }
 
 // (2026-04-20) Squad lookup for router — enables squad-aware role resolution
-// so dual-use agents (e.g. BHISHMA in pentest vs stocks) route to the correct
+// so dual-use agents (e.g. veteran in pentest vs stocks) route to the correct
 // role per the squad_agent_roles override map in model-config.json.
 function _getTaskSquad(taskId) {
   try {
@@ -2330,15 +2330,15 @@ function getAgentModelFromOverrides(agentId, complexityScore = 0) {
   }
 }
 
-// ── EKLAVYA as Real Agent (Phase 0.5) ──
-// Spawns EKLAVYA as a proper openclaw agent process.
-// EKLAVYA uses exec tool to run real tools and writes endpoint map to shared file.
-// Fallback: if EKLAVYA fails or file not written, SANJAY runs basic crawl itself.
-// Wrapper: marks checkpoint.verifying=true for the entire EKLAVYA recon phase
+// ── TRACER as Real Agent (Phase 0.5) ──
+// Spawns TRACER as a proper openclaw agent process.
+// TRACER uses exec tool to run real tools and writes endpoint map to shared file.
+// Fallback: if TRACER fails or file not written, NEXUS runs basic crawl itself.
+// Wrapper: marks checkpoint.verifying=true for the entire TRACER recon phase
 // (Phase A1+A2+A3+B+C+G1+G3+G4). Without this, supervisor.js would SIGKILL the
 // daemon at 5-min stale-checkpoint detection during long synchronous sub-phases
 // (e.g., Phase G3's 200-curl sequential probe). With verifying=true the
-// supervisor uses its 15-min threshold, sufficient for any single eklavya phase.
+// supervisor uses its 15-min threshold, sufficient for any single tracer phase.
 //
 // Why setInterval re-assertion (NOT just a single persistCheckpointNow at start):
 //   persistCheckpointNow uses a debounced flush (1s/5s), and after each flush
@@ -2352,7 +2352,7 @@ function getAgentModelFromOverrides(agentId, complexityScore = 0) {
 // Spec: docs/superpowers/plans/2026-05-08-supervisor-heartbeat-fix.md (Round 2 fix)
 //
 // (2026-05-11 round-7 coverage-variance fix) IN-FLIGHT DE-DUP:
-//   _inFlightCrawls maps taskId → in-flight Promise. If runEklavyaAgent is
+//   _inFlightCrawls maps taskId → in-flight Promise. If runtracerAgent is
 //   called a second time for the SAME taskId while the first crawl is still
 //   running, return the existing promise instead of starting a second crawl.
 //   Without this guard, two concurrent dispatchPentestParallel runs (from the
@@ -2361,12 +2361,12 @@ function getAgentModelFromOverrides(agentId, complexityScore = 0) {
 //   endpoint map — losing the richer dataset (round-7: 16716 URLs → 160 URLs).
 const _inFlightCrawls = new Map()
 
-async function runEklavyaAgent(target, taskId) {
+async function runtracerAgent(target, taskId) {
   // De-dup: if a crawl for this taskId is already running, await it instead
   // of starting a parallel duplicate that would overwrite the endpoint file.
   const tid = String(taskId)
   if (_inFlightCrawls.has(tid)) {
-    log(`⏭️ EKLAVYA crawl already in-flight for task ${tid} — joining existing run`)
+    log(`⏭️ TRACER crawl already in-flight for task ${tid} — joining existing run`)
     return _inFlightCrawls.get(tid)
   }
   persistCheckpointNow({ verifying: true })
@@ -2375,7 +2375,7 @@ async function runEklavyaAgent(target, taskId) {
   }, 4000)
   const p = (async () => {
     try {
-      return await _runEklavyaAgentInner(target, taskId)
+      return await _runtracerAgentInner(target, taskId)
     } finally {
       clearInterval(reassertTimer)
       persistCheckpointNow({ verifying: false })
@@ -2386,7 +2386,7 @@ async function runEklavyaAgent(target, taskId) {
   return p
 }
 
-async function _runEklavyaAgentInner(target, taskId) {
+async function _runtracerAgentInner(target, taskId) {
   // Security (2026-04-19): target + taskId can originate from dispatch JSON, which in turn
   // can be LLM-generated by the auto-dispatcher. Sanitize everything that flows into shell.
   const sTarget = safeUrl(target)
@@ -2396,7 +2396,7 @@ async function _runEklavyaAgentInner(target, taskId) {
   const fs = require('fs')
   const { execSync } = require('child_process')
 
-  log(`🕷️  EKLAVYA crawl4ai: ${sTarget} → ${outDir}`)
+  log(`🕷️  TRACER crawl4ai: ${sTarget} → ${outDir}`)
 
   const host = (() => { try { return safeHost(new URL(target).hostname) } catch(e) { return safeHost(target) } })()
 
@@ -2408,7 +2408,7 @@ async function _runEklavyaAgentInner(target, taskId) {
       result = e.stdout || ''
     }
     // Round-5 fix 2026-05-09: re-assert checkpoint freshness after EVERY sync
-    // subprocess call. The runEklavyaAgent wrapper's setInterval cannot fire
+    // subprocess call. The runtracerAgent wrapper's setInterval cannot fire
     // during synchronous sub-phases (Phase B/C/D/G1/G3 don't await). Without
     // this, checkpoint goes stale during long sync loops → supervisor SIGKILL
     // at the 15-min verifying threshold. Updating after every run() means every
@@ -2451,7 +2451,7 @@ async function _runEklavyaAgentInner(target, taskId) {
   try {
     // Full depth crawl with memory-safe timeout — no missing endpoints
     // Connect to existing Chrome on port 18800 via CDP — no new browser spawn, saves ~2GB RAM
-    const crawlCmd = `CRAWL4AI_CDP_URL=http://localhost:18800 timeout 300 python3 ${agentPaths.skillsDir('eklavya')}/web-crawling/scripts/crawl4ai_crawler.py -u "${sTarget}" -d 4 --max-pages 200 -o "${outDir}" 2>&1`
+    const crawlCmd = `CRAWL4AI_CDP_URL=http://localhost:18800 timeout 300 python3 ${agentPaths.skillsDir('tracer')}/web-crawling/scripts/crawl4ai_crawler.py -u "${sTarget}" -d 4 --max-pages 200 -o "${outDir}" 2>&1`
     log(`   Phase A3: crawl4ai browser crawl (depth 4, max 200, CDP reuse, 5min timeout, heartbeat 30s)...`)
     const crawlResult = await runWithHeartbeat(crawlCmd, {
       timeout: 200000,
@@ -2745,7 +2745,7 @@ async function _runEklavyaAgentInner(target, taskId) {
     target,
     crawledAt: new Date().toISOString(),
     totalUrls: discovered.size,
-    source: crawl4aiSuccess ? 'crawl4ai+jsExtract+waymore+ssoSignal' : 'sanjay-fallback+jsExtract+waymore+ssoSignal',
+    source: crawl4aiSuccess ? 'crawl4ai+jsExtract+waymore+ssoSignal' : 'nexus-fallback+jsExtract+waymore+ssoSignal',
     endpoints,
     forms: formsForOutput,
     apiEndpoints,
@@ -2763,7 +2763,7 @@ async function _runEklavyaAgentInner(target, taskId) {
 
   // (2026-05-11 round-7 coverage-variance fix) NO-CLOBBER GUARD + LOW-COVERAGE WARN
   //
-  // The original failure mode: a second EKLAVYA crawl (triggered by the
+  // The original failure mode: a second TRACER crawl (triggered by the
   // double-dispatch race in processTaskActionsInbox) overwrote the first run's
   // 16716-URL endpoint map with a 160-URL map, silently downgrading every
   // downstream specialist's surface knowledge. We now:
@@ -2773,7 +2773,7 @@ async function _runEklavyaAgentInner(target, taskId) {
   //       map. Defends against silent regression even if a stray second run
   //       sneaks past the in-flight de-dup (e.g., post-restart resurrection).
   //   (3) If discovered.size is suspiciously low (< 500), emit a low-coverage
-  //       warning so the SANJAY orchestrator and humans see the signal even
+  //       warning so the NEXUS orchestrator and humans see the signal even
   //       when no prior map exists. Heuristic; not a hard fail.
   try {
     let existingTotalUrls = 0
@@ -2783,23 +2783,23 @@ async function _runEklavyaAgentInner(target, taskId) {
         priorMap = JSON.parse(fs.readFileSync(outFile, 'utf-8'))
         existingTotalUrls = Number(priorMap?.totalUrls || 0)
       } catch (e) {
-        log(`   ⚠️ EKLAVYA: prior endpoint map unreadable (${e.message.slice(0, 100)}) — overwriting`)
+        log(`   ⚠️ TRACER: prior endpoint map unreadable (${e.message.slice(0, 100)}) — overwriting`)
       }
     }
     if (existingTotalUrls >= 500 && existingTotalUrls >= discovered.size * 2) {
-      log(`⚠️ EKLAVYA low-coverage refuse-to-overwrite: new crawl=${discovered.size} URLs ` +
+      log(`⚠️ TRACER low-coverage refuse-to-overwrite: new crawl=${discovered.size} URLs ` +
           `vs prior=${existingTotalUrls} URLs — KEEPING prior endpoint map (suspicious regression). ` +
           `Source of new crawl: ${result.source}. If this is intentional, delete ${outFile} first.`)
       // Return the EXISTING map so callers still get a valid object.
       return priorMap || result
     }
     if (discovered.size < 500) {
-      log(`⚠️ EKLAVYA low-coverage warning: only ${discovered.size} URLs discovered (heuristic threshold: 500). ` +
+      log(`⚠️ TRACER low-coverage warning: only ${discovered.size} URLs discovered (heuristic threshold: 500). ` +
           `Light crawl: ${lightCrawlUrls}, crawl4ai-ok: ${crawl4aiSuccess}, js-extract: ${jsExtractedUrls.length}. ` +
           `If the target is known-large (e.g., support.*, *.com root, vendor portal), check WAF/proxy/timeout.`)
     }
   } catch (e) {
-    log(`   ⚠️ EKLAVYA no-clobber guard error (continuing with write): ${e.message.slice(0, 200)}`)
+    log(`   ⚠️ TRACER no-clobber guard error (continuing with write): ${e.message.slice(0, 200)}`)
   }
 
   fs.writeFileSync(outFile, JSON.stringify(result, null, 2))
@@ -2812,11 +2812,11 @@ async function _runEklavyaAgentInner(target, taskId) {
     fs.writeFileSync(`${outDir}/summary.txt`, summary)
   }
 
-  log(`✅ EKLAVYA complete: ${discovered.size} URLs, ${endpoints.length} endpoints → ${outFile}`)
+  log(`✅ TRACER complete: ${discovered.size} URLs, ${endpoints.length} endpoints → ${outFile}`)
   log(`   Discovery: light=${lightCrawlUrls}, js=${jsExtractedUrls.length}, waymore=${waymoreUrls.length}, sso-signaled=${result.discoveryStats.ssoSignaled}`)
-  if (phpinfoFound) log(`   🔍 phpinfo.php FOUND — DHARMA should check session.use_only_cookies`)
-  if (newuserFound) log(`   🔍 secured/newuser.php FOUND — KARNA/NAKUL must test this`)
-  if (showimageFound) log(`   🔍 showimage.php FOUND — ABHIMANYU must test for LFI`)
+  if (phpinfoFound) log(`   🔍 phpinfo.php FOUND — SENTRY should check session.use_only_cookies`)
+  if (newuserFound) log(`   🔍 secured/newuser.php FOUND — DRILL/VIPER must test this`)
+  if (showimageFound) log(`   🔍 showimage.php FOUND — VAULT must test for LFI`)
 
   return result
 }
@@ -2825,7 +2825,7 @@ async function _runEklavyaAgentInner(target, taskId) {
 // MIGRATED: Uses claude CLI instead of openclaw agent
 // ── Recon Spot Check (Phase 1.5) ──
 // Cheap (~$0.15) Sonnet pass that reviews Haiku recon output and flags missed signals.
-// Only used when target complexity is LOW (recon ran on Haiku). Feeds back as SANJAY activity
+// Only used when target complexity is LOW (recon ran on Haiku). Feeds back as NEXUS activity
 // so Phase 2 specialists see it in their prompt context.
 async function runReconSpotCheck({ taskId, targetUrl, squad, projectId, endpointMapFile }) {
   let endpointFileData = '(no endpoint map)'
@@ -2838,12 +2838,12 @@ async function runReconSpotCheck({ taskId, targetUrl, squad, projectId, endpoint
   try {
     // Fast path via per-task log; filter to recon agents only.
     const entries = readTaskActivity(taskId)
-      .filter(e => /^(ARJUN|RUDRA)$/i.test(String(e.agent || '')))
+      .filter(e => /^(SCOUT|RANGER)$/i.test(String(e.agent || '')))
       .slice(-50)
     reconDump = entries.map(e => JSON.stringify(e)).join('\n').slice(0, 6000)
   } catch {}
 
-  const spotPrompt = `Review this recon output from Haiku agents (ARJUN, RUDRA) for the target ${targetUrl}.
+  const spotPrompt = `Review this recon output from Haiku agents (SCOUT, RANGER) for the target ${targetUrl}.
 Your job: catch signals the recon agents may have missed — hidden endpoints, obvious auth flows, tech stack details, or attack surface that's implicit in the data but wasn't explicitly called out.
 
 RECON ACTIVITY:
@@ -2877,7 +2877,7 @@ Do not analyze. Do not pad. Just list misses. If nothing missed, output "NONE".`
     const misses = (String(text || '').match(/^MISSED:.*$/gm) || []).slice(0, 10)
     if (misses.length > 0) {
       log(`🔎 Spot check flagged ${misses.length} missed signal(s). Forwarding to Phase 2.`)
-      logActivity('SANJAY', `🔎 Spot check: ${misses.length} missed signals from Haiku recon`, {
+      logActivity('NEXUS', `🔎 Spot check: ${misses.length} missed signals from Haiku recon`, {
         type: 'spot-check', squad, taskId, projectId: projectId || '',
         details: misses.join('\n'),
       })
@@ -2936,7 +2936,7 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
       ? opts.complexityScore
       : _getTaskComplexityScore(taskId)  // falls back to task metadata or 0
     // (2026-04-20) Squad context so router can apply per-squad role overrides
-    // for dual-use agents (e.g. BHISHMA is vuln_specialist in pentest but
+    // for dual-use agents (e.g. veteran is vuln_specialist in pentest but
     // stock_analyst in stocks). Caller can pass opts.squad; else look up by taskId.
     const squad = typeof opts.squad === 'string' ? opts.squad : _getTaskSquad(taskId)
 
@@ -2955,12 +2955,12 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
       effortLevel = routed.effort
       routingReason = `${routed.family}(${routed.role})${routed.upgraded ? ' [upgraded]' : ''}`
       // 2026-05-14: Tech-affinity model demotion. Off by default. When
-      // KURUKSHETRA_TECH_GATING=enabled, demote stack-specific specialists
-      // (e.g. KARNA for PHP, BHEEM for Java) to the fast family if their
+      // archon_TECH_GATING=enabled, demote stack-specific specialists
+      // (e.g. DRILL for PHP, RELAY for Java) to the fast family if their
       // affinity stack isn't in the detected fingerprint. Soft gating —
       // specialist still RUNS, just on a cheaper model. Preserves the
       // "NEVER restricts specialist roster" invariant.
-      if (process.env.KURUKSHETRA_TECH_GATING === 'enabled') {
+      if (process.env.archon_TECH_GATING === 'enabled') {
         try {
           const techAffinity = require('./agents/tech-affinity')
           let detected = []
@@ -3175,7 +3175,7 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
     const DONE_GRACE_MS = 8 * 60 * 1000 // 8 min grace after agent reports "done" in activity log
     // ACTIVITY-STALL (2026-06-08): catches the "streaming/thinking but producing NOTHING" hang
     // that NO_MOVEMENT misses — lastDataTime keys off the stream, so an agent that keeps
-    // streaming tokens without writing real output (BHISHMA hung 45min while streaming, evading
+    // streaming tokens without writing real output (veteran hung 45min while streaming, evading
     // the 15min NO_MOVEMENT, only the 45min cap caught it) never trips it. Real progress = a NEW
     // activity-log entry. No new entry for 22min → kill+retry. 22min is generous (slowest healthy
     // analyst wrote within ~14min; pentest agents log findings far more often).
@@ -3545,7 +3545,7 @@ function buildSynthesizerPrompt(taskTitle, taskId, projectId, squad, phase, goal
   const goalLine = goalContext ? `Goal: ${goalContext}\n` : ''
   const feedbackCtx = getDisprovenContext(squad) + getSquadLessons(squad)
   const gates = getSquadGates(squad)
-  // 4.7 verbosity hint for final dossier — same fix as VYASA (pentest report writer)
+  // 4.7 verbosity hint for final dossier — same fix as SCRIBE (pentest report writer)
   // Only on the final phase; initial CIO synthesis is supposed to be compact.
   const verbosityHint = phase === 'final'
     ? `\n## CRITICAL LENGTH REQUIREMENT (Opus 4.7 reminder)\nOpus 4.7 defaults to shorter responses than prior models. The final dossier is an EXCEPTION — it must be comprehensive.\nRequired output: 25KB+ markdown, all 15-21 required sections fully populated (Executive Summary → Investment Thesis → Valuation → Risks → Monitoring KPIs → Decision Card). Per-section depth matters: numbers with sources, quarterly trends not point estimates, 3 bull/base/bear scenarios with probability weights, specific stop-loss + position-size recommendations.\nDo NOT abbreviate. Do NOT summarize analyst findings without recomputing. The reader is a portfolio manager who needs every detail to act.\n`
@@ -3555,7 +3555,7 @@ ${goalLine}${verbosityHint}${gates}${feedbackCtx}
 Read your skill: cat ${agentPaths.skillsDir('chanakya')}/*/SKILL.md
 Read workflows: cat ${agentPaths.skillsDir('chanakya')}/*/workflows/*.md 2>/dev/null
 Read analyst findings (structured): cat ${agentPaths.INTEL_ROOT}/tasks/${taskId}/findings/*.json 2>/dev/null
-Read analyst findings (fallback): grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -v SANJAY | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'dispatch' | grep -v 'Spawning' | grep -v 'recovery'
+Read analyst findings (fallback): grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -v NEXUS | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'dispatch' | grep -v 'Spawning' | grep -v 'recovery'
 Read memory: cat ${agentPaths.lessonsPath('chanakya')} 2>/dev/null
 Write synthesis to ACTIVITY-LOG.jsonl with taskId=${taskId}.
 echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"CHANAKYA","action":"${phase === 'initial' ? 'CIO Synthesis' : 'Final Dossier'} — ${taskTitle}","details":"ANALYSIS","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
@@ -3574,7 +3574,7 @@ ${goalLine}${gates}${feedbackCtx}
 Read your skill: cat ${agentPaths.skillsDir(agentLower)}/*/SKILL.md
 Read references: cat ${agentPaths.skillsDir(agentLower)}/*/references/*.md 2>/dev/null
 Read team findings (structured): cat ${agentPaths.INTEL_ROOT}/tasks/${taskId}/findings/*.json 2>/dev/null
-Read team analysis (fallback): grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -v SANJAY | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'dispatch' | grep -v 'Spawning' | grep -v 'recovery'
+Read team analysis (fallback): grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -v NEXUS | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'dispatch' | grep -v 'Spawning' | grep -v 'recovery'
 Read memory: cat ${agentPaths.lessonsPath(agentLower)} 2>/dev/null
 Write challenge to ACTIVITY-LOG.jsonl with taskId=${taskId}.
 echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"${agentUpper}","action":"HEADLINE","details":"ANALYSIS","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
@@ -3730,9 +3730,9 @@ echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"${agentUpper}","action":
 Execute now.${missedSignalsBlock}`
 }
 
-// ── Build KRIPA validation prompt ──
-function buildKripaValidationPrompt(taskTitle, taskId, projectId, squad, targetUrl, goalContext) {
-  // KRIPA must validate findings independently, not parrot baseline counts.
+// ── Build AUDITOR validation prompt ──
+function buildauditorValidationPrompt(taskTitle, taskId, projectId, squad, targetUrl, goalContext) {
+  // AUDITOR must validate findings independently, not parrot baseline counts.
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalSection = scrubbedGoal ? `\nUSER GOAL: ${scrubbedGoal}\n` : ''
   const feedbackCtx = getDisprovenContext(squad, targetUrl) + getSquadLessons(squad, targetUrl) + getFreshEyesNotice(targetUrl)
@@ -3743,7 +3743,7 @@ function buildKripaValidationPrompt(taskTitle, taskId, projectId, squad, targetU
       return p ? targetClassifier.buildPromptFragment(p) : ''
     } catch { return '' }
   })()
-  return `You are KRIPA, the Finding Validator for the ${squad} squad.
+  return `You are AUDITOR, the Finding Validator for the ${squad} squad.
 ${goalSection}${profileFragment}${MUST_GATES}${feedbackCtx}
 ## YOUR TASK
 Validate ALL suspected findings for: ${taskTitle}
@@ -3752,25 +3752,25 @@ Task ID: ${taskId}
 Project: ${projectId || 'none'}
 
 ## INSTRUCTIONS — READ YOUR FILES FIRST
-1. Read your identity: exec: cat ${agentPaths.soulPath('kripa')}
-2. Read your skill (7-Question Gate + Never-Submit List): exec: cat ${agentPaths.skillsDir('kripa')}/finding-validation/SKILL.md
-3. Read chain-builder workflow: exec: cat ${agentPaths.skillsDir('kripa')}/finding-validation/workflows/chain-builder.md
+1. Read your identity: exec: cat ${agentPaths.soulPath('auditor')}
+2. Read your skill (7-Question Gate + Never-Submit List): exec: cat ${agentPaths.skillsDir('auditor')}/finding-validation/SKILL.md
+3. Read chain-builder workflow: exec: cat ${agentPaths.skillsDir('auditor')}/finding-validation/workflows/chain-builder.md
 4. Read all suspected findings: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'suspected\\|finding'
-5. Read your lessons: exec: cat ${agentPaths.lessonsPath('kripa')} 2>/dev/null
+5. Read your lessons: exec: cat ${agentPaths.lessonsPath('auditor')} 2>/dev/null
 
 ## MANDATORY: Run 7-Question Gate on EVERY finding. One wrong = KILL.
 ## Check Never-Submit List FIRST (Q7). Route chain-required findings to chain-builder workflow.
 ## Use REAL curl probes. Binary decisions only: PASS or KILL.
 
 ## OUTPUT
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"KRIPA","action":"CONFIRMED|KILLED — [ID]","details":"Q1-Q7 results + evidence","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"AUDITOR","action":"CONFIRMED|KILLED — [ID]","details":"Q1-Q7 results + evidence","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
 
 CRITICAL: Include taskId in EVERY entry. Be ruthless about false positives.
 Execute now — read your skill file first, then validate every finding.`
 }
 
-// ── Build VYASA report prompt ──
-function buildVyasaReportPrompt(taskTitle, taskId, projectId, squad, targetUrl, goalContext, chainResults, defensiveActions) {
+// ── Build SCRIBE report prompt ──
+function buildscribeReportPrompt(taskTitle, taskId, projectId, squad, targetUrl, goalContext, chainResults, defensiveActions) {
   // Report writer MUST NOT see baseline numbers — otherwise the executive
   // summary gets sycophantically anchored to them (confirmed Apr-21 Run 1).
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
@@ -3779,7 +3779,7 @@ function buildVyasaReportPrompt(taskTitle, taskId, projectId, squad, targetUrl, 
   // Sprint C.2 Task 8 (2026-05-10): scan /root/intel/handoffs/done/ for
   // cross-squad verdicts matching this taskId and inject a CORROBORATION
   // section the report writer can cite under each source finding.
-  // Empty string if no matching handoffs — VYASA must NOT fabricate the section.
+  // Empty string if no matching handoffs — SCRIBE must NOT fabricate the section.
   let crossSquadSection = ''
   try {
     const handoffProtocol = require('./agents/handoff-protocol')
@@ -3792,7 +3792,7 @@ function buildVyasaReportPrompt(taskTitle, taskId, projectId, squad, targetUrl, 
 
   // 2026-05-12 (C3): surface handoff success stats so the report explicitly
   // states cross-squad reach. If 0 handoffs fired, the absence of this section
-  // is itself a signal; if >0 fired, VYASA can cite the breakdown.
+  // is itself a signal; if >0 fired, SCRIBE can cite the breakdown.
   let handoffStatsSection = ''
   try {
     const handoffMonitor = require('./agents/handoff-end-to-end-monitor')
@@ -3810,7 +3810,7 @@ Cite this in the executive summary if cross-squad scope is material to the repor
   } catch { /* fail-soft */ }
 
   // FIX 2 (2026-05-09): trajectory observer signals. Sprint C.1 collected the
-  // signal; this surfaces it to VYASA so off-track specialist findings get
+  // signal; this surfaces it to SCRIBE so off-track specialist findings get
   // flagged as LESS RELIABLE in the report. Anti-sycophancy: instruction is
   // explicitly cross-reference + caution, NOT blanket dismissal.
   let trajectorySection = ''
@@ -3840,7 +3840,7 @@ or no specialists ran long enough to be observed. Treat findings on standard foo
 ${onTrack.length} of ${total} specialists ran on-track. ${flagged.length} ${flagged.length === 1 ? 'went' : 'went'} off-track or crashed:
 ${flaggedLines}
 
-VYASA: when reporting findings from off-track or crashed specialists, treat their
+SCRIBE: when reporting findings from off-track or crashed specialists, treat their
 evidence as LESS RELIABLE. Cross-reference with judge-verifier verdicts (JUDGED-FINDINGS)
 and chain-verifier results before promoting to High/Critical. Do NOT dismiss the
 finding entirely — an off-track specialist may still produce one valid finding —
@@ -3877,7 +3877,7 @@ A verified chain of 2 mediums = 1 Critical in the report.
 `
   }
 
-  return `You are VYASA, the Final Report Writer for the ${squad} squad.
+  return `You are SCRIBE, the Final Report Writer for the ${squad} squad.
 
 ## CRITICAL LENGTH REQUIREMENT (Opus 4.7 reminder)
 Opus 4.7 defaults to shorter responses than prior models. This report is an EXCEPTION — it must be comprehensive and detailed.
@@ -3899,10 +3899,10 @@ For each finding in JUDGED-FINDINGS, apply these rules:
 
 - **judge_verdict='confirmed'** → all 4 stages (A/B/C/D) passed. Severity is preserved at the original level. This is STRONG independent evidence the finding is real and exploitable. Include with original severity.
 - **judge_verdict='downgraded'** → ONE stage failed. The judge has REDUCED the severity to a stage-specific floor (A→Info, B→Medium, C→Low, D→Info). USE THE NEW severity field, NOT severity_original. Include the judge's failure reason in the finding's "Notes" section so reviewers understand why.
-- **judge_verdict='not-judged'** → finding was below the severity filter threshold (Medium/Low/Info). Treat exactly as before — no judge signal either way. Use KRIPA's verdict.
+- **judge_verdict='not-judged'** → finding was below the severity filter threshold (Medium/Low/Info). Treat exactly as before — no judge signal either way. Use AUDITOR's verdict.
 - **judge_verdict='indeterminate'** → judge LLM error or parse failure. Severity is preserved but flag in the finding's "Notes": "⚠ Judge unavailable — review manually". Do NOT claim independent confirmation in the executive summary.
 
-Why this matters: the judge runs WITHOUT seeing analyst-claim fields (impact, gate12), so confirmation here is independent validation, not echoing the analyst. Treat 'confirmed' as Tier-1 evidence equivalent to BROWSER-VERIFICATION.
+Why this matters: the judge runs WITHOUT seeing analyst-claim fields (impact, gate12), so confirmation here is independent validation, not echoing analyst. Treat 'confirmed' as Tier-1 evidence equivalent to BROWSER-VERIFICATION.
 
 ## BROWSER-VERIFICATION EVIDENCE (Tier-1 proof)
 
@@ -3915,27 +3915,27 @@ Browser-verification provides deterministic Playwright execution evidence for br
 - For each entry in BROWSER-VERIFICATION jsonl:
   * If browser_fired === true AND verdict === 'CONFIRMED' → STRONG Tier-1 evidence the finding fires in a real browser. Include in the report at the original (or higher) severity. Cite browser execution as proof.
   * If browser_fired === false AND verdict === 'KILLED' → STRONG evidence the finding does not actually fire in a real browser. DOWNGRADE the severity by one tier OR mark the finding as 'AWAITING-MANUAL-CONFIRMATION' OR omit from the confirmed-findings section. Do NOT claim it as confirmed in the executive summary.
-  * If verdict === 'INDETERMINATE' → fall back to KRIPA's verdict and chain-verifier evidence as before.
+  * If verdict === 'INDETERMINATE' → fall back to AUDITOR's verdict and chain-verifier evidence as before.
 
-- For findings NOT present in BROWSER-VERIFICATION jsonl (non-browser-relevant types): use KRIPA validation + chain-verifier evidence as before.
+- For findings NOT present in BROWSER-VERIFICATION jsonl (non-browser-relevant types): use AUDITOR validation + chain-verifier evidence as before.
 ${crossSquadSection}${handoffStatsSection}${trajectorySection}
 ## CROSS-SQUAD HANDOFF VERDICTS (A2A corroboration — Sprint C.2)
 
 If a CROSS-SQUAD CORROBORATION section appears above, each entry is an INDEPENDENT verdict from another squad's specialist (e.g. KUBERA confirming a supply-chain finding's S3 bucket exposure). Apply these rules:
 
 - **CONFIRMED verdicts** are STRONG ADDITIONAL evidence the finding is real. Cite the cross-squad squad + agent + verdict reason in the finding's evidence section, alongside (NOT in place of) the primary finding evidence. Format: "Corroborated by <squad>/<agent>: <reason>".
-- **KILLED verdicts** are STRONG counter-evidence. Downgrade severity by one tier OR mark "AWAITING-MANUAL-CONFIRMATION" — same rule as a KRIPA KILL.
+- **KILLED verdicts** are STRONG counter-evidence. Downgrade severity by one tier OR mark "AWAITING-MANUAL-CONFIRMATION" — same rule as a AUDITOR KILL.
 - **PARTIAL / INDETERMINATE** verdicts are advisory — note them in the finding's "Notes" section but do not change severity.
 
-Anti-sycophancy: a handoff verdict is ADDITIONAL evidence, never the primary evidence. The pentest squad's own probe + KRIPA verdict remain the foundation; the handoff verdict supplements it. Do NOT replace primary evidence with the handoff verdict.
+Anti-sycophancy: a handoff verdict is ADDITIONAL evidence, never the primary evidence. The pentest squad's own probe + AUDITOR verdict remain the foundation; the handoff verdict supplements it. Do NOT replace primary evidence with the handoff verdict.
 
 ## INSTRUCTIONS — READ YOUR FILES FIRST
-1. Read your identity: exec: cat ${agentPaths.soulPath('vyasa')}
-2. Read your skill (report templates + HackerOne format): exec: cat ${agentPaths.skillsDir('vyasa')}/report-writing/SKILL.md
-3. Read ONLY KRIPA-confirmed findings: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'CONFIRMED'
+1. Read your identity: exec: cat ${agentPaths.soulPath('scribe')}
+2. Read your skill (report templates + HackerOne format): exec: cat ${agentPaths.skillsDir('scribe')}/report-writing/SKILL.md
+3. Read ONLY AUDITOR-confirmed findings: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'CONFIRMED'
 4. Read chain analysis results: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'CHAIN'
 5. Read full activity log for context: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
-6. Read your lessons: exec: cat ${agentPaths.lessonsPath('vyasa')} 2>/dev/null
+6. Read your lessons: exec: cat ${agentPaths.lessonsPath('scribe')} 2>/dev/null
 7. Read defensive actions: exec: cat ${agentPaths.INTEL_ROOT}/defensive-actions-${taskId}.json 2>/dev/null
 ${defensiveActions || ''}
 ## MANDATORY: Only include CONFIRMED findings. Use impact-first language ("attacker CAN").
@@ -3960,7 +3960,7 @@ This is a comprehensive engagement. The report MUST include a **Coverage Matrix*
 ## OUTPUT
 Write the COMPLETE report to ${getSquadFinalReportPath(squad) || (agentPaths.INTEL_ROOT + '/pentest/FINAL-REPORT.md')} (overwrite if exists).
 Also write the report to ACTIVITY-LOG.jsonl — replace YOUR_FULL_REPORT_HERE with the ACTUAL report content:
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"VYASA","action":"FULL_REPORT","details":"PASTE_YOUR_FULL_REPORT_MARKDOWN_HERE","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"SCRIBE","action":"FULL_REPORT","details":"PASTE_YOUR_FULL_REPORT_MARKDOWN_HERE","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
 
 WARNING: Do NOT write "COMPLETE_REPORT" literally. Write the ACTUAL full report text as the details value. If you can't fit it in one echo, write it to FINAL-REPORT.md first (that's the primary output).
 
@@ -4008,12 +4008,12 @@ ${A2A_HANDOFF_SECTION}
 Execute now.`
 }
 
-// ── Build KRIPA cloud validation prompt — 2026-04-23 ──
-function buildKripaCloudPrompt(taskTitle, taskId, projectId, squad, accountId, goalContext) {
+// ── Build AUDITOR cloud validation prompt — 2026-04-23 ──
+function buildauditorCloudPrompt(taskTitle, taskId, projectId, squad, accountId, goalContext) {
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalSection = scrubbedGoal ? `\nUSER GOAL: ${scrubbedGoal}\n` : ''
   const feedbackCtx = getDisprovenContext(squad, accountId) + getSquadLessons(squad, accountId) + getFreshEyesNotice(accountId)
-  return `You are KRIPA, cloud finding validator for the ${squad} squad.
+  return `You are AUDITOR, cloud finding validator for the ${squad} squad.
 ${goalSection}${MUST_GATES}${feedbackCtx}
 ## Task
 Validate ALL suspected cloud findings for: ${taskTitle}
@@ -4024,7 +4024,7 @@ Task ID: ${taskId}
 - ${agentPaths.INTEL_ROOT}/cloud/findings/${taskId}/*.jsonl (per-specialist output)
 
 ## Output
-Write per-finding verdicts to: ${agentPaths.INTEL_ROOT}/cloud/KRIPA-VERDICTS-${taskId}.jsonl
+Write per-finding verdicts to: ${agentPaths.INTEL_ROOT}/cloud/AUDITOR-VERDICTS-${taskId}.jsonl
 Format: {"findingId":"...","verdict":"CONFIRMED|KILLED|PARTIAL","reproCommand":"...","actualOutput":"...","reason":"..."}
 
 Independently reproduce each finding. "The specialist confirmed" is NOT validation — RUN THE COMMAND YOURSELF.
@@ -4036,7 +4036,7 @@ Execute now.`
 function buildVarunaChainPrompt(taskTitle, taskId, squad, accountId, graphContext) {
   return `You are VARUNA, cloud squad leader. Synthesize cross-cloud attack chains.
 ## Confirmed findings
-Read: ${agentPaths.INTEL_ROOT}/cloud/KRIPA-VERDICTS-${taskId}.jsonl (only CONFIRMED entries)
+Read: ${agentPaths.INTEL_ROOT}/cloud/AUDITOR-VERDICTS-${taskId}.jsonl (only CONFIRMED entries)
 ${graphContext ? '\n## Attack graph\n' + graphContext.slice(0, 3000) : ''}
 
 ## Task
@@ -4089,11 +4089,11 @@ ${A2A_HANDOFF_SECTION}
 Execute now.`
 }
 
-// ── Build KRIPA network validation prompt — 2026-04-23 ──
-function buildKripaNetworkPrompt(taskTitle, taskId, projectId, squad, meta, goalContext) {
+// ── Build AUDITOR network validation prompt — 2026-04-23 ──
+function buildauditorNetworkPrompt(taskTitle, taskId, projectId, squad, meta, goalContext) {
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalSection = scrubbedGoal ? `\nUSER GOAL: ${scrubbedGoal}\n` : ''
-  return `You are KRIPA, network finding validator for ${squad}.
+  return `You are AUDITOR, network finding validator for ${squad}.
 ${goalSection}${MUST_GATES}
 ## Task
 Validate all suspected findings for: ${taskTitle}
@@ -4106,7 +4106,7 @@ CIDR: ${meta.cidr}
 You reproduce via READ-ONLY probes. Same constraint as specialists — no exploit, no crack, no lateral.
 
 ## Output
-Write verdicts to: ${agentPaths.INTEL_ROOT}/network/KRIPA-VERDICTS-${taskId}.jsonl
+Write verdicts to: ${agentPaths.INTEL_ROOT}/network/AUDITOR-VERDICTS-${taskId}.jsonl
 Format: {"findingId":"...","verdict":"CONFIRMED|KILLED|PARTIAL","reproCommand":"...","actualOutput":"...","reason":"..."}
 
 Execute now.`
@@ -4116,7 +4116,7 @@ Execute now.`
 function buildShalyaChainPrompt(taskTitle, taskId, squad, meta) {
   return `You are SHALYA, network squad leader. Synthesize detection-mode attack chains.
 ## Confirmed findings
-Read: ${agentPaths.INTEL_ROOT}/network/KRIPA-VERDICTS-${taskId}.jsonl (CONFIRMED only)
+Read: ${agentPaths.INTEL_ROOT}/network/AUDITOR-VERDICTS-${taskId}.jsonl (CONFIRMED only)
 
 ## Task
 Emit strict JSON chains per network-chain-analysis skill.
@@ -4129,15 +4129,15 @@ Chain-verifier only runs curl. For network-layer attacks, emit chains with a cur
 Output MUST validate against CHAIN_OUTPUT_SCHEMA.`
 }
 
-// ── Build VYASA network report prompt — 2026-04-23 ──
-function buildVyasaNetworkPrompt(taskTitle, taskId, projectId, squad, meta, goalContext, chainResults) {
+// ── Build SCRIBE network report prompt — 2026-04-23 ──
+function buildscribeNetworkPrompt(taskTitle, taskId, projectId, squad, meta, goalContext, chainResults) {
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalSection = scrubbedGoal ? `\nUSER GOAL: ${scrubbedGoal}\n` : ''
-  return `You are VYASA, network report writer for ${squad}.
+  return `You are SCRIBE, network report writer for ${squad}.
 ${goalSection}
 ## Inputs
 - ${agentPaths.INTEL_ROOT}/network/findings/${taskId}/*.jsonl
-- ${agentPaths.INTEL_ROOT}/network/KRIPA-VERDICTS-${taskId}.jsonl (CONFIRMED only)
+- ${agentPaths.INTEL_ROOT}/network/AUDITOR-VERDICTS-${taskId}.jsonl (CONFIRMED only)
 - Chains: ${(chainResults || []).length}
 
 ## Output
@@ -4153,8 +4153,8 @@ Execute now.`
 }
 
 // ── Build framework specialist prompt (white-box source review) — 2026-04-23 ──
-// Works for any of: dhrishtadyumna (access-control), vikarna (account-takeover),
-// virata (xss), jayadratha (sqli), barbarika (ssrf), drupada (rce)
+// Works for any of: marshal (access-control), siphon (account-takeover),
+// cipher (xss), quill (sqli), beacon (ssrf), breaker (rce)
 function buildSpecialistPrompt(agentId, taskTitle, taskId, projectId, squad, goalContext, sourceDir, framework) {
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalLine = scrubbedGoal ? `Goal: ${scrubbedGoal}\n` : ''
@@ -4193,21 +4193,21 @@ ${A2A_HANDOFF_SECTION}
 ## Must Not
 - Run the target application (READ-ONLY review)
 - Modify the codebase
-- Claim CONFIRMED — only emit CANDIDATES. UTTARA probes runtime. KRIPA verdicts.
+- Claim CONFIRMED — only emit CANDIDATES. PROBER probes runtime. AUDITOR verdicts.
 - Sample or summarize. Index EVERY endpoint / every relevant pattern sink.
 - Stray outside your framework — you are the ${framework} specialist. Other flaws go to other specialists.
 
 Execute now.`
 }
 
-// ── Build UTTARA runtime validator prompt — 2026-04-23 ──
-function buildUttaraPrompt(agentName, taskTitle, taskId, projectId, squad, goalContext, deployUrl, testAccounts, frameworks) {
+// ── Build PROBER runtime validator prompt — 2026-04-23 ──
+function buildproberPrompt(agentName, taskTitle, taskId, projectId, squad, goalContext, deployUrl, testAccounts, frameworks) {
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalLine = scrubbedGoal ? `Goal: ${scrubbedGoal}\n` : ''
   const accountsSection = testAccounts
     ? `## Test accounts\n${JSON.stringify(testAccounts, null, 2)}\n`
     : `## Test accounts\nNot provided — use unauthenticated probes only. Tag candidates requiring auth as 'blocked_no_creds'.\n`
-  return `You are UTTARA, runtime validator for the ${squad} squad.
+  return `You are PROBER, runtime validator for the ${squad} squad.
 ${goalLine}
 ## Target
 Deployed URL: ${deployUrl}
@@ -4216,15 +4216,15 @@ Frameworks covered by specialists: ${frameworks.join(', ')}
 ${accountsSection}
 
 ## Task
-For each candidate in ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/*.jsonl (emitted by the 6 framework specialists — dhrishtadyumna, vikarna, virata, jayadratha, barbarika, drupada):
+For each candidate in ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/*.jsonl (emitted by the 6 framework specialists — marshal, siphon, cipher, quill, beacon, breaker):
 1. Read attack_plan
-2. Read your skill: exec: cat ${agentPaths.skillsDir('uttara')}/candidate-validation/SKILL.md
+2. Read your skill: exec: cat ${agentPaths.skillsDir('prober')}/candidate-validation/SKILL.md
 3. Run baseline + exploit + 10+ variations per skill recipe
 4. Mark CONFIRMED / FALSE_POSITIVE / INFORMATIONAL
 5. Write verdict with exact reproCommand + actualOutput
 
 ## Output
-Write to: ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/uttara-verdicts.jsonl
+Write to: ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/prober-verdicts.jsonl
 
 ${MUST_GATES}
 
@@ -4236,26 +4236,26 @@ ${MUST_GATES}
 Execute now.`
 }
 
-// ── Build KRIPA code-review validation prompt — 2026-04-23 v2 (evidence-completeness cap) ──
-function buildKripaCodeReviewPrompt(taskTitle, taskId, projectId, squad, goalContext, frameworks) {
+// ── Build AUDITOR code-review validation prompt — 2026-04-23 v2 (evidence-completeness cap) ──
+function buildauditorCodeReviewPrompt(taskTitle, taskId, projectId, squad, goalContext, frameworks) {
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalSection = scrubbedGoal ? `\nUSER GOAL: ${scrubbedGoal}\n` : ''
-  return `You are KRIPA, code-review finding validator for ${squad}.
+  return `You are AUDITOR, code-review finding validator for ${squad}.
 ${goalSection}${MUST_GATES}
 ## Task
-Cross-check specialist candidates against UTTARA runtime verdicts for: ${taskTitle}
+Cross-check specialist candidates against PROBER runtime verdicts for: ${taskTitle}
 Frameworks covered: ${frameworks.join(', ')}
-Specialists: dhrishtadyumna (AC), vikarna (ATO), virata (XSS), jayadratha (SQLi), barbarika (SSRF), drupada (RCE)
+Specialists: marshal (AC), siphon (ATO), cipher (XSS), quill (SQLi), beacon (SSRF), breaker (RCE)
 
 ## Inputs
 - ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/*-*.jsonl (candidates from all specialists who ran)
-- ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/uttara-verdicts.jsonl (if UTTARA ran)
+- ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/prober-verdicts.jsonl (if PROBER ran)
 - ${agentPaths.INTEL_ROOT}/code-review/blueprint-${taskId}.md (architecture summary)
 
 ## Your decision per candidate
-- If UTTARA confirmed → CONFIRMED (unless evidence is thin)
-- If UTTARA rejected → KILLED (unless the attack_plan was wrong)
-- If UTTARA didn't run → evaluate on specialist evidence alone: is there a clear gap + plausible exploit? Mark SUSPECTED (not CONFIRMED).
+- If PROBER confirmed → CONFIRMED (unless evidence is thin)
+- If PROBER rejected → KILLED (unless the attack_plan was wrong)
+- If PROBER didn't run → evaluate on specialist evidence alone: is there a clear gap + plausible exploit? Mark SUSPECTED (not CONFIRMED).
 
 ## STACKED SEVERITY CAPS (MANDATORY — apply BOTH v1 evidence AND v2 threat-model)
 
@@ -4307,12 +4307,12 @@ Additional auto-downgrades (v1, still apply):
 - runtime_verification_command missing + severity ≥ High → −1 tier + \`unverifiable_by_design: true\`
 - Identical TP/FP signatures → REJECT as malformed
 
-## Output (per candidate, one JSONL line in KRIPA-VERDICTS-${taskId}.jsonl)
+## Output (per candidate, one JSONL line in AUDITOR-VERDICTS-${taskId}.jsonl)
 {
   "candidateId": "...",
   "verdict": "CONFIRMED|KILLED|SUSPECTED",
   "specialist_claimed_severity": "...",
-  "kripa_final_severity": "...",
+  "auditor_final_severity": "...",
   "severity_capped": true|false,
   "v1_cap_applied": "evidence_completeness=partial → Medium" or null,
   "v2_caps_applied": [
@@ -4328,11 +4328,11 @@ Additional auto-downgrades (v1, still apply):
   "evidence_refs": ["file:line", "..."]
 }
 
-Write to: ${agentPaths.INTEL_ROOT}/code-review/KRIPA-VERDICTS-${taskId}.jsonl
+Write to: ${agentPaths.INTEL_ROOT}/code-review/AUDITOR-VERDICTS-${taskId}.jsonl
 
 ## Must Not
 - Accept CRITICAL if evidence_completeness ≠ "full" (v1 rule) OR attacker_privilege ∈ {admin, superuser} without a boundary-crossing modifier
-- Emit CONFIRMED for candidates with only code-reading evidence (no UTTARA, no runtime signature) — that's SUSPECTED
+- Emit CONFIRMED for candidates with only code-reading evidence (no PROBER, no runtime signature) — that's SUSPECTED
 - Ignore the stacked cap composition — MIN (lowest) ceiling wins across v1 + v2
 - Approve identical TP/FP signatures
 - Apply v1 cap without v2 cap, or vice versa — they MUST stack
@@ -4340,13 +4340,13 @@ Write to: ${agentPaths.INTEL_ROOT}/code-review/KRIPA-VERDICTS-${taskId}.jsonl
 Execute now.`
 }
 
-// ── Build VIBHISHANA chain analysis prompt — 2026-04-23 ──
-function buildVibhishanaChainPrompt(taskTitle, taskId, squad, sourceDir, frameworks) {
-  return `You are VIBHISHANA, code-review squad leader. Synthesize cross-framework attack chains.
+// ── Build CURATOR chain analysis prompt — 2026-04-23 ──
+function buildcuratorChainPrompt(taskTitle, taskId, squad, sourceDir, frameworks) {
+  return `You are CURATOR, code-review squad leader. Synthesize cross-framework attack chains.
 ## Context
 Source tree: ${sourceDir}
 Frameworks run: ${frameworks.join(', ')}
-Confirmed findings: ${agentPaths.INTEL_ROOT}/code-review/KRIPA-VERDICTS-${taskId}.jsonl (CONFIRMED only)
+Confirmed findings: ${agentPaths.INTEL_ROOT}/code-review/AUDITOR-VERDICTS-${taskId}.jsonl (CONFIRMED only)
 App blueprint: ${agentPaths.INTEL_ROOT}/code-review/blueprint-${taskId}.md
 
 ## Task
@@ -4361,18 +4361,18 @@ Every chain MUST combine findings from ≥2 frameworks OR 2 distinct code module
 Output MUST validate against CHAIN_OUTPUT_SCHEMA. Empty chains array is a legitimate answer.`
 }
 
-// ── Build VYASA code-review report prompt — 2026-04-23 v2 (evidence tier table) ──
-function buildVyasaCodeReviewPrompt(taskTitle, taskId, projectId, squad, sourceDir, goalContext, chainResults, frameworks) {
+// ── Build SCRIBE code-review report prompt — 2026-04-23 v2 (evidence tier table) ──
+function buildscribeCodeReviewPrompt(taskTitle, taskId, projectId, squad, sourceDir, goalContext, chainResults, frameworks) {
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalSection = scrubbedGoal ? `\nUSER GOAL: ${scrubbedGoal}\n` : ''
   const verified = (chainResults || []).filter(c => c.verified)
   const unverified = (chainResults || []).filter(c => !c.verified)
-  return `You are VYASA, code-review report writer for ${squad}.
+  return `You are SCRIBE, code-review report writer for ${squad}.
 ${goalSection}
 ## Inputs
 - ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/*-*.jsonl (raw candidates from all specialists)
-- ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/uttara-verdicts.jsonl (if ran)
-- ${agentPaths.INTEL_ROOT}/code-review/KRIPA-VERDICTS-${taskId}.jsonl (final verdicts — use CONFIRMED only)
+- ${agentPaths.INTEL_ROOT}/code-review/findings/${taskId}/prober-verdicts.jsonl (if ran)
+- ${agentPaths.INTEL_ROOT}/code-review/AUDITOR-VERDICTS-${taskId}.jsonl (final verdicts — use CONFIRMED only)
 - ${agentPaths.INTEL_ROOT}/code-review/blueprint-${taskId}.md (app blueprint from Phase 1)
 - Verified chains: ${verified.length}, unverified: ${unverified.length}
 
@@ -4399,7 +4399,7 @@ Replace any severity-count-only table with this 5-column version:
 | Medium   | <n> | <n> | <n> | <n> |
 | Low      | <n> | <n> | <n> | <n> |
 
-Runtime-Confirmed = UTTARA verdict "CONFIRMED".
+Runtime-Confirmed = PROBER verdict "CONFIRMED".
 Full-Trace Suspected = evidence_completeness="full" but no runtime (no deployUrl).
 Partial-Trace Suspected = evidence_completeness="partial".
 Local-Only Suspected = evidence_completeness="local_only".
@@ -4438,26 +4438,26 @@ Every finding MUST cite file:line — this is WHITE-BOX review, lines are your e
 ## Must Not
 - Include unverified/KILLED findings as "confirmed"
 - Invent file paths or line numbers
-- Use internal agent names (DHRISHTADYUMNA/VIKARNA/VIRATA/JAYADRATHA/BARBARIKA/DRUPADA/UTTARA/KRIPA/VIBHISHANA) — use professional titles per cleanReportForPublish
+- Use internal agent names (MARSHAL/SIPHON/CIPHER/QUILL/BEACON/BREAKER/PROBER/AUDITOR/CURATOR) — use professional titles per cleanReportForPublish
 - Omit Context Inventory table
 - Omit any of the three required tables (Evidence Tier / Threat Tier / Effective Severity)
-- Promote severity above the KRIPA-capped value — KRIPA computed final; you render, don't re-rate
+- Promote severity above the AUDITOR-capped value — AUDITOR computed final; you render, don't re-rate
 - Hide the severity audit trail — transparency is the whole point of the v2 discipline
 
 Execute now.`
 }
 
-// ── Build VYASA cloud report prompt — 2026-04-23 ──
-function buildVyasaCloudPrompt(taskTitle, taskId, projectId, squad, accountId, goalContext, chainResults) {
+// ── Build SCRIBE cloud report prompt — 2026-04-23 ──
+function buildscribeCloudPrompt(taskTitle, taskId, projectId, squad, accountId, goalContext, chainResults) {
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalSection = scrubbedGoal ? `\nUSER GOAL: ${scrubbedGoal}\n` : ''
   const verified = (chainResults || []).filter(c => c.verified)
   const unverified = (chainResults || []).filter(c => !c.verified)
-  return `You are VYASA, cloud report writer for ${squad} squad.
+  return `You are SCRIBE, cloud report writer for ${squad} squad.
 ${goalSection}
 ## Inputs
 - ${agentPaths.INTEL_ROOT}/cloud/findings/${taskId}/*.jsonl (raw specialist findings)
-- ${agentPaths.INTEL_ROOT}/cloud/KRIPA-VERDICTS-${taskId}.jsonl (only include CONFIRMED)
+- ${agentPaths.INTEL_ROOT}/cloud/AUDITOR-VERDICTS-${taskId}.jsonl (only include CONFIRMED)
 - Verified chains: ${verified.length}, unverified: ${unverified.length}
 
 ## Output
@@ -4589,7 +4589,7 @@ async function dispatchPentestParallel(dispatch) {
   const _dynBatches = _focus ? batchesFromList(_focus) : buildPentestBatches()
   if (_focus) {
     log(`🎯 Focused scan: ${_focus.map(a => a.toUpperCase()).join(', ')} (classes: ${(dispatch.meta.focusClasses || []).join(', ')})`)
-    logActivity('SANJAY', `🎯 Focused scan — ${(dispatch.meta.focusClasses || []).join(', ')}`, {
+    logActivity('NEXUS', `🎯 Focused scan — ${(dispatch.meta.focusClasses || []).join(', ')}`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
       details: `Specialists: ${_focus.map(a => a.toUpperCase()).join(', ')} (full roster skipped)`,
     })
@@ -4708,7 +4708,7 @@ async function dispatchPentestParallel(dispatch) {
       if (wasKilled && noOutput && attempt < maxRetries) {
         // (2026-04-23) Respect user cancel: if task was marked cancelled, the kill
         // came FROM cancel-signal, not a transient crash — don't re-spawn. Apr-21
-        // Run 1 regression: first cancel-signal killed ARJUN/RUDRA at 23:34 and
+        // Run 1 regression: first cancel-signal killed SCOUT/RANGER at 23:34 and
         // 30s later this retry re-spawned them (parallel copy #2 had the check,
         // this copy didn't).
         if (_isTaskCancelled(taskId)) {
@@ -4737,7 +4737,7 @@ async function dispatchPentestParallel(dispatch) {
       const reachCheck = execSync(`curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${safeUrl_local}" 2>/dev/null || echo "000"`, { timeout: 15000 }).toString().trim()
       if (reachCheck === '000') {
         log(`🚫 Pre-flight FAILED: ${targetUrl} unreachable (HTTP 000 / timeout)`)
-        logActivity('SANJAY', `🚫 Target unreachable: ${targetUrl} — aborting pentest`, {
+        logActivity('NEXUS', `🚫 Target unreachable: ${targetUrl} — aborting pentest`, {
           type: 'preflight-fail', squad, taskId, projectId: projectId || '',
           details: `Pre-flight reachability check failed. Target returned HTTP 000 (connection timeout). Aborting to save agent costs. Fix: verify target is up and accessible from this server.`
         })
@@ -4750,14 +4750,14 @@ async function dispatchPentestParallel(dispatch) {
       log(`⚠️ Pre-flight check error: ${e.message} — continuing anyway`)
     }
 
-    // ── PHASE 0: Ensure endpoint map exists (EKLAVYA crawl should already be done by SANJAY) ──
+    // ── PHASE 0: Ensure endpoint map exists (TRACER crawl should already be done by NEXUS) ──
     const endpointMapFile = `${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json`
     let wafStatus = 'unknown'
     let techContext = '' // populated after Phase 1 recon
 
     // Run WAF detection
     log(`🔍 Phase 0: WAF detection for ${targetUrl}`)
-    logActivity('SANJAY', `🔍 Phase 0: WAF detection for ${targetUrl}`, {
+    logActivity('NEXUS', `🔍 Phase 0: WAF detection for ${targetUrl}`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
       details: `Target: ${targetUrl}\nChecking WAF presence before dispatching specialists`
     })
@@ -4775,10 +4775,10 @@ async function dispatchPentestParallel(dispatch) {
       if (wafBody || headerCheck.match(/cloudflare|akamai|incapsula|f5|barracuda|sucuri|imperva/i)) {
         const wafType = headerCheck.match(/cloudflare|akamai|incapsula|f5|barracuda|sucuri|imperva/i)?.[0] || 'Unknown'
         wafStatus = `detected — ${wafType}`
-        logActivity('SANJAY', `⚠️ WAF detected: ${wafType}`, { type: 'waf', squad, taskId, projectId: projectId || '' })
+        logActivity('NEXUS', `⚠️ WAF detected: ${wafType}`, { type: 'waf', squad, taskId, projectId: projectId || '' })
       } else {
         wafStatus = 'none detected'
-        logActivity('SANJAY', `✅ No WAF detected`, { type: 'waf', squad, taskId, projectId: projectId || '' })
+        logActivity('NEXUS', `✅ No WAF detected`, { type: 'waf', squad, taskId, projectId: projectId || '' })
       }
     } catch (e) {
       log(`⚠️ WAF detection failed: ${e.message}`)
@@ -4806,7 +4806,7 @@ async function dispatchPentestParallel(dispatch) {
         authType = 'open'
       }
       log(`🔐 Auth type detected: ${authType}`)
-      logActivity('SANJAY', `🔐 Auth type: ${authType}. PRIORITIZE ${authType === 'azure-ad' ? 'OAuth/device-code/ROPC flows' : authType === 'keycloak' ? 'OAuth/SAML/admin-console' : authType === 'saml' ? 'SAML ACS/redirect/signature bypass' : 'standard web testing'}. Also test all other surfaces you discover.`, {
+      logActivity('NEXUS', `🔐 Auth type: ${authType}. PRIORITIZE ${authType === 'azure-ad' ? 'OAuth/device-code/ROPC flows' : authType === 'keycloak' ? 'OAuth/SAML/admin-console' : authType === 'saml' ? 'SAML ACS/redirect/signature bypass' : 'standard web testing'}. Also test all other surfaces you discover.`, {
         type: 'auth-detect', squad, taskId, projectId: projectId || ''
       })
     } catch (e) {
@@ -4815,11 +4815,11 @@ async function dispatchPentestParallel(dispatch) {
 
     // Ensure endpoint map exists (run crawl if not)
     if (!fs.existsSync(endpointMapFile)) {
-      log(`⚠️ Endpoint map not found — running EKLAVYA crawl`)
+      log(`⚠️ Endpoint map not found — running TRACER crawl`)
       try {
-        await runEklavyaAgent(targetUrl, taskId)
+        await runtracerAgent(targetUrl, taskId)
       } catch (e) {
-        log(`⚠️ EKLAVYA crawl failed: ${e.message}`)
+        log(`⚠️ TRACER crawl failed: ${e.message}`)
       }
     }
 
@@ -4836,7 +4836,7 @@ async function dispatchPentestParallel(dispatch) {
 
       // Tech fingerprint from HTTP response headers (generic — works for ANY target).
       // Running an extra `curl -I` here costs ~1s but unlocks the dynamic_app signal
-      // in complexity scoring. Previously this signal never fired because the EKLAVYA
+      // in complexity scoring. Previously this signal never fired because the TRACER
       // endpoint map uses {endpoints,forms,apiEndpoints} keys, not {technology,fingerprint}.
       try {
         const safeUrl_local = safeUrl(targetUrl)
@@ -4915,32 +4915,32 @@ async function dispatchPentestParallel(dispatch) {
       _writeTaskField(taskId, 'complexitySignals', scoring.signals)
 
       log(`📊 Complexity score: ${scoring.score} (${scoring.tier}) — ${scoring.signals.map(s => s.id).join(', ') || 'no signals'}`)
-      logActivity('SANJAY', `📊 Complexity: ${scoring.score} (${scoring.tier}). Action: ${scoring.tierAction}. Signals: ${scoring.signals.map(s => s.id).join(', ') || 'none'}`, {
+      logActivity('NEXUS', `📊 Complexity: ${scoring.score} (${scoring.tier}). Action: ${scoring.tierAction}. Signals: ${scoring.signals.map(s => s.id).join(', ') || 'none'}`, {
         type: 'complexity-score', squad, taskId, projectId: projectId || '',
       })
     } catch (e) {
       log(`⚠️ Complexity scoring failed: ${e.message} — downstream agents will use role defaults`)
     }
 
-    // ── PHASE 1: Recon (parallel — ARJUN + RUDRA) ──
+    // ── PHASE 1: Recon (parallel — SCOUT + RANGER) ──
     // (2026-06-18) skip-recon: when the operator wants to go straight to
     // authenticated functionality / specialist testing, skip the nmap/surface
     // recon phase. Specialists still get the brief, creds, and target.
     const _skipRecon = !!(dispatch.meta && dispatch.meta.skipRecon)
     if (_skipRecon) {
       log(`⏭️ Skip-recon ON — no nmap/surface discovery; going straight to functionality/specialist testing`)
-      logActivity('SANJAY', `⏭️ Phase 1 recon skipped (operator)`, {
+      logActivity('NEXUS', `⏭️ Phase 1 recon skipped (operator)`, {
         type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
-        details: 'ARJUN/RUDRA recon skipped — direct authenticated functionality testing',
+        details: 'SCOUT/RANGER recon skipped — direct authenticated functionality testing',
       })
       updateProgress(15, 'Recon skipped — direct to specialists')
     } else {
     log(`🔄 Phase 1: Dispatching recon agents (${PENTEST_RECON.map(a => a.toUpperCase()).join(', ')})`)
-    logActivity('SANJAY', `🔄 Phase 1: Recon — ${PENTEST_RECON.map(a => a.toUpperCase()).join(', ')}`, {
+    logActivity('NEXUS', `🔄 Phase 1: Recon — ${PENTEST_RECON.map(a => a.toUpperCase()).join(', ')}`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
-      details: `ARJUN: Recon & Attack Surface\nRUDRA: nmap -sV scan\nTarget: ${targetUrl}`
+      details: `SCOUT: Recon & Attack Surface\nranger: nmap -sV scan\nTarget: ${targetUrl}`
     })
-    updateProgress(10, 'Phase 1: Recon running (ARJUN + RUDRA)')
+    updateProgress(10, 'Phase 1: Recon running (SCOUT + RANGER)')
 
     const reconResults = await Promise.all(PENTEST_RECON.map(agent => {
       const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId])
@@ -4950,7 +4950,7 @@ async function dispatchPentestParallel(dispatch) {
 
     const reconSuccess = reconResults.filter(r => (r.code === 0 || r.code === 1)).length
     log(`✅ Phase 1 complete: ${reconSuccess}/${PENTEST_RECON.length} recon agents succeeded`)
-    logActivity('SANJAY', `✅ Phase 1 complete: ${reconSuccess}/${PENTEST_RECON.length} recon agents`, {
+    logActivity('NEXUS', `✅ Phase 1 complete: ${reconSuccess}/${PENTEST_RECON.length} recon agents`, {
       type: 'phase-complete', squad, taskId, projectId: projectId || '',
       details: reconResults.map(r => `${r.agentName.toUpperCase()}: ${(r.code === 0 || r.code === 1) ? '✅' : '❌'}`).join(', ')
     })
@@ -4981,13 +4981,13 @@ async function dispatchPentestParallel(dispatch) {
 
     // ── PHASE 1.6: JS bundle endpoint discovery ──
     // 2026-05-12: Universal across web-app squads. The 2026-05-11 bounty-PoC
-    // session surfaced that EKLAVYA crawls .js URLs but never analyzed their
+    // session surfaced that TRACER crawls .js URLs but never analyzed their
     // contents — we missed /api/v1/printLog entirely (a second unauth-write
     // vector on the same backend as chatLog/sync). This block fetches each
     // discovered JS bundle and regex-extracts API paths + URLs + internal
     // hints + build-metadata leaks. New endpoints feed Phase 2 specialists.
     // Fail-soft: any error here is non-fatal — Phase 2 still runs on the
-    // endpoint set EKLAVYA already produced.
+    // endpoint set TRACER already produced.
     try {
       const __jsAnalyzer = require('./agents/js-bundle-analyzer')
       const jsUrls = __jsAnalyzer.readJsUrlsForTask(taskId)
@@ -5003,7 +5003,7 @@ async function dispatchPentestParallel(dispatch) {
             log(`🔬 Phase 1.6: ${analysis.bundles_analyzed} bundle(s) analyzed, ${analysis.endpoints.length} endpoints + ${analysis.internal_hints.length} internal hints + ${analysis.build_metadata.length} metadata leaks discovered`)
             if (analysis.endpoints.length > 0) {
               const newEndpoints = analysis.endpoints.slice(0, 30)
-              logActivity('SANJAY', `🔬 Phase 1.6: JS-bundle scan found ${analysis.endpoints.length} API endpoints`, {
+              logActivity('NEXUS', `🔬 Phase 1.6: JS-bundle scan found ${analysis.endpoints.length} API endpoints`, {
                 type: 'js-bundle-analysis', squad, taskId, projectId: projectId || '',
                 details: `Endpoints (top 30):\n${newEndpoints.join('\n')}` +
                   (analysis.internal_hints.length > 0 ? `\n\nInternal hints:\n${analysis.internal_hints.slice(0, 10).join('\n')}` : '') +
@@ -5015,7 +5015,7 @@ async function dispatchPentestParallel(dispatch) {
           }
         })()
       } else {
-        log(`🔬 Phase 1.6 skipped: no JS URLs in EKLAVYA crawl output for this task`)
+        log(`🔬 Phase 1.6 skipped: no JS URLs in TRACER crawl output for this task`)
       }
     } catch (jsErr) {
       log(`⚠️ Phase 1.6 module load error: ${jsErr.message}`)
@@ -5073,7 +5073,7 @@ async function dispatchPentestParallel(dispatch) {
         })
         if (!conv.shouldExit) {
           log(`🧭 Goal-evaluator: oracle overrode early-exit → CONTINUE (source=${conv.source})`)
-          logActivity('SANJAY', `🧭 Goal-evaluator: oracle overrode early-exit → CONTINUE`, {
+          logActivity('NEXUS', `🧭 Goal-evaluator: oracle overrode early-exit → CONTINUE`, {
             type: 'goal-convergence', squad, taskId, projectId: projectId || '',
             details: `source=${conv.source} oracleUsed=${conv.oracleUsed} reason=${conv.reason}`,
           })
@@ -5086,7 +5086,7 @@ async function dispatchPentestParallel(dispatch) {
     }
 
     log(`🧭 Pipeline decision: ${decision.decision} (${decision.reason})`)
-    logActivity('SANJAY', `🧭 Pipeline decision: ${decision.decision}`, {
+    logActivity('NEXUS', `🧭 Pipeline decision: ${decision.decision}`, {
       type: 'pipeline-decision', squad, taskId, projectId: projectId || '',
       details: `Decision: ${decision.decision}\nReason: ${decision.reason}\nendpoints=${endpointCount} reachable=${targetReachable} missedSignals=${_spotCheckMisses.length}`,
     })
@@ -5107,7 +5107,7 @@ async function dispatchPentestParallel(dispatch) {
         }
         if (altReachable) {
           log(`🔁 Alt-scheme reachable — swapping ${targetUrl} → ${altUrl} and continuing with hints`)
-          logActivity('SANJAY', `🔁 Scheme swap: ${targetUrl} → ${altUrl}`, {
+          logActivity('NEXUS', `🔁 Scheme swap: ${targetUrl} → ${altUrl}`, {
             type: 'scheme-swap', squad, taskId, projectId: projectId || '',
           })
           targetUrl = altUrl
@@ -5122,7 +5122,7 @@ async function dispatchPentestParallel(dispatch) {
 
     if (decision.decision === EARLY_EXIT_DECISIONS.EARLY_EXIT) {
       log(`⏭️ Early exit: ${decision.reason} — skipping specialist phases`)
-      logActivity('SANJAY', `⏭️ No testable endpoints found AND target unreachable — limited assessment only`, {
+      logActivity('NEXUS', `⏭️ No testable endpoints found AND target unreachable — limited assessment only`, {
         type: 'early-exit', taskId, squad
       })
 
@@ -5138,15 +5138,15 @@ async function dispatchPentestParallel(dispatch) {
         }
       } catch (e) { log(`⚠️ Failed to flag unreachable: ${e.message}`) }
 
-      // Only run DHARMA (headers) on the base URL, then VYASA writes "no surface" report
-      log(`🔄 Early exit: Running DHARMA (headers only) + VYASA report`)
-      const dharmaPrompt = buildPentestSpecialistPrompt('dharma', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId])
-      const dharmaResult = await spawnAgent('dharma', taskId, dharmaPrompt, `task-${taskId}-dharma-earlyexit`, modelOverride)
-      trackCosts([dharmaResult])
+      // Only run SENTRY (headers) on the base URL, then SCRIBE writes "no surface" report
+      log(`🔄 Early exit: Running SENTRY (headers only) + SCRIBE report`)
+      const sentryPrompt = buildPentestSpecialistPrompt('sentry', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId])
+      const sentryResult = await spawnAgent('sentry', taskId, sentryPrompt, `task-${taskId}-sentry-earlyexit`, modelOverride)
+      trackCosts([sentryResult])
 
-      const vyasaPrompt = buildVyasaReportPrompt(taskTitle, taskId, projectId || '', squad, targetUrl, taskGoal || '', [])
-      const vyasaResult = await spawnAgent(PENTEST_REPORTER, taskId, vyasaPrompt, `task-${taskId}-vyasa-earlyexit`, modelOverride)
-      trackCosts([vyasaResult])
+      const scribePrompt = buildscribeReportPrompt(taskTitle, taskId, projectId || '', squad, targetUrl, taskGoal || '', [])
+      const scribeResult = await spawnAgent(PENTEST_REPORTER, taskId, scribePrompt, `task-${taskId}-scribe-earlyexit`, modelOverride)
+      trackCosts([scribeResult])
 
       updateProgress(90, 'Early exit — limited assessment complete')
 
@@ -5168,7 +5168,7 @@ async function dispatchPentestParallel(dispatch) {
       } catch {}
 
       log(`💰 Total pentest task cost (early exit): $${totalCost.toFixed(4)}`)
-      logActivity('SANJAY', `💰 Total pentest task cost (early exit): $${totalCost.toFixed(4)}`, {
+      logActivity('NEXUS', `💰 Total pentest task cost (early exit): $${totalCost.toFixed(4)}`, {
         type: 'cost-total', squad, taskId, projectId: projectId || '',
         details: `Total: $${totalCost.toFixed(4)} (early exit — 0 endpoints)\n${allCosts.map(c => `${c.agent}: $${c.totalCost.toFixed(4)}`).join('\n')}`
       })
@@ -5207,12 +5207,12 @@ async function dispatchPentestParallel(dispatch) {
       if (detected.length > 0) {
         techContext = detected.join(', ')
         log(`🔍 Tech fingerprint: ${techContext}`)
-        logActivity('SANJAY', `🔍 Tech stack detected: ${techContext}`, {
+        logActivity('NEXUS', `🔍 Tech stack detected: ${techContext}`, {
           type: 'tech-fingerprint', squad, taskId, details: detected.join(', ')
         })
       }
       // 2026-05-14: Persist detected stacks so spawnAgent can apply tech-affinity
-      // model demotion (off by default — gated by KURUKSHETRA_TECH_GATING=enabled).
+      // model demotion (off by default — gated by archon_TECH_GATING=enabled).
       try {
         fs.writeFileSync(
           `${agentPaths.INTEL_ROOT}/tech-stack-${taskId}.json`,
@@ -5251,7 +5251,7 @@ async function dispatchPentestParallel(dispatch) {
           .filter(([k, v]) => targetClassifier.DIMENSIONS.includes(k) && v !== 'unknown')
           .map(([k, v]) => `${k}=${v}`).join(', ')
         log(`🎯 Target profile saved: ${nonUnknown || 'all-unknown'}`)
-        logActivity('SANJAY', `🎯 Target profile: ${nonUnknown || 'all-unknown'}`, {
+        logActivity('NEXUS', `🎯 Target profile: ${nonUnknown || 'all-unknown'}`, {
           type: 'target-profile', squad, taskId, details: nonUnknown || 'all-unknown (insufficient evidence)'
         })
       }
@@ -5267,11 +5267,11 @@ async function dispatchPentestParallel(dispatch) {
     // emits a structured EndpointModel[] capturing facts AND implicit author
     // assumptions, so Phase 2 specialists can operate in pure adversarial mode.
     //
-    // Off by default — opt in with KURUKSHETRA_PHASE_1_8=enabled. Strictly
+    // Off by default — opt in with archon_PHASE_1_8=enabled. Strictly
     // additive: writes a .jsonl artifact, does not alter Phase 2 specialist
     // prompts yet (that comes in a follow-up sprint once we measure utility).
     try {
-      if (process.env.KURUKSHETRA_PHASE_1_8 === 'enabled') {
+      if (process.env.archon_PHASE_1_8 === 'enabled') {
         const __endpointAnalyzer = require('./agents/endpoint-analyzer')
         let reconData = { endpoints: [] }
         try {
@@ -5282,7 +5282,7 @@ async function dispatchPentestParallel(dispatch) {
         fs.writeFileSync(outPath, models.map(m => JSON.stringify(m)).join('\n') + (models.length > 0 ? '\n' : ''))
         const totalAssumptions = models.reduce((n, m) => n + (m.assumptions || []).length, 0)
         log(`🧩 Phase 1.8: EndpointModel — ${models.length} endpoints analyzed, ${totalAssumptions} assumptions extracted → ${outPath}`)
-        logActivity('SANJAY', `🧩 Phase 1.8: EndpointModel structured handoff (${models.length} endpoints, ${totalAssumptions} assumptions)`, {
+        logActivity('NEXUS', `🧩 Phase 1.8: EndpointModel structured handoff (${models.length} endpoints, ${totalAssumptions} assumptions)`, {
           type: 'endpoint-model', squad, taskId, projectId: projectId || '',
           details: `Artifact: ${outPath}`,
         })
@@ -5301,7 +5301,7 @@ async function dispatchPentestParallel(dispatch) {
 
     log(`🔄 Phase 2 Wave 1 — ${wave1Agents.length} specialists in parallel: ${wave1Agents.map(a => a.toUpperCase()).join(', ')}`)
     logEvent('PHASE_START', { taskId, phase: 'vuln-wave1', agents: wave1Agents.map(a => a.toUpperCase()) })
-    logActivity('SANJAY', `🔄 Phase 2 Wave 1 (parallel): ${wave1Agents.map(a => a.toUpperCase()).join(', ')}`, {
+    logActivity('NEXUS', `🔄 Phase 2 Wave 1 (parallel): ${wave1Agents.map(a => a.toUpperCase()).join(', ')}`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
       details: `All wave-1 specialists running simultaneously`
     })
@@ -5345,7 +5345,7 @@ async function dispatchPentestParallel(dispatch) {
       const budget = getCostBudget(squad)
       if (totalCost > budget) {
         log(`💰 BUDGET EXCEEDED after wave 1: $${totalCost.toFixed(2)} > $${budget} limit`)
-        logActivity('SANJAY', `💰 Budget exceeded — skipping wave 2 specialists`, { type: 'budget-exceeded', squad, taskId })
+        logActivity('NEXUS', `💰 Budget exceeded — skipping wave 2 specialists`, { type: 'budget-exceeded', squad, taskId })
         _enforceBudgetCap(taskId, squad, totalCost, budget, taskTitle)
         budgetExceeded = true
       }
@@ -5356,7 +5356,7 @@ async function dispatchPentestParallel(dispatch) {
     if (!budgetExceeded && wave2Agents.length > 0) {
       log(`🔄 Phase 2 Wave 2 — ${wave2Agents.length} specialists in parallel${_batch1Critique ? ' [reflexion active]' : ''}: ${wave2Agents.map(a => a.toUpperCase()).join(', ')}`)
       logEvent('PHASE_START', { taskId, phase: 'vuln-wave2', agents: wave2Agents.map(a => a.toUpperCase()) })
-      logActivity('SANJAY', `🔄 Phase 2 Wave 2 (parallel): ${wave2Agents.map(a => a.toUpperCase()).join(', ')}`, {
+      logActivity('NEXUS', `🔄 Phase 2 Wave 2 (parallel): ${wave2Agents.map(a => a.toUpperCase()).join(', ')}`, {
         type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
         details: `All wave-2 specialists running simultaneously${_batch1Critique ? ' with reflexion context' : ''}`
       })
@@ -5378,7 +5378,7 @@ async function dispatchPentestParallel(dispatch) {
       const budget = getCostBudget(squad)
       if (totalCost > budget) {
         log(`💰 BUDGET EXCEEDED after wave 2: $${totalCost.toFixed(2)} > $${budget} limit`)
-        logActivity('SANJAY', `💰 Budget exceeded — skipping conditional specialists`, { type: 'budget-exceeded', squad, taskId })
+        logActivity('NEXUS', `💰 Budget exceeded — skipping conditional specialists`, { type: 'budget-exceeded', squad, taskId })
         _enforceBudgetCap(taskId, squad, totalCost, budget, taskTitle)
         budgetExceeded = true
       }
@@ -5471,39 +5471,39 @@ async function dispatchPentestParallel(dispatch) {
       // PARALLEL conditional specialists — all run simultaneously (was sequential, saving 30+ min)
       const conditionalPromises = []
 
-      // KRITAVARMA (XXE) — dispatch if XML/SOAP/RSS/file-upload endpoints detected
+      // SPECTRE (XXE) — dispatch if XML/SOAP/RSS/file-upload endpoints detected
       const hasXmlSurface = /xml|soap|wsdl|rss|atom|svg|docx|xlsx|content-type.*xml|queryxpath/i.test(endpointData + reconActivity)
       if (hasXmlSurface) {
-        log(`🎯 Conditional: XML/SOAP surface detected — dispatching KRITAVARMA (XXE)`)
-        logActivity('SANJAY', `🎯 Conditional dispatch: KRITAVARMA (XXE surface detected)`, {
+        log(`🎯 Conditional: XML/SOAP surface detected — dispatching SPECTRE (XXE)`)
+        logActivity('NEXUS', `🎯 Conditional dispatch: SPECTRE (XXE surface detected)`, {
           type: 'conditional-dispatch', squad, taskId, projectId: projectId || ''
         })
-        const xxePrompt = buildPentestSpecialistPrompt('kritavarma', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
-        conditionalPromises.push(spawnWithRetry('kritavarma', xxePrompt + _conditionalReflexion, undefined))
+        const xxePrompt = buildPentestSpecialistPrompt('spectre', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+        conditionalPromises.push(spawnWithRetry('spectre', xxePrompt + _conditionalReflexion, undefined))
       }
 
-      // SHIKHANDI (CSRF) — dispatch if forms/state-changing endpoints or any POST endpoints detected
+      // DECOY (CSRF) — dispatch if forms/state-changing endpoints or any POST endpoints detected
       const hasFormSurface = /form|action=|doTransfer|doLogin|submit|POST|csrf|token|login|register|signup|password|profile|settings|update|delete|create/i.test(endpointData + reconActivity)
       if (hasFormSurface) {
-        log(`🎯 Conditional: Form/state-change surface detected — dispatching SHIKHANDI (CSRF)`)
-        logActivity('SANJAY', `🎯 Conditional dispatch: SHIKHANDI (CSRF surface detected)`, {
+        log(`🎯 Conditional: Form/state-change surface detected — dispatching DECOY (CSRF)`)
+        logActivity('NEXUS', `🎯 Conditional dispatch: DECOY (CSRF surface detected)`, {
           type: 'conditional-dispatch', squad, taskId, projectId: projectId || ''
         })
-        const csrfPrompt = buildPentestSpecialistPrompt('shikhandi', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
-        conditionalPromises.push(spawnWithRetry('shikhandi', csrfPrompt + _conditionalReflexion, undefined))
+        const csrfPrompt = buildPentestSpecialistPrompt('decoy', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+        conditionalPromises.push(spawnWithRetry('decoy', csrfPrompt + _conditionalReflexion, undefined))
       }
 
-      // RUDRA-CMDi (OS Command Injection) — dispatch if parameters that accept user input detected
+      // RANGER-CMDi (OS Command Injection) — dispatch if parameters that accept user input detected
       const hasCmdSurface = /cmd|exec|ping|host|ip=|url=|file=|path=|dir=|domain|lookup|resolve|download|fetch|convert|process|run/i.test(endpointData + reconActivity)
       if (hasCmdSurface) {
-        log(`🎯 Conditional: Command-injectable surface detected — dispatching RUDRA (CMDi)`)
-        logActivity('SANJAY', `🎯 Conditional dispatch: RUDRA CMDi (command-injectable surface detected)`, {
+        log(`🎯 Conditional: Command-injectable surface detected — dispatching RANGER (CMDi)`)
+        logActivity('NEXUS', `🎯 Conditional dispatch: RANGER CMDi (command-injectable surface detected)`, {
           type: 'conditional-dispatch', squad, taskId, projectId: projectId || ''
         })
-        const cmdiPrompt = buildPentestSpecialistPrompt('rudra', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
-          + `\n\nFOCUS: OS Command Injection testing ONLY (not recon). Read your CMDi skill: cat ${agentPaths.skillsDir('rudra')}/cmdi-testing/SKILL.md`
+        const cmdiPrompt = buildPentestSpecialistPrompt('ranger', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+          + `\n\nFOCUS: OS Command Injection testing ONLY (not recon). Read your CMDi skill: cat ${agentPaths.skillsDir('ranger')}/cmdi-testing/SKILL.md`
           + _conditionalReflexion
-        conditionalPromises.push(spawnWithRetry('rudra', cmdiPrompt, undefined))
+        conditionalPromises.push(spawnWithRetry('ranger', cmdiPrompt, undefined))
       }
 
       // Run ALL conditional specialists in PARALLEL (was sequential — saves 30+ min!)
@@ -5527,7 +5527,7 @@ async function dispatchPentestParallel(dispatch) {
       ...conditionalResults.map(r => r.agentName)]
     log(`✅ Phase 2 complete: ${vulnSuccess}/${allSpecialists.length} vuln specialists succeeded`)
     logEvent('PHASE_DONE', { taskId, phase: 'vuln-specialists' })
-    logActivity('SANJAY', `✅ Phase 2 complete: ${vulnSuccess}/${allSpecialists.length} vulnerability specialists`, {
+    logActivity('NEXUS', `✅ Phase 2 complete: ${vulnSuccess}/${allSpecialists.length} vulnerability specialists`, {
       type: 'phase-complete', squad, taskId, projectId: projectId || '',
       details: allVulnResults.map(r => `${r.agentName.toUpperCase()}: ${(r.code === 0 || r.code === 1) ? '✅' : '❌'}`).join(', ')
     })
@@ -5553,8 +5553,8 @@ async function dispatchPentestParallel(dispatch) {
 
     // ── PHASE 2.9: Cross-agent contradiction detector ──
     // Scans live-findings for agents that contradict each other about the same URL.
-    // E.g. ARJUN says "URL X has no auth", KARNA says "URL X requires auth".
-    // Flags contradictions in a contradiction-report-{taskId}.json for KRIPA to resolve.
+    // E.g. SCOUT says "URL X has no auth", DRILL says "URL X requires auth".
+    // Flags contradictions in a contradiction-report-{taskId}.json for AUDITOR to resolve.
     // Fail-soft, zero LLM calls, pure file analysis.
     try {
       const __lfPath = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
@@ -5595,7 +5595,7 @@ async function dispatchPentestParallel(dispatch) {
           const reportPath = `${agentPaths.INTEL_ROOT}/contradiction-report-${taskId}.json`
           fs.writeFileSync(reportPath, JSON.stringify({ contradictions, generated: new Date().toISOString() }, null, 2))
           log(`⚠️ Phase 2.9: Found ${contradictions.length} agent contradictions → ${reportPath}`)
-          logActivity('SANJAY', `⚠️ Phase 2.9: ${contradictions.length} cross-agent contradictions detected`, {
+          logActivity('NEXUS', `⚠️ Phase 2.9: ${contradictions.length} cross-agent contradictions detected`, {
             type: 'quality-check', squad, taskId, projectId: projectId || '',
             details: contradictions.map(c => `${c.url}: ${c.type}`).join('\n'),
           })
@@ -5605,79 +5605,79 @@ async function dispatchPentestParallel(dispatch) {
       log(`⚠️ Phase 2.9 contradiction detector error (non-fatal): ${contradErr.message}`)
     }
 
-    // ── PHASE 3: Validation (KRIPA) ──
-    log(`🔄 Phase 3: KRIPA validating all suspected findings`)
-    logEvent('PHASE_START', { taskId, phase: 'validation-3', agents: ['KRIPA'] })
-    logActivity('SANJAY', `🔄 Phase 3: KRIPA validation`, {
+    // ── PHASE 3: Validation (AUDITOR) ──
+    log(`🔄 Phase 3: AUDITOR validating all suspected findings`)
+    logEvent('PHASE_START', { taskId, phase: 'validation-3', agents: ['AUDITOR'] })
+    logActivity('NEXUS', `🔄 Phase 3: AUDITOR validation`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
-      details: 'KRIPA reading all suspected findings and re-probing independently'
+      details: 'AUDITOR reading all suspected findings and re-probing independently'
     })
-    updateProgress(70, 'Phase 3: KRIPA validating findings')
+    updateProgress(70, 'Phase 3: AUDITOR validating findings')
 
-    const kripaPrompt = buildKripaValidationPrompt(taskTitle, taskId, projectId || '', squad, targetUrl, taskGoal || '')
-    const kripaResult = await spawnAgent(PENTEST_VALIDATOR, taskId, kripaPrompt, `task-${taskId}-kripa-validate`, modelOverride)
-    trackCosts([kripaResult])
+    const auditorPrompt = buildauditorValidationPrompt(taskTitle, taskId, projectId || '', squad, targetUrl, taskGoal || '')
+    const auditorResult = await spawnAgent(PENTEST_VALIDATOR, taskId, auditorPrompt, `task-${taskId}-auditor-validate`, modelOverride)
+    trackCosts([auditorResult])
 
-    log(`✅ Phase 3 complete: KRIPA validation done`)
+    log(`✅ Phase 3 complete: AUDITOR validation done`)
     logEvent('PHASE_DONE', { taskId, phase: 'validation' })
-    logActivity('SANJAY', `✅ Phase 3 complete: KRIPA validation done`, {
+    logActivity('NEXUS', `✅ Phase 3 complete: AUDITOR validation done`, {
       type: 'phase-complete', squad, taskId, projectId: projectId || '',
-      details: `KRIPA: ${(kripaResult.code === 0 || kripaResult.code === 1) ? '✅' : '❌'}`
+      details: `AUDITOR: ${(auditorResult.code === 0 || auditorResult.code === 1) ? '✅' : '❌'}`
     })
     updateProgress(75, 'Phase 3 complete — validation done')
 
-    // ── PHASE 3.05: Bridge KRIPA's ACTIVITY-LOG verdicts → per-task VALIDATED-FINDINGS ──
+    // ── PHASE 3.05: Bridge AUDITOR's ACTIVITY-LOG verdicts → per-task VALIDATED-FINDINGS ──
     // 2026-05-11: Phase 3.9 (judge) + Phase 3.45 (rule-based handoff gen)
     // expected /root/intel/pentest/VALIDATED-FINDINGS.jsonl but no producer
-    // ever wrote that file. The shared file was a fossil from a prior KRIPA
-    // prompt that wrote it directly. KRIPA's current prompt writes
+    // ever wrote that file. The shared file was a fossil from a prior AUDITOR
+    // prompt that wrote it directly. AUDITOR's current prompt writes
     // CONFIRMED/KILLED entries to ACTIVITY-LOG.jsonl, but no bridge code
     // converted those into the file Phase 3.9 reads. Result: rounds 9 + 10
     // both had Phase 3.9 judging stale data (round-9 88% pass was partial
     // luck — stale entries happened to match motorola target). This block
-    // builds VALIDATED-FINDINGS-{taskId}.jsonl from KRIPA's verdicts on
+    // builds VALIDATED-FINDINGS-{taskId}.jsonl from AUDITOR's verdicts on
     // every run, so Phase 3.9 + 3.45 read fresh per-task data.
     // Fail-soft: any error here is non-fatal — downstream still has live-
-    // findings + ACTIVITY-LOG as fallback context for VYASA.
+    // findings + ACTIVITY-LOG as fallback context for SCRIBE.
     try {
-      const __kripaBuilder = require('./agents/kripa-validated-builder')
-      const __bw = __kripaBuilder.buildAndWriteForTask(taskId)
-      log(`📋 Phase 3.05: Built ${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl from KRIPA ACTIVITY-LOG verdicts (${__bw.count} CONFIRMED records)`)
-      logActivity('SANJAY', `📋 Phase 3.05: Per-task VALIDATED-FINDINGS built (${__bw.count} CONFIRMED)`, {
+      const __auditorBuilder = require('./agents/auditor-validated-builder')
+      const __bw = __auditorBuilder.buildAndWriteForTask(taskId)
+      log(`📋 Phase 3.05: Built ${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl from AUDITOR ACTIVITY-LOG verdicts (${__bw.count} CONFIRMED records)`)
+      logActivity('NEXUS', `📋 Phase 3.05: Per-task VALIDATED-FINDINGS built (${__bw.count} CONFIRMED)`, {
         type: 'phase-complete', squad, taskId, projectId: projectId || '',
-        details: `Path: ${__bw.path}, Source: KRIPA ACTIVITY-LOG entries, Filter: CONFIRMED only`,
+        details: `Path: ${__bw.path}, Source: AUDITOR ACTIVITY-LOG entries, Filter: CONFIRMED only`,
       })
 
-      // ── Typed inter-phase seam guard (GATE-125): KRIPA→VALIDATED silent-drop ──
-      // VERDICT_RE broke twice (May 11/15): KRIPA logged CONFIRMED verdicts but the
+      // ── Typed inter-phase seam guard (GATE-125): AUDITOR→VALIDATED silent-drop ──
+      // VERDICT_RE broke twice (May 11/15): AUDITOR logged CONFIRMED verdicts but the
       // builder yielded 0 VALIDATED findings, silently starving Phase 3.075+3.9. Wrap
       // the seam in a typed envelope and quarantine LOUD when input>0 but output=0 —
       // visible record + alarm, pipeline still continues (fail-into-quarantine-LOUD).
       try {
         const __env = require('./agents/phase-envelope')
-        let __kripaRawVerdicts = 0
+        let __auditorRawVerdicts = 0
         try {
           for (const __l of fs.readFileSync(ACTIVITY_LOG, 'utf-8').split('\n')) {
             if (!__l) continue
             try {
               const __e = JSON.parse(__l)
-              if (__e.taskId === taskId && __e.agent === 'KRIPA' && /\b(CONFIRMED|KILLED)\b/.test(`${__e.action || ''} ${__e.details || ''}`)) __kripaRawVerdicts++
+              if (__e.taskId === taskId && __e.agent === 'AUDITOR' && /\b(CONFIRMED|KILLED)\b/.test(`${__e.action || ''} ${__e.details || ''}`)) __auditorRawVerdicts++
             } catch {}
           }
         } catch {}
-        __env.wrap('kripa-result', { taskId, count: __bw.count, rawVerdicts: __kripaRawVerdicts }, { source: 'KRIPA', taskId })
-        if (__kripaRawVerdicts > 0 && __bw.count === 0) {
+        __env.wrap('auditor-result', { taskId, count: __bw.count, rawVerdicts: __auditorRawVerdicts }, { source: 'AUDITOR', taskId })
+        if (__auditorRawVerdicts > 0 && __bw.count === 0) {
           try {
             __env.quarantine(
-              { taskId, kripaRawVerdicts: __kripaRawVerdicts, validatedCount: 0 },
-              `KRIPA→VALIDATED silent-drop: ${__kripaRawVerdicts} KRIPA verdict line(s) in ACTIVITY-LOG but builder produced 0 VALIDATED findings — judge/severity would run on empty data (VERDICT_RE regression?)`,
+              { taskId, auditorRawVerdicts: __auditorRawVerdicts, validatedCount: 0 },
+              `AUDITOR→VALIDATED silent-drop: ${__auditorRawVerdicts} AUDITOR verdict line(s) in ACTIVITY-LOG but builder produced 0 VALIDATED findings — judge/severity would run on empty data (VERDICT_RE regression?)`,
               { taskId }
             )
           } catch (__qThrow) {
             // quarantine() throws by design after writing the visible record — surface LOUD, don't crash
-            logActivity('SANJAY', `🚨 Phase 3.05 QUARANTINE — KRIPA→VALIDATED silent-drop detected`, {
+            logActivity('NEXUS', `🚨 Phase 3.05 QUARANTINE — AUDITOR→VALIDATED silent-drop detected`, {
               type: 'phase-quarantine', squad, taskId, projectId: projectId || '',
-              details: `${__kripaRawVerdicts} KRIPA verdicts but 0 reached VALIDATED-FINDINGS. DHARMARAJ + severity would judge empty data. Investigate kripa-validated-builder VERDICT_RE. Quarantined to ${agentPaths.INTEL_ROOT}/quarantine-${taskId}.jsonl`,
+              details: `${__auditorRawVerdicts} AUDITOR verdicts but 0 reached VALIDATED-FINDINGS. ARBITER + severity would judge empty data. Investigate auditor-validated-builder VERDICT_RE. Quarantined to ${agentPaths.INTEL_ROOT}/quarantine-${taskId}.jsonl`,
             })
           }
         }
@@ -5687,10 +5687,10 @@ async function dispatchPentestParallel(dispatch) {
 
       // ── PHASE 3.055: Challenger — adversarial refuter for top CONFIRMED findings ──
       // Research shows heterogeneous adversarial agents improve quality (+17.9% on hard tasks).
-      // This phase runs AFTER KRIPA confirms findings but BEFORE DHARMARAJ judges them.
+      // This phase runs AFTER AUDITOR confirms findings but BEFORE ARBITER judges them.
       // A dedicated Challenger agent (Haiku, 3-min cap) tries to REFUTE each high-severity
       // CONFIRMED finding. If it cannot refute → confidence boosted. If it succeeds → confidence
-      // downgraded, finding annotated with challenger_note for DHARMARAJ.
+      // downgraded, finding annotated with challenger_note for ARBITER.
       // Covers top 5 critical/high findings only (cost control: ~$0.02-0.05 total).
       // Fail-soft: challenger error never drops findings, only annotates.
       if (__bw.count > 0) {
@@ -5703,7 +5703,7 @@ async function dispatchPentestParallel(dispatch) {
 
           if (__topFindings.length > 0) {
             log(`🔴 Phase 3.055: Challenger adversarial check on ${__topFindings.length} high-severity findings`)
-            logActivity('SANJAY', `🔴 Phase 3.055: Challenger running on top ${__topFindings.length} findings`, {
+            logActivity('NEXUS', `🔴 Phase 3.055: Challenger running on top ${__topFindings.length} findings`, {
               type: 'phase-start', squad, taskId, projectId: projectId || '',
             })
 
@@ -5760,7 +5760,7 @@ Be brief and specific. This is an adversarial check.`
                 ...f,
                 challenger_verdict: cr.verdict,
                 challenger_note: cr.note,
-                // REFUTED findings get confidence downgraded for DHARMARAJ
+                // REFUTED findings get confidence downgraded for ARBITER
                 confidence: cr.verdict === 'REFUTED' ? 'low'
                   : cr.verdict === 'CANNOT_REFUTE' ? 'high'
                   : (f.confidence || 'medium'),
@@ -5770,7 +5770,7 @@ Be brief and specific. This is an adversarial check.`
             const refuted = challengerResults.filter(r => r.verdict === 'REFUTED').length
             const confirmed = challengerResults.filter(r => r.verdict === 'CANNOT_REFUTE').length
             log(`🔴 Phase 3.055: Challenger complete — ${confirmed} confirmed, ${refuted} refuted of ${__topFindings.length}`)
-            logActivity('SANJAY', `🔴 Phase 3.055: Challenger complete (${confirmed} confirmed, ${refuted} refuted)`, {
+            logActivity('NEXUS', `🔴 Phase 3.055: Challenger complete (${confirmed} confirmed, ${refuted} refuted)`, {
               type: 'phase-complete', squad, taskId, projectId: projectId || '',
               details: `Top findings challenged: ${__topFindings.length}, REFUTED: ${refuted}, CANNOT_REFUTE: ${confirmed}`,
             })
@@ -5786,7 +5786,7 @@ Be brief and specific. This is an adversarial check.`
       // api.motorola.com, only 2 (www.motorola.com-hosted) were cleanly in
       // Bugcrowd scope. This phase rewrites VALIDATED-FINDINGS with a per-
       // finding scope_status: in-scope / infrastructure-dependency / out-of-
-      // scope. VYASA reads the annotation to mark/omit findings appropriately.
+      // scope. SCRIBE reads the annotation to mark/omit findings appropriately.
       //
       // Scope config: /root/intel/scope-{taskId}.json (optional). When
       // missing, all findings are tagged "out-of-scope" with reason
@@ -5807,7 +5807,7 @@ Be brief and specific. This is an adversarial check.`
           const summary = __scopeValidator.summarize(annotated)
           fs.writeFileSync(__bw.path, annotated.map(f => JSON.stringify(f)).join('\n') + '\n')
           log(`🎯 Phase 3.06: Scope annotated ${annotated.length} findings — in-scope:${summary.in_scope}, infra-dependency:${summary.infra_dependency}, out-of-scope:${summary.out_of_scope}`)
-          logActivity('SANJAY', `🎯 Phase 3.06: Scope validation (${annotated.length} findings)`, {
+          logActivity('NEXUS', `🎯 Phase 3.06: Scope validation (${annotated.length} findings)`, {
             type: 'phase-complete', squad, taskId, projectId: projectId || '',
             details: `in-scope=${summary.in_scope}, infra-dependency=${summary.infra_dependency}, out-of-scope=${summary.out_of_scope}`,
           })
@@ -5817,13 +5817,13 @@ Be brief and specific. This is an adversarial check.`
       }
 
       // ── PHASE 3.062: Prod-endpoint validation — flag sandbox-as-PROD ──
-      // 2026-05-15: Q#8 shipped "F-002 PROD PayPal CRITICAL" where KRIPA
+      // 2026-05-15: Q#8 shipped "F-002 PROD PayPal CRITICAL" where AUDITOR
       // validated against api.sandbox.paypal.com — Jay tested PROD and got
-      // invalid_client. The framework's confidence chain (KRIPA→DHARMARAJ)
+      // invalid_client. The framework's confidence chain (AUDITOR→ARBITER)
       // never checked "is the validation endpoint actually production?"
       // This phase classifies each Critical/High finding's URL by
       // environment kind and flags prod-claim-against-sandbox mismatches.
-      // VYASA reads prod_validation_warning to downgrade or annotate.
+      // SCRIBE reads prod_validation_warning to downgrade or annotate.
       try {
         const __prodValidator = require('./agents/prod-endpoint-validator')
         if (fs.existsSync(__bw.path) && __bw.count > 0) {
@@ -5834,7 +5834,7 @@ Be brief and specific. This is an adversarial check.`
           fs.writeFileSync(__bw.path, audited.map(f => JSON.stringify(f)).join('\n') + '\n')
           log(`🏭 Phase 3.062: Prod-endpoint audit — ${summary.warnings} warnings (sandbox/test/uat impersonating prod), ${summary.clean} clean`)
           if (summary.warnings > 0) {
-            logActivity('SANJAY', `🏭 Phase 3.062: ${summary.warnings} findings flag sandbox-as-PROD mismatch`, {
+            logActivity('NEXUS', `🏭 Phase 3.062: ${summary.warnings} findings flag sandbox-as-PROD mismatch`, {
               type: 'phase-complete', squad, taskId, projectId: projectId || '',
               details: audited.filter(f => f.prod_validation_warning).map(f => `${f.id}: ${f.prod_validation_reason}`).join(' | '),
             })
@@ -5850,14 +5850,14 @@ Be brief and specific. This is an adversarial check.`
       // manually re-curl endpoints to get actual response bodies for Bugcrowd.
       // This block snapshots the live HTTP response for every CONFIRMED
       // finding that carries a URL. Stored under /root/intel/poc-evidence/
-      // {taskId}/{findingId}.json with status+headers+body+timing. VYASA
+      // {taskId}/{findingId}.json with status+headers+body+timing. SCRIBE
       // reads these alongside ACTIVITY-LOG for reports. Fail-soft per finding.
       try {
         const __pocCapture = require('./agents/poc-evidence-capture')
         // captureForValidatedFindings is async — fire-and-forget so it never
         // delays the rest of the pipeline. Caps per-finding at 3 URLs and
         // 10s per request, so worst-case ~30s per finding × {{ count }}.
-        // We DON'T await it — the pipeline keeps moving. VYASA reads at Phase 4.
+        // We DON'T await it — the pipeline keeps moving. SCRIBE reads at Phase 4.
         ;(async () => {
           try {
             const captureResult = await __pocCapture.captureForValidatedFindings({
@@ -5868,7 +5868,7 @@ Be brief and specific. This is an adversarial check.`
             })
             log(`📸 Phase 3.07: Evidence capture — ${captureResult.captured.length} confirmed-finding bodies snapshotted, ${captureResult.skipped.length} skipped (no URL), ${captureResult.errors.length} errors`)
             if (captureResult.captured.length > 0) {
-              logActivity('SANJAY', `📸 Phase 3.07: ${captureResult.captured.length} response bodies captured`, {
+              logActivity('NEXUS', `📸 Phase 3.07: ${captureResult.captured.length} response bodies captured`, {
                 type: 'evidence-capture', squad, taskId, projectId: projectId || '',
                 details: captureResult.captured.map(c => `${c.finding_id}: ${c.capture_count} url(s) → ${c.path}`).join('\n'),
               })
@@ -5925,23 +5925,23 @@ Be brief and specific. This is an adversarial check.`
               }
             }
             if (__escalated) {
-              logActivity('SANJAY', `🔺 Phase 3.075: ${__escalated} high-conviction finding(s) escalated to manual-review-queue (not silently dropped)`, {
+              logActivity('NEXUS', `🔺 Phase 3.075: ${__escalated} high-conviction finding(s) escalated to manual-review-queue (not silently dropped)`, {
                 type: 'suppression-escalate', squad, taskId, projectId: projectId || '',
                 details: `${__escalated} of ${__archived.length} archived findings routed to manual review`,
               })
             }
           } catch (__suErr) {
-            logActivity('SANJAY', `⚠️ Phase 3.075 suppression-ledger error (non-fatal): ${__suErr.message}`, {
+            logActivity('NEXUS', `⚠️ Phase 3.075 suppression-ledger error (non-fatal): ${__suErr.message}`, {
               type: 'suppression-ledger-error', squad, taskId, projectId: projectId || '',
             })
           }
-          logActivity('SANJAY', `🎚️ Phase 3.075: severity filter (${__profile}) — reported=${__reported.length}, archived=${__archived.length}`, {
+          logActivity('NEXUS', `🎚️ Phase 3.075: severity filter (${__profile}) — reported=${__reported.length}, archived=${__archived.length}`, {
             type: 'severity-filter', squad, taskId, projectId: projectId || '',
             details: `Profile: ${__profile} | Reported: ${__reported.length} | Archived: ${__archived.length}${__warnings && __warnings.length ? ' | Warnings: ' + __warnings.join(', ') : ''}`,
           })
         }
       } catch (__svErr) {
-        logActivity('SANJAY', `⚠️ Phase 3.075 severity-filter error (non-fatal): ${__svErr.message}`, {
+        logActivity('NEXUS', `⚠️ Phase 3.075 severity-filter error (non-fatal): ${__svErr.message}`, {
           type: 'severity-filter-error', squad, taskId, projectId: projectId || '',
           details: String(__svErr && __svErr.message || __svErr),
         })
@@ -5950,7 +5950,7 @@ Be brief and specific. This is an adversarial check.`
       // ── PHASE 3.08: Active PoC probes (off by default, env+permission gated) ──
       // 2026-05-12: enables safe-exploitation probes when the dispatch task has
       // engagement_mode='active-poc' + a valid active_poc_permission token AND
-      // the daemon has KURUKSHETRA_ACTIVE_POC=enabled env var. See:
+      // the daemon has archon_ACTIVE_POC=enabled env var. See:
       // agents/active-poc-policy.js for full safety contract.
       try {
         const __aPocPolicy = require('./agents/active-poc-policy')
@@ -5966,7 +5966,7 @@ Be brief and specific. This is an adversarial check.`
                   findings: (__bw && __bw.records) || [],
                 })
                 log(`🎯 Phase 3.08: active-poc — ${r.probes_run} probes ran, ${r.skipped_reasons.length} skipped, ${r.defender_aborts} defender-aborts, audit at ${r.audit_path}`)
-                logActivity('SANJAY', `🎯 Phase 3.08 active-poc: ${r.probes_run} probes`, {
+                logActivity('NEXUS', `🎯 Phase 3.08 active-poc: ${r.probes_run} probes`, {
                   type: 'active-poc-complete', squad, taskId, projectId: projectId || '',
                   details: `Audit: ${r.audit_path}`,
                 })
@@ -5981,19 +5981,19 @@ Be brief and specific. This is an adversarial check.`
       } catch (aPocOuterErr) {
         log(`⚠️ Phase 3.08 outer error (non-fatal): ${aPocOuterErr.message}`)
       }
-    } catch (kripaBuilderErr) {
-      log(`⚠️ Phase 3.05 kripa-validated-builder error (non-fatal): ${kripaBuilderErr.message}`)
+    } catch (auditorBuilderErr) {
+      log(`⚠️ Phase 3.05 auditor-validated-builder error (non-fatal): ${auditorBuilderErr.message}`)
     }
 
-    // ── PHASE 3.4: Build Attack Graph + Validate with KRIPA results (Level 3) ──
+    // ── PHASE 3.4: Build Attack Graph + Validate with AUDITOR results (Level 3) ──
     let graphContext = ''
     try {
       const graph = attackGraph.buildGraphFromFindings(taskId, targetUrl)
       if (graph && graph.nodes.size > 0) {
-        // Update graph with KRIPA validation — marks confirmed nodes, reduces edge costs
+        // Update graph with AUDITOR validation — marks confirmed nodes, reduces edge costs
         const valResult = attackGraph.updateGraphWithValidation(taskId)
         if (valResult && valResult.validatedCount > 0) {
-          log(`🕸️ Graph validation: ${valResult.validatedCount} nodes validated from ${valResult.totalKripa} KRIPA confirmations — edge costs reduced`)
+          log(`🕸️ Graph validation: ${valResult.validatedCount} nodes validated from ${valResult.totalauditor} AUDITOR confirmations — edge costs reduced`)
         }
         // Re-load graph after validation updates
         const updatedGraph = new attackGraph.AttackGraph(taskId)
@@ -6001,7 +6001,7 @@ Be brief and specific. This is an adversarial check.`
         const chains = updatedGraph.findAttackChains()
         const validatedNodes = [...updatedGraph.nodes.values()].filter(n => n.properties?.validated).length
         log(`🕸️ Attack Graph: ${updatedGraph.nodes.size} nodes, ${updatedGraph.edges.length} edges, ${chains.length} chains (${validatedNodes} validated)`)
-        logActivity('SANJAY', `🕸️ Attack Graph: ${updatedGraph.nodes.size} nodes, ${chains.length} cost-ranked chains (${validatedNodes} validated, costs reduced)`, {
+        logActivity('NEXUS', `🕸️ Attack Graph: ${updatedGraph.nodes.size} nodes, ${chains.length} cost-ranked chains (${validatedNodes} validated, costs reduced)`, {
           type: 'attack-graph', squad, taskId, projectId: projectId || '',
           details: chains.slice(0, 5).map(c => `[${c.severity} cost:${c.totalCost?.toFixed(1)}] ${c.description} (${c.validatedCount}/${c.vulnCount} validated)`).join('\n')
         })
@@ -6023,7 +6023,7 @@ Be brief and specific. This is an adversarial check.`
       const __hp = require('./agents/handoff-protocol')
       // 2026-05-11: Switched from shared /root/intel/pentest/VALIDATED-FINDINGS.jsonl
       // (fossil — no producer ever wrote it) to per-task file built by
-      // Phase 3.05's kripa-validated-builder. Per-task data is always fresh
+      // Phase 3.05's auditor-validated-builder. Per-task data is always fresh
       // and scoped to the current run — no need for cross-run filter heuristics.
       const __validatedFile = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
       let __validatedFindings = []
@@ -6049,7 +6049,7 @@ Be brief and specific. This is an adversarial check.`
         })
         log(`📨 Rule-based handoffs: ${__ruleResult.created.length} created, ${__ruleResult.skipped.length} skipped, ${__ruleResult.errors.length} errors (from ${__validatedFindings.length} validated findings)`)
         if (__ruleResult.created.length > 0) {
-          logActivity('SANJAY', `📨 Rule-based handoffs created: ${__ruleResult.created.length}`, {
+          logActivity('NEXUS', `📨 Rule-based handoffs created: ${__ruleResult.created.length}`, {
             type: 'rule-based-handoff', squad, taskId, projectId: projectId || '',
             details: __ruleResult.created.map(c => `${c.rule_id}: ${c.target_squad}/${c.target_capability} (finding=${c.finding_id})`).join('\n'),
           })
@@ -6070,19 +6070,19 @@ Be brief and specific. This is an adversarial check.`
     // Pattern generalizes to any multi-step validation — stocks thesis chains, cloud IAM chains, etc.
     let chainResults = []
     try {
-      // (2026-04-20 architecture fix) KRIPA's subprocess writes to global
+      // (2026-04-20 architecture fix) AUDITOR's subprocess writes to global
       // ACTIVITY-LOG.jsonl AFTER the process exits (post-flush), so its
       // CONFIRMED findings often land a few seconds after Phase 3 completes.
       // Give those writes a chance to flush before we read the activity log.
       await new Promise(r => setTimeout(r, 5000))
       log(`⛓️ Phase 3.5: Chain analysis starting (Constructor + Executor pattern)`)
-      logActivity('SANJAY', `⛓️ Phase 3.5: Chain analysis — structured output + deterministic execution`, {
+      logActivity('NEXUS', `⛓️ Phase 3.5: Chain analysis — structured output + deterministic execution`, {
         type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
         details: `Using --json-schema to force strict JSON output; chain-verifier.js runs each step deterministically`
       })
       updateProgress(77, 'Phase 3.5: Chain analysis')
 
-      // (2026-04-20) Filter scans action AND details — KRIPA's subprocess
+      // (2026-04-20) Filter scans action AND details — AUDITOR's subprocess
       // emits CONFIRMED findings inside the details field (its SOUL template
       // uses action="VALIDATION COMPLETE" and lists verdicts in details).
       // The old action-only filter saw 0 matches even on successful validation runs.
@@ -6099,7 +6099,7 @@ Be brief and specific. This is an adversarial check.`
 
       if (confirmedEntries.length > 100) {
         const squadType = squad.replace('-squad', '')
-        const leaderAgentId = (CHAIN_PATTERNS[squadType]?.leaderAgent || 'krishna').toLowerCase()
+        const leaderAgentId = (CHAIN_PATTERNS[squadType]?.leaderAgent || 'atlas').toLowerCase()
 
         // Constructor prompt — explicitly tells the model to emit structured JSON.
         // The --json-schema flag enforces this at the API layer (constrained decoding).
@@ -6120,7 +6120,7 @@ ${graphContext ? `## Attack graph context\n${graphContext.slice(0, 3000)}\n\n` :
 
 ## Output rules
 - Emit at most 8 chains, prioritized by severity.
-- EACH chain MUST populate \`finding_ids\` with the exact IDs of the confirmed findings the chain composes. Use IDs from the confirmed-findings list above. Do not invent IDs. Chains without backing finding_ids are dropped downstream by the VYASA orphan guard.
+- EACH chain MUST populate \`finding_ids\` with the exact IDs of the confirmed findings the chain composes. Use IDs from the confirmed-findings list above. Do not invent IDs. Chains without backing finding_ids are dropped downstream by the SCRIBE orphan guard.
 - EACH step must have a valid curl command (just \`curl\` + flags + URL, no shell pipes or &&).
 - \`expected_result\` can be: a plain substring to look for in response, a regex in /.../ form, or a status-code shorthand like "HTTP 200".
 - \`extracts\` is optional; use jsonpath like "$.session.token" to pull a value from the response for use in later steps.
@@ -6173,7 +6173,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
         log(`⛓️ Phase 3.5: Constructor emitted ${chains.length} chain(s) (strict JSON, no regex parsing)`)
 
         if (chains.length === 0) {
-          logActivity('SANJAY', `⛓️ No attack chains identified — findings are independent`, {
+          logActivity('NEXUS', `⛓️ No attack chains identified — findings are independent`, {
             type: 'chain-analysis', squad, taskId, projectId: projectId || '',
             details: 'Constructor agent emitted empty chains array — findings do not combine'
           })
@@ -6188,7 +6188,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
 
           // ── PHASE 3.6: Deterministic execution via chain-verifier.js ──
           log(`⛓️ Phase 3.6: Deterministic execution of ${chains.length} chain(s)`)
-          logActivity('SANJAY', `⛓️ Phase 3.6: Running chains via chain-verifier.js (no LLM, pure curl)`, {
+          logActivity('NEXUS', `⛓️ Phase 3.6: Running chains via chain-verifier.js (no LLM, pure curl)`, {
             type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
             details: `${chains.length} chains × ≤${chainVerifier.STEP_TIMEOUT_SEC}s per step`
           })
@@ -6198,7 +6198,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
             logger: (msg) => log(`  ${msg}`),
           })
 
-          // Project verified chains back into chainResults (format VYASA expects)
+          // Project verified chains back into chainResults (format SCRIBE expects)
           chainResults = verification.results.map(r => ({
             name: r.name || r.id,
             severity: r.severity || 'Unknown',
@@ -6222,15 +6222,15 @@ The output MUST validate against the schema. You cannot emit prose — only the 
           }
 
           log(`⛓️ Phase 3.6 complete: ${verification.verified}/${verification.total} chains verified`)
-          logActivity('SANJAY', `⛓️ Phase 3.6 complete: ${verification.verified}/${verification.total} chains verified (deterministic execution)`, {
+          logActivity('NEXUS', `⛓️ Phase 3.6 complete: ${verification.verified}/${verification.total} chains verified (deterministic execution)`, {
             type: 'phase-complete', squad, taskId, projectId: projectId || '',
             details: chainResults.map(c => `${c.verified ? '✅' : '❌'} ${c.name}`).join(', ')
           })
 
-          // ── Chain-verifier evidence bridge → DHARMARAJ (2026-06-06) ──
-          // Anti-sycophancy design blocks DHARMARAJ from seeing LLM verdicts.
+          // ── Chain-verifier evidence bridge → ARBITER (2026-06-06) ──
+          // Anti-sycophancy design blocks ARBITER from seeing LLM verdicts.
           // But curl results from chain-verifier are DETERMINISTIC evidence — not opinion.
-          // Annotate VALIDATED-FINDINGS with chain_verified+chain_evidence so DHARMARAJ
+          // Annotate VALIDATED-FINDINGS with chain_verified+chain_evidence so ARBITER
           // gets real HTTP confirmation in Stage C (reachability), not just text.
           try {
             const validatedPath = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
@@ -6262,7 +6262,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
               fs.writeFileSync(validatedPath, annotated.map(f => JSON.stringify(f)).join('\n') + '\n')
               const annotatedCount = Object.keys(chainByFinding).length
               if (annotatedCount > 0) {
-                log(`⛓️ Chain-evidence bridge: annotated ${annotatedCount} finding(s) with chain_verified for DHARMARAJ`)
+                log(`⛓️ Chain-evidence bridge: annotated ${annotatedCount} finding(s) with chain_verified for ARBITER`)
               }
             }
           } catch (bridgeErr) {
@@ -6274,7 +6274,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
       }
     } catch (chainErr) {
       log(`⛓️ Phase 3.5 error (non-fatal): ${chainErr.message}`)
-      logActivity('SANJAY', `⛓️ Chain analysis error (non-fatal): ${chainErr.message.slice(0, 100)}`, {
+      logActivity('NEXUS', `⛓️ Chain analysis error (non-fatal): ${chainErr.message.slice(0, 100)}`, {
         type: 'chain-error', squad, taskId, projectId: projectId || ''
       })
     }
@@ -6287,7 +6287,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
       if (defActions.length > 0) {
         defensiveActionsText = offensiveVaccine.formatForReport(defActions)
         log(`💉 Offensive Vaccine: ${defActions.length} defensive actions generated`)
-        logActivity('SANJAY', `💉 Offensive Vaccine: ${defActions.length} defensive actions (${defActions.filter(a => a.priority === 'CRITICAL').length} critical, ${defActions.filter(a => a.priority === 'HIGH').length} high)`, {
+        logActivity('NEXUS', `💉 Offensive Vaccine: ${defActions.length} defensive actions (${defActions.filter(a => a.priority === 'CRITICAL').length} critical, ${defActions.filter(a => a.priority === 'HIGH').length} high)`, {
           type: 'offensive-vaccine', squad, taskId, projectId: projectId || '',
           details: defActions.map(a => `[${a.priority}] ${a.category}: ${a.finding_summary.slice(0, 60)}`).join('\n')
         })
@@ -6297,8 +6297,8 @@ The output MUST validate against the schema. You cannot emit prose — only the 
     // ── PHASE 3.8: Browser-side execution verification ──
     // Runs deterministic Playwright recipes against findings whose validation
     // requires real browser execution (DOM XSS, prototype pollution, postMessage,
-    // CSP bypass, etc.). Output feeds VYASA at Phase 4 as strong CONFIRM/KILL
-    // evidence — false-fired browser results force VYASA to downgrade or omit.
+    // CSP bypass, etc.). Output feeds SCRIBE at Phase 4 as strong CONFIRM/KILL
+    // evidence — false-fired browser results force SCRIBE to downgrade or omit.
     let browserVerificationCount = 0
     try {
       const browserVerifier = freshRequire('./agents/browser-verifier')
@@ -6310,12 +6310,12 @@ The output MUST validate against the schema. You cannot emit prose — only the 
         parseConstructorResponse,
       } = freshRequire('./agents/pentest-browser-recipe-constructor')
 
-      // Read DHARMA's structured findings file. Filter by browser-relevant types
+      // Read SENTRY's structured findings file. Filter by browser-relevant types
       // OR by free-form match in the constructor — start with the type filter.
       // Sprint A.2 (2026-05-09): readFindingsFile normalizes severity case +
       // findingId→id + title fallbacks before downstream filters.
       // 2026-05-11: Switched to per-task file (Sprint May-11 fix). Same
-      // fossil-stale-data class as Phase 3.9 + DHARMARAJ — the shared
+      // fossil-stale-data class as Phase 3.9 + ARBITER — the shared
       // /root/intel/pentest/VALIDATED-FINDINGS.jsonl is never written to.
       const findingsFile = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
       const { readFindingsFile } = freshRequire('./agents/finding-schema')
@@ -6327,7 +6327,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
 
       if (browserCandidates.length === 0) {
         log(`🔬 Phase 3.8 skipped — no browser-relevant findings (${taskFindings.length} total in scope)`)
-        // 2026-05-14 (GATE-55 fix): emit explicit "skipped" marker so VYASA
+        // 2026-05-14 (GATE-55 fix): emit explicit "skipped" marker so SCRIBE
         // reports include `browser_validation_skipped` instead of silently
         // omitting browser-evidence references. Verify-framework gate rejects
         // post-3.8-deploy reports that mention DOM XSS/proto-pollution/etc
@@ -6348,13 +6348,13 @@ The output MUST validate against the schema. You cannot emit prose — only the 
         }
       } else {
         log(`🔬 Phase 3.8: Browser-side validation — ${browserCandidates.length}/${taskFindings.length} browser-relevant findings`)
-        logActivity('SANJAY', `🔬 Phase 3.8: Browser-side validation`, {
+        logActivity('NEXUS', `🔬 Phase 3.8: Browser-side validation`, {
           type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
           details: `${browserCandidates.length} browser-relevant findings → Playwright deterministic check`
         })
 
         const squadType = String(squad).replace('-squad', '')
-        const leaderAgentId = (CHAIN_PATTERNS[squadType]?.leaderAgent || 'krishna').toLowerCase()
+        const leaderAgentId = (CHAIN_PATTERNS[squadType]?.leaderAgent || 'atlas').toLowerCase()
         const constructorPrompt = buildConstructorPrompt(browserCandidates, { taskId })
 
         // FIX 1 (2026-05-09): Anthropic API rejects {type:"array"} top-level
@@ -6407,35 +6407,35 @@ The output MUST validate against the schema. You cannot emit prose — only the 
           const killed = results.filter(r => r.verdict === 'KILLED').length
           const indet = results.length - fired - killed
           log(`🔬 Phase 3.8 complete: ${results.length} recipes — ${fired} CONFIRMED, ${killed} KILLED, ${indet} INDETERMINATE`)
-          logActivity('SANJAY', `🔬 Phase 3.8 complete: ${fired} CONFIRMED / ${killed} KILLED / ${indet} INDETERMINATE`, {
+          logActivity('NEXUS', `🔬 Phase 3.8 complete: ${fired} CONFIRMED / ${killed} KILLED / ${indet} INDETERMINATE`, {
             type: 'phase-complete', squad, taskId, projectId: projectId || '',
             details: `Output: ${outPath}`
           })
         }
       }
     } catch (e) {
-      log(`🔬 Phase 3.8 error (non-fatal, VYASA will skip browser evidence): ${e.message}`)
+      log(`🔬 Phase 3.8 error (non-fatal, SCRIBE will skip browser evidence): ${e.message}`)
     }
 
     // ── PHASE 3.9: Judge Verifier (G1) — independent 4-stage validation ──
     // Spec: docs/superpowers/specs/2026-05-07-G1-phase-2-event-bus-wiring.md
-    // Fail-soft: any error → log + continue. VYASA falls back to raw VALIDATED-FINDINGS.
-    // Rollback: set KURUKSHETRA_PHASE_3_9=disabled to skip the hook entirely.
-    if (process.env.KURUKSHETRA_PHASE_3_9 === 'disabled') {
-      log(`⚖️  Phase 3.9 disabled by env (KURUKSHETRA_PHASE_3_9=disabled)`)
+    // Fail-soft: any error → log + continue. SCRIBE falls back to raw VALIDATED-FINDINGS.
+    // Rollback: set archon_PHASE_3_9=disabled to skip the hook entirely.
+    if (process.env.archon_PHASE_3_9 === 'disabled') {
+      log(`⚖️  Phase 3.9 disabled by env (archon_PHASE_3_9=disabled)`)
     } else {
       try {
         // 2026-05-11: Switched to per-task file built by Phase 3.05's
-        // kripa-validated-builder. The previously-referenced shared file
+        // auditor-validated-builder. The previously-referenced shared file
         // was a fossil (no producer wrote to it; the "round-6 fix" comment
         // was describing an INTENT that never landed in code). Round-9's
-        // 88% DHARMARAJ was partially luck — stale entries matched target.
+        // 88% ARBITER was partially luck — stale entries matched target.
         const validatedFile = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
         const judgeOutputDir = `${agentPaths.INTEL_ROOT}`
         if (fs.existsSync(validatedFile)) {
           log(`⚖️  Phase 3.9: Judge Verifier — 3-judge consensus for High/Critical + Medium promotion gate`)
           logEvent('PHASE_START', { taskId, phase: 'judge-3.9', agents: ['judge-verifier'] })
-          logActivity('SANJAY', `⚖️ Phase 3.9: Judge Verifier (Critical/High + Medium promotion gate)`, {
+          logActivity('NEXUS', `⚖️ Phase 3.9: Judge Verifier (Critical/High + Medium promotion gate)`, {
             type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
             details: 'Independent 4-stage validation with anti-sycophancy guard. Medium tier evaluated under stricter promotion rubric (cap 10/task).'
           })
@@ -6460,7 +6460,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
               `C=${s.downgraded_by_stage.C} D=${s.downgraded_by_stage.D}), ` +
               `${s.total - s.confirmed - s.downgraded - (s.indeterminate || 0)} not-judged`)
           logEvent('PHASE_DONE', { taskId, phase: 'judge-3.9', summary: s })
-          logActivity('SANJAY', `⚖️ Phase 3.9 complete: ${s.confirmed} confirmed / ${s.downgraded} downgraded${promotedLine}`, {
+          logActivity('NEXUS', `⚖️ Phase 3.9 complete: ${s.confirmed} confirmed / ${s.downgraded} downgraded${promotedLine}`, {
             type: 'phase-complete', squad, taskId, projectId: projectId || '',
             details: `Output: ${judgeResult.outFile}\nDowngrades by stage: A=${s.downgraded_by_stage.A} B=${s.downgraded_by_stage.B} C=${s.downgraded_by_stage.C} D=${s.downgraded_by_stage.D}` + (typeof s.promoted === 'number' ? `\nPromoted (Medium→High): ${s.promoted}` : '')
           })
@@ -6468,20 +6468,20 @@ The output MUST validate against the schema. You cannot emit prose — only the 
           log(`⚖️  Phase 3.9 skipped — no VALIDATED-FINDINGS file at ${validatedFile}`)
         }
       } catch (e) {
-        log(`⚖️  Phase 3.9 error (non-fatal, VYASA will use raw VALIDATED-FINDINGS): ${e.message}`)
+        log(`⚖️  Phase 3.9 error (non-fatal, SCRIBE will use raw VALIDATED-FINDINGS): ${e.message}`)
       }
     }
 
     // ── TRIAGE GATE (2026-06-17) — stop before the report when meta.triageGate ──
-    // Findings are produced (KRIPA-validated, DHARMARAJ-judged) but the report is
+    // Findings are produced (AUDITOR-validated, ARBITER-judged) but the report is
     // NOT auto-written. The operator triages findings in the Findings tab, then a
-    // 'generate-report' inbox action runs VYASA on the confirmed set. Returns the
+    // 'generate-report' inbox action runs SCRIBE on the confirmed set. Returns the
     // partial cost so the caller's accounting stays correct; the caller sees the
     // 'awaiting-triage' status and skips grading/done.
     if (dispatch.meta && dispatch.meta.triageGate) {
       log(`⏸️ Triage gate ON — findings ready, report deferred until operator triage`)
       logEvent('PHASE_DONE', { taskId, phase: 'findings-ready' })
-      logActivity('SANJAY', `⏸️ AWAITING TRIAGE — findings ready, report gated`, {
+      logActivity('NEXUS', `⏸️ AWAITING TRIAGE — findings ready, report gated`, {
         type: 'awaiting-triage', squad, taskId, projectId: projectId || '',
         details: 'Triage the findings in the Findings tab, then click Generate report.',
       })
@@ -6493,25 +6493,25 @@ The output MUST validate against the schema. You cannot emit prose — only the 
       return { totalCost, allCosts }
     }
 
-    // ── PHASE 4: Report (VYASA) ──
-    log(`🔄 Phase 4: VYASA writing final report`)
-    logEvent('PHASE_START', { taskId, phase: 'report-4', agents: ['VYASA'] })
-    logActivity('SANJAY', `🔄 Phase 4: VYASA writing final report`, {
+    // ── PHASE 4: Report (SCRIBE) ──
+    log(`🔄 Phase 4: SCRIBE writing final report`)
+    logEvent('PHASE_START', { taskId, phase: 'report-4', agents: ['SCRIBE'] })
+    logActivity('NEXUS', `🔄 Phase 4: SCRIBE writing final report`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
-      details: 'VYASA reading only KRIPA-confirmed findings and writing professional report'
+      details: 'SCRIBE reading only AUDITOR-confirmed findings and writing professional report'
     })
-    updateProgress(85, 'Phase 4: VYASA writing report')
+    updateProgress(85, 'Phase 4: SCRIBE writing report')
 
-    // ── PHASE 4 PRE-GUARD: VYASA chain-orphan guard (Sprint B Task B3) ──
+    // ── PHASE 4 PRE-GUARD: SCRIBE chain-orphan guard (Sprint B Task B3) ──
     // Defensive root-cause fix for the 2026-05-22 account.motorola.com FP class:
     // chain-verifier emitted "VERIFIED" on CORS-on-redirect, VALIDATED-FINDINGS
-    // was empty (KRIPA killed all 10), but VYASA still published CRITICAL
+    // was empty (AUDITOR killed all 10), but SCRIBE still published CRITICAL
     // CHAIN-001 from chain-verifier output alone. Defense in depth — even if
     // Sprint B B1/B2 ever miss, the report path can no longer emit findings
-    // without validated backing. Fail-soft: guard errors must not break VYASA.
+    // without validated backing. Fail-soft: guard errors must not break SCRIBE.
     let safeChainResults = chainResults
     try {
-      const orphanGuard = freshRequire('./agents/vyasa-chain-orphan-guard')
+      const orphanGuard = freshRequire('./agents/scribe-chain-orphan-guard')
       const { readFindingsFile: __readFindingsFile } = freshRequire('./agents/finding-schema')
       const __validatedFile = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
       const __validatedFindings = fs.existsSync(__validatedFile)
@@ -6542,7 +6542,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
             projectId: projectId || '',
             details: d.reason || '',
           })
-        } catch (_e) { /* logActivity failure must not break VYASA */ }
+        } catch (_e) { /* logActivity failure must not break SCRIBE */ }
       }
       if (__filtered.dropped.length > 0) {
         log(`🛡️ Phase 4 pre-guard: dropped ${__filtered.dropped.length}/${(chainResults || []).length} orphan chain(s) (no validated-findings backing)`)
@@ -6552,15 +6552,15 @@ The output MUST validate against the schema. You cannot emit prose — only the 
       log(`🛡️ Phase 4 pre-guard error (non-fatal, passing raw chainResults): ${guardErr.message}`)
     }
 
-    const vyasaPrompt = buildVyasaReportPrompt(taskTitle, taskId, projectId || '', squad, targetUrl, taskGoal || '', safeChainResults, defensiveActionsText)
-    const vyasaResult = await spawnAgent(PENTEST_REPORTER, taskId, vyasaPrompt, `task-${taskId}-vyasa-report`, modelOverride)
-    trackCosts([vyasaResult])
+    const scribePrompt = buildscribeReportPrompt(taskTitle, taskId, projectId || '', squad, targetUrl, taskGoal || '', safeChainResults, defensiveActionsText)
+    const scribeResult = await spawnAgent(PENTEST_REPORTER, taskId, scribePrompt, `task-${taskId}-scribe-report`, modelOverride)
+    trackCosts([scribeResult])
 
-    log(`✅ Phase 4 complete: VYASA report written`)
+    log(`✅ Phase 4 complete: SCRIBE report written`)
     logEvent('PHASE_DONE', { taskId, phase: 'report' })
-    logActivity('SANJAY', `✅ Phase 4 complete: VYASA report written`, {
+    logActivity('NEXUS', `✅ Phase 4 complete: SCRIBE report written`, {
       type: 'phase-complete', squad, taskId, projectId: projectId || '',
-      details: `VYASA: ${(vyasaResult.code === 0 || vyasaResult.code === 1) ? '✅' : '❌'}`
+      details: `SCRIBE: ${(scribeResult.code === 0 || scribeResult.code === 1) ? '✅' : '❌'}`
     })
     updateProgress(90, 'Phase 4 complete — report written')
 
@@ -6583,7 +6583,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
     } catch {}
 
     log(`💰 Total pentest task cost: $${totalCost.toFixed(4)}`)
-    logActivity('SANJAY', `💰 Total pentest task cost: $${totalCost.toFixed(4)}`, {
+    logActivity('NEXUS', `💰 Total pentest task cost: $${totalCost.toFixed(4)}`, {
       type: 'cost-total', squad, taskId, projectId: projectId || '',
       details: `Total: $${totalCost.toFixed(4)}\n${allCosts.map(c => `${c.agent}: $${c.totalCost.toFixed(4)}`).join('\n')}`
     })
@@ -6593,7 +6593,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
 
   } catch (e) {
     log(`❌ Pentest parallel dispatch failed: ${e.message}`)
-    logActivity('SANJAY', `❌ Pentest parallel dispatch failed: ${e.message}`, {
+    logActivity('NEXUS', `❌ Pentest parallel dispatch failed: ${e.message}`, {
       type: 'error', squad, taskId, projectId: projectId || '',
     })
     delete _taskMissedSignals[taskId]
@@ -6757,10 +6757,10 @@ async function dispatchStocksParallel(dispatch) {
     // Split analysts into 2 batches of 3 to avoid resource exhaustion (6 parallel Opus calls = OOM/throttle)
     // 2 waves of 3 (was 3 waves of 2). 3 concurrent Sonnet analysts ≈ 1.1GB RAM — safe on this
     // box (≥5GB free), within the tested 4-concurrent ceiling. Halves the wave count so one slow
-    // analyst (e.g. BHISHMA) blocks fewer downstream waves; the activity-stall watchdog caps a
+    // analyst (e.g. veteran) blocks fewer downstream waves; the activity-stall watchdog caps a
     // hung agent at ~22min regardless. (2026-06-08)
     const batch1 = STOCKS_ANALYSTS.slice(0, 3) // narad, surya, lakshmi
-    const batch2 = STOCKS_ANALYSTS.slice(3, 6) // vayu, drona, bhishma
+    const batch2 = STOCKS_ANALYSTS.slice(3, 6) // vayu, analyst, veteran
     const batch3 = STOCKS_ANALYSTS.slice(6)    // (empty — kept for back-compat with the block below)
     
     // Phase 1 skip check — if analysts already done (resume mode), jump to synthesis
@@ -6770,7 +6770,7 @@ async function dispatchStocksParallel(dispatch) {
     } else {
     log(`🔄 Phase 1a: Dispatching batch 1 (${batch1.map(a=>a.toUpperCase()).join(', ')}) for "${taskTitle}"`)
     logEvent('PHASE_START', { taskId, phase: 'analysts-1a', agents: batch1.map(a => a.toUpperCase()) })
-    logActivity('SANJAY', `🔄 Phase 1: Dispatching ${STOCKS_ANALYSTS.length} analysts (2 waves of 3)`, {
+    logActivity('NEXUS', `🔄 Phase 1: Dispatching ${STOCKS_ANALYSTS.length} analysts (2 waves of 3)`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
       details: `Batch 1: ${batch1.map(a => a.toUpperCase()).join(', ')}\nBatch 2: ${batch2.map(a => a.toUpperCase()).join(', ')}\nBatch 3: ${batch3.map(a => a.toUpperCase()).join(', ')}\nTask: ${taskTitle}`
     })
@@ -6809,7 +6809,7 @@ async function dispatchStocksParallel(dispatch) {
     
     const successCount = analystResults.filter(r => (r.code === 0 || r.code === 1)).length
     log(`✅ Phase 1 complete: ${successCount}/${STOCKS_ANALYSTS.length} analysts succeeded`)
-    logActivity('SANJAY', `✅ Phase 1 complete: ${successCount}/${STOCKS_ANALYSTS.length} analysts`, {
+    logActivity('NEXUS', `✅ Phase 1 complete: ${successCount}/${STOCKS_ANALYSTS.length} analysts`, {
       type: 'phase-complete', squad, taskId, projectId: projectId || '',
       details: analystResults.map(r => `${r.agentName.toUpperCase()}: ${(r.code === 0 || r.code === 1) ? '✅' : '❌'}`).join(', ')
     })
@@ -6820,7 +6820,7 @@ async function dispatchStocksParallel(dispatch) {
       const budget = getCostBudget(squad)
       if (totalCost > budget) {
         log(`💰 BUDGET EXCEEDED: $${totalCost.toFixed(2)} > $${budget} limit for ${squad}`)
-        logActivity('SANJAY', `💰 Budget exceeded — continuing to synthesis but skipping retries`, { type: 'budget-exceeded', squad, taskId })
+        logActivity('NEXUS', `💰 Budget exceeded — continuing to synthesis but skipping retries`, { type: 'budget-exceeded', squad, taskId })
         _enforceBudgetCap(taskId, squad, totalCost, budget, taskTitle)
         budgetExceeded = true
       }
@@ -6861,7 +6861,7 @@ async function dispatchStocksParallel(dispatch) {
     } else {
     log(`🔄 Phase 2: CHANAKYA synthesizing analyst findings`)
     logEvent('PHASE_START', { taskId, phase: 'synthesis-2', agents: ['CHANAKYA'] })
-    logActivity('SANJAY', `🔄 Phase 2: CHANAKYA synthesizing`, {
+    logActivity('NEXUS', `🔄 Phase 2: CHANAKYA synthesizing`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
       details: 'CHANAKYA reading all analyst reports and creating initial synthesis'
     })
@@ -6883,12 +6883,12 @@ async function dispatchStocksParallel(dispatch) {
       updateProgress(75, 'Phase 3 skipped')
     } else if (budgetExceeded) {
       log(`💰 Skipping Phase 3 challengers — budget exceeded ($${totalCost.toFixed(2)})`)
-      logActivity('SANJAY', `💰 Phase 3 skipped — budget exceeded`, { type: 'budget-skip', squad, taskId })
+      logActivity('NEXUS', `💰 Phase 3 skipped — budget exceeded`, { type: 'budget-skip', squad, taskId })
       updateProgress(75, 'Phase 3 skipped — budget exceeded')
     } else {
     log(`🔄 Phase 3: Dispatching ${STOCKS_CHALLENGERS.length} challengers in parallel`)
     logEvent('PHASE_START', { taskId, phase: 'challengers-3', agents: STOCKS_CHALLENGERS.map(a => a.toUpperCase()) })
-    logActivity('SANJAY', `🔄 Phase 3: Dispatching challengers`, {
+    logActivity('NEXUS', `🔄 Phase 3: Dispatching challengers`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
       details: `Challengers: ${STOCKS_CHALLENGERS.map(a => a.toUpperCase()).join(', ')}`
     })
@@ -6910,7 +6910,7 @@ async function dispatchStocksParallel(dispatch) {
     // ── PHASE 4: CHANAKYA Final Dossier ──
     log(`🔄 Phase 4: CHANAKYA writing final dossier`)
     logEvent('PHASE_START', { taskId, phase: 'final-dossier-4', agents: ['CHANAKYA'] })
-    logActivity('SANJAY', `🔄 Phase 4: CHANAKYA final dossier`, {
+    logActivity('NEXUS', `🔄 Phase 4: CHANAKYA final dossier`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
       details: 'CHANAKYA incorporating all findings into final institutional-grade dossier'
     })
@@ -6973,7 +6973,7 @@ async function dispatchStocksParallel(dispatch) {
     } catch {}
     
     log(`💰 Total task cost: $${totalCost.toFixed(4)}`)
-    logActivity('SANJAY', `💰 Total task cost: $${totalCost.toFixed(4)}`, {
+    logActivity('NEXUS', `💰 Total task cost: $${totalCost.toFixed(4)}`, {
       type: 'cost-total', squad, taskId, projectId: projectId || '',
       details: `Total: $${totalCost.toFixed(4)}\n${allCosts.map(c => `${c.agent}: $${c.totalCost.toFixed(4)}`).join('\n')}`
     })
@@ -6982,7 +6982,7 @@ async function dispatchStocksParallel(dispatch) {
     
   } catch (e) {
     log(`❌ Stocks parallel dispatch failed: ${e.message}`)
-    logActivity('SANJAY', `❌ Parallel dispatch failed: ${e.message}`, {
+    logActivity('NEXUS', `❌ Parallel dispatch failed: ${e.message}`, {
       type: 'error', squad, taskId, projectId: projectId || '',
     })
     return { totalCost, allCosts }
@@ -7014,12 +7014,12 @@ function extractFailureContext(taskActivity, expectationText) {
 // Fallback to a hardcoded roster ONLY if the cache is empty — this prevents a config
 // reload blip from silently misattributing during the window.
 const _fallbackAgentIds = [
-  'krishna','chanakya','arjun','bheem','nakul','sahdev','karna',
-  'draupadi','dharma','vyasa','agni','indra','maya','rudra','kubera',
-  'yuyutsu','shalya','ghatotkacha','ashwatthama','abhimanyu','kripa',
-  'eklavya','satyaki','parashurama','varuna',
-  'narad','surya','lakshmi','vayu','drona','bhishma',
-  'shakuni','vidura','vishnu','dharmaraj','sanjay','rof',
+  'atlas','chanakya','scout','relay','viper','gateway','drill',
+  'warden','sentry','scribe','agni','indra','maya','ranger','kubera',
+  'ledger','shalya','ghatotkacha','forge','vault','auditor',
+  'tracer','keyring','parashurama','varuna',
+  'narad','surya','lakshmi','vayu','analyst','veteran',
+  'shakuni','vidura','vishnu','arbiter','nexus','command',
 ]
 function _getAllAgentIds() {
   try {
@@ -7172,7 +7172,7 @@ CRITICAL CONSTRAINTS:
       status: 'pending',
       progress: 0,
       squad: 'main-squad',
-      assignee: 'ROF',
+      assignee: 'COMMAND',
       priority: 'low',
       projectId: '',
       createdAt: parseInt(repairTaskId),
@@ -7184,7 +7184,7 @@ CRITICAL CONSTRAINTS:
       id: 'repair-' + repairTaskId,
       taskId: repairTaskId,
       taskTitle: 'Auto-Repair: ' + agentId.toUpperCase() + ' SKILL.md',
-      assignee: 'ROF',
+      assignee: 'COMMAND',
       squad: 'main-squad',
       status: 'pending',
       priority: 'low',
@@ -7447,7 +7447,7 @@ CRITICAL CONSTRAINTS:
         status: 'pending',
         progress: 0,
         squad: 'main-squad',
-        assignee: 'ROF',
+        assignee: 'COMMAND',
         priority: 'high',
         projectId: '',
         createdAt: parseInt(repairTaskId),
@@ -7463,7 +7463,7 @@ CRITICAL CONSTRAINTS:
         id: `repair-${repairTaskId}`,
         taskId: repairTaskId,
         taskTitle: `Auto-Repair: ${targetAgent.toUpperCase()}`,
-        assignee: 'ROF',
+        assignee: 'COMMAND',
         squad: 'main-squad',
         status: 'pending',
         priority: 'high',
@@ -7592,8 +7592,8 @@ async function extractAndSavePentestReport(taskId, squad = 'pentest') {
         const targetMatch = task ? (task.title || '').match(/[\w.-]+\.[\w.-]+\.\w+/) : null
         const targetDomain = targetMatch ? targetMatch[0] : null
         if (!targetDomain || reportContent.includes(targetDomain)) {
-          // (2026-04-20) KRIPA escalation: run cleanReportForPublish on the copied
-          // content. Was previously a bypass path — if VYASA slipped and left
+          // (2026-04-20) AUDITOR escalation: run cleanReportForPublish on the copied
+          // content. Was previously a bypass path — if SCRIBE slipped and left
           // agent names in FINAL-REPORT.md, they'd land in the published report.
           const rawContent = fs.readFileSync(candidatePath, 'utf-8')
           const cleaned = cleanReportForPublish(rawContent)
@@ -7611,7 +7611,7 @@ async function extractAndSavePentestReport(taskId, squad = 'pentest') {
     const entries = readTaskActivity(taskId);
     if (!entries.length) return;
 
-    // Try FULL_REPORT entry first (if VYASA wrote one)
+    // Try FULL_REPORT entry first (if SCRIBE wrote one)
     for (const e of [...entries].reverse()) {
       if (e.action === 'FULL_REPORT' && e.details) {
         // (2026-04-20) bypass-path fix — run cleanReportForPublish before writing.
@@ -7631,7 +7631,7 @@ async function extractAndSavePentestReport(taskId, squad = 'pentest') {
     for (const e of entries) {
       const ag = e.agent || '';
       const ac = String(e.action || '');
-      if (ag === 'KRIPA' && ac.startsWith('CONFIRMED')) {
+      if (ag === 'AUDITOR' && ac.startsWith('CONFIRMED')) {
         const sevM = ac.match(/severity:\s*(\w+)/i);
         const cvssM = ac.match(/CVSS:\s*([\d.]+)/i);
         const epM = ac.match(/endpoint:\s*([^|]+)/i);
@@ -7643,7 +7643,7 @@ async function extractAndSavePentestReport(taskId, squad = 'pentest') {
           severityCounts[sev] = (severityCounts[sev] || 0) + 1;
         }
       }
-      if (ag === 'VYASA') {
+      if (ag === 'SCRIBE') {
         if (ac.includes('Executive Summary')) execSummary = ac.split('Executive Summary:')[1]?.trim().slice(0, 500) || '';
         else if (ac.includes('Overall Risk')) overallRisk = ac.split('Overall Risk:')[1]?.trim().slice(0, 50) || '';
         else if (ac.includes('Tools used')) tools = ac.split('Tools used:')[1]?.trim().slice(0, 400) || '';
@@ -7692,16 +7692,16 @@ ${sevOrder.map(s => `| ${sevEmoji[s]} ${s} | ${severityCounts[s] || 0} |`).join(
 ## Scope & Coverage
 
 **Target:** ${target}  
-**Findings Confirmed:** ${findings.length} (KRIPA validated — 0 false positives)
+**Findings Confirmed:** ${findings.length} (AUDITOR validated — 0 false positives)
 
 ### What Was Tested
-- ✅ Phase 0 — Session/Auth (SATYAKI)
-- ✅ Phase 0.5 — Surface Discovery (EKLAVYA)
-- ✅ Phase 1 — Recon (ARJUN + RUDRA)
+- ✅ Phase 0 — Session/Auth (KEYRING)
+- ✅ Phase 0.5 — Surface Discovery (TRACER)
+- ✅ Phase 1 — Recon (SCOUT + RANGER)
 - ✅ Phase 2 — SQL Injection, XSS, SSRF, IDOR, RCE/CMDi, LFI
 - ✅ Phase 3 — Security Headers, CSRF, Misconfigs, Cloud, APIs
-- ✅ Phase 3.5 — False Positive Validation (KRIPA)
-- ✅ Phase 4 — Final Report (VYASA)
+- ✅ Phase 3.5 — False Positive Validation (AUDITOR)
+- ✅ Phase 4 — Final Report (SCRIBE)
 
 ---
 
@@ -7722,12 +7722,12 @@ ${tools || 'nmap, crawl4ai, gau, katana, ffuf, gospider, nuclei, dalfox'}
 
 ---
 
-*Report generated by KURUKSHETRA Pentest AI | Report Writer*
+*Report generated by ARCHON Pentest AI | Report Writer*
 *Date: ${date} | Confirmed Findings: ${findings.length}*
 `;
     // (2026-04-20) bypass-path fix — run cleanReportForPublish before writing
     // the reconstructed report too. This path builds a template that references
-    // internal agents (KRIPA, VYASA, SATYAKI, EKLAVYA, ARJUN, RUDRA, etc) so
+    // internal agents (AUDITOR, SCRIBE, KEYRING, TRACER, SCOUT, RANGER, etc) so
     // it always needs scrubbing.
     const cleaned = cleanReportForPublish(report)
     fs.writeFileSync(reportPath, cleaned, 'utf8');
@@ -7763,7 +7763,7 @@ async function smartRetry(taskId, taskTitle, squad, projectId, gradeResult, disp
   const alreadyRetried = Number(dispatch?.smartRetryCount || 0)
   if (alreadyRetried >= SMART_RETRY_MAX) {
     log(`🛑 Smart retry cap reached for ${taskTitle} (${alreadyRetried}/${SMART_RETRY_MAX}) — accepting ${passRate}%`)
-    logActivity('SANJAY', `🛑 Retry cap reached (${alreadyRetried}/${SMART_RETRY_MAX}) — accepting ${passRate}%`, {
+    logActivity('NEXUS', `🛑 Retry cap reached (${alreadyRetried}/${SMART_RETRY_MAX}) — accepting ${passRate}%`, {
       type: 'retry-cap-reached', squad, taskId, projectId: projectId || '',
       details: `Cost-safety cap to prevent bomb-loop. Task graded ${passRate}% after ${alreadyRetried} retries.`,
     })
@@ -7775,7 +7775,7 @@ async function smartRetry(taskId, taskTitle, squad, projectId, gradeResult, disp
   if (failed.length === 0) return null
 
   log(`🔄 Smart retry for ${taskTitle} (${passRate}% → targeting 95%+, attempt ${alreadyRetried + 1}/${SMART_RETRY_MAX})`)
-  logActivity('SANJAY', `🔄 Smart retry: ${failed.length} gaps detected`, {
+  logActivity('NEXUS', `🔄 Smart retry: ${failed.length} gaps detected`, {
     type: 'smart-retry', squad, taskId, projectId: projectId || '',
     details: `Current: ${passRate}%\nFailed: ${failed.map(f => f.text).join(', ').slice(0, 300)}`
   })
@@ -7787,7 +7787,7 @@ async function smartRetry(taskId, taskTitle, squad, projectId, gradeResult, disp
   const hasFinalDossier = taskActivity.includes('Final Dossier') || taskActivity.includes('FULL_REPORT')
 
   // Check if analyst data exists (for stocks)
-  const hasAnalystData = ['NARAD', 'SURYA', 'LAKSHMI', 'VAYU', 'DRONA', 'BHISHMA'].some(a =>
+  const hasAnalystData = ['NARAD', 'SURYA', 'LAKSHMI', 'VAYU', 'analyst', 'veteran'].some(a =>
     taskActivity.includes(a)
   )
 
@@ -7798,7 +7798,7 @@ async function smartRetry(taskId, taskTitle, squad, projectId, gradeResult, disp
 
   // For pentest: check if findings exist
   const hasFindings = taskActivity.includes('SUSPECTED') || taskActivity.includes('CONFIRMED')
-  const hasReport = taskActivity.includes('FULL_REPORT') || taskActivity.includes('VYASA')
+  const hasReport = taskActivity.includes('FULL_REPORT') || taskActivity.includes('SCRIBE')
 
   // (2026-04-19 architect review GAP-1) — use gate style not squad-name literal.
   // analysis = stocks-like retry (gap-fix), security = pentest-like retry (failed-class rerun).
@@ -7821,7 +7821,7 @@ async function smartRetry(taskId, taskTitle, squad, projectId, gradeResult, disp
       const prompt = `You are CHANAKYA, CIO of ${squad}. Phase: final. Task: ${taskTitle}. TaskID: ${taskId}.
 ${goalLine}Read your skill: cat ${agentPaths.skillsDir('chanakya')}/*/SKILL.md
 Read workflows: cat ${agentPaths.skillsDir('chanakya')}/*/workflows/*.md 2>/dev/null
-Read ALL analyst and challenger findings (filtered): grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -v SANJAY | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'dispatch' | grep -v 'Spawning' | grep -v 'recovery' | grep -v 'budget' | grep -v 'Phase'
+Read ALL analyst and challenger findings (filtered): grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -v NEXUS | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'dispatch' | grep -v 'Spawning' | grep -v 'recovery' | grep -v 'budget' | grep -v 'Phase'
 Read memory: cat ${agentPaths.lessonsPath('chanakya')} 2>/dev/null
 
 CRITICAL: Write ONE comprehensive Final Dossier with ALL 20 sections. This is a RETRY — analysts already ran, their data is in the activity log above. Synthesize everything into the golden template.
@@ -7886,7 +7886,7 @@ ${goalLine}
 GRADING RESULT: ${passRate}% — THESE SECTIONS/CHECKS FAILED:
 ${gapList}
 
-Read ALL existing findings (filtered): grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -v SANJAY | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'dispatch' | grep -v 'Spawning' | grep -v 'recovery' | grep -v 'budget' | grep -v 'Phase'
+Read ALL existing findings (filtered): grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -v NEXUS | grep -v 'Quality Score' | grep -v 'Cost:' | grep -v 'dispatch' | grep -v 'Spawning' | grep -v 'recovery' | grep -v 'budget' | grep -v 'Phase'
 Read your skill: cat ${agentPaths.skillsDir('chanakya')}/*/SKILL.md
 Read workflows: cat ${agentPaths.skillsDir('chanakya')}/*/workflows/*.md 2>/dev/null
 
@@ -7951,13 +7951,13 @@ Execute now.`
     } catch {}
 
     if (hasFindings && !hasReport) {
-      // Findings exist but VYASA report missing
-      log(`  🔍 Findings OK, report missing → re-running VYASA only`)
+      // Findings exist but SCRIBE report missing
+      log(`  🔍 Findings OK, report missing → re-running SCRIBE only`)
 
       // (2026-04-27) Use shared extractor.
       const targetUrl = extractTargetUrl({ taskTitle, description: dispatch.description, goal: dispatch.goal, config: dispatch.config }) || 'UNKNOWN'
 
-      const prompt = `You are VYASA, the Final Report Writer for ${squad}.
+      const prompt = `You are SCRIBE, the Final Report Writer for ${squad}.
 
 ## CRITICAL LENGTH REQUIREMENT (Opus 4.7 reminder)
 Produce a comprehensive 40KB+ markdown report. Complete curl commands per finding, full CVSS:3.1 vectors, OWASP mapping, remediation + verification per finding. Do NOT abbreviate.
@@ -7966,17 +7966,17 @@ Target: ${targetUrl}
 Task: ${taskTitle}
 TaskID: ${taskId}
 
-Read your skill: cat ${agentPaths.skillsDir('vyasa')}/*/SKILL.md
-Read platform templates: cat ${agentPaths.skillsDir('vyasa')}/*/references/platform-templates.md 2>/dev/null
-Read ALL confirmed findings: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -iE 'CONFIRMED|KRIPA'
+Read your skill: cat ${agentPaths.skillsDir('scribe')}/*/SKILL.md
+Read platform templates: cat ${agentPaths.skillsDir('scribe')}/*/references/platform-templates.md 2>/dev/null
+Read ALL confirmed findings: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -iE 'CONFIRMED|AUDITOR'
 
 Write the FULL pentest report to ACTIVITY-LOG.jsonl with taskId=${taskId}.
 Execute now.`
 
-      // (2026-04-20) Defer to modelRouter (VYASA → report role → balanced/high).
+      // (2026-04-20) Defer to modelRouter (SCRIBE → report role → balanced/high).
       const model = modelOverride || null
-      const result = await spawnAgent('vyasa', taskId, prompt, `task-${taskId}-vyasa-smartretry`, model)
-      return { retryType: 'vyasa-report-only', cost: result.cost }
+      const result = await spawnAgent('scribe', taskId, prompt, `task-${taskId}-scribe-smartretry`, model)
+      return { retryType: 'scribe-report-only', cost: result.cost }
     }
 
     if (!hasFindings) {
@@ -8013,7 +8013,7 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
     
     // Collect all activity text for this task (fast path via per-task log)
     const taskEntries = readTaskActivity(taskId)
-      .filter(e => e && e.agent !== 'SANJAY' && !String(e.action || '').includes('Quality Score'))
+      .filter(e => e && e.agent !== 'NEXUS' && !String(e.action || '').includes('Quality Score'))
 
     // Also include the saved final report file — newer agents on Opus 4.7 sometimes skip
     // the duplicate ACTIVITY-LOG FULL_REPORT entry, so reading the file covers both paths.
@@ -8047,7 +8047,7 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
     }
 
     // (2026-04-20) Squads sometimes write dossier to a custom path (e.g.
-    // CHANAKYA-TICKER-V2-DATE.md for stocks, or VYASA-TARGET-DATE.md for pentest).
+    // CHANAKYA-TICKER-V2-DATE.md for stocks, or SCRIBE-TARGET-DATE.md for pentest).
     // Fallback: include the freshest large *.md modified within the last 10 min
     // under ALL known squad report dirs + /root/intel/reports/. Prevents a grader
     // false-negative from a path mismatch. Only kicks in when no content found yet.
@@ -8108,10 +8108,10 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
     // Also skip coverage expectations if agents report limited surface (avg self-eval < 6)
     const agentsRan = new Set(taskEntries.map(e => (e.agent || '').toUpperCase()))
     const agentExpMap = {
-      'bheem': 'BHEEM', 'draupadi': 'DRAUPADI', 'abhimanyu': 'ABHIMANYU',
-      'nakul': 'NAKUL', 'karna': 'KARNA', 'sahdev': 'SAHDEV', 'dharma': 'DHARMA',
-      'ashwatthama': 'ASHWATTHAMA', 'yuyutsu': 'YUYUTSU', 'kritavarma': 'KRITAVARMA',
-      'shikhandi': 'SHIKHANDI', 'rudra': 'RUDRA', 'arjun': 'ARJUN'
+      'relay': 'RELAY', 'warden': 'WARDEN', 'vault': 'VAULT',
+      'viper': 'VIPER', 'drill': 'DRILL', 'gateway': 'GATEWAY', 'sentry': 'SENTRY',
+      'forge': 'FORGE', 'ledger': 'LEDGER', 'spectre': 'SPECTRE',
+      'decoy': 'DECOY', 'ranger': 'RANGER', 'scout': 'SCOUT'
     }
 
     const gradeResults = bestEval.expectations.map(exp => {
@@ -8178,8 +8178,8 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
       } else if (expLower.includes('52') && (expLower.includes('week') || expLower.includes('w'))) {
         passed = /52[\s-]*(week|w)[\s-]*(high|low)|52wk|yearly (high|low)/i.test(taskActivity)
         matchRate = passed ? 100 : 0
-      } else if (expLower.includes('sub-agent') || expLower.includes('narad') || expLower.includes('surya') || expLower.includes('lakshmi') || expLower.includes('vayu') || expLower.includes('saraswati') || expLower.includes('vishnu') || expLower.includes('drona') || expLower.includes('bhishma') || expLower.includes('shakuni') || expLower.includes('vidura')) {
-        const agents = ['narad', 'surya', 'lakshmi', 'vayu', 'saraswati', 'vishnu', 'drona', 'bhishma', 'shakuni', 'vidura']
+      } else if (expLower.includes('sub-agent') || expLower.includes('narad') || expLower.includes('surya') || expLower.includes('lakshmi') || expLower.includes('vayu') || expLower.includes('saraswati') || expLower.includes('vishnu') || expLower.includes('analyst') || expLower.includes('veteran') || expLower.includes('shakuni') || expLower.includes('vidura')) {
+        const agents = ['narad', 'surya', 'lakshmi', 'vayu', 'saraswati', 'vishnu', 'analyst', 'veteran', 'shakuni', 'vidura']
         const mentioned = agents.filter(a => expLower.includes(a))
         passed = mentioned.some(a => new RegExp(a, 'i').test(taskActivity))
         matchRate = passed ? 100 : 0
@@ -8290,8 +8290,8 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
       } else if (expLower.includes('suspected') || (expLower.includes('finding') && !expLower.includes('each') && !expLower.includes('owasp') && !expLower.includes('total'))) {
         passed = /suspected|Suspected-High|Suspected-Medium|possible.*vuln|potentially vulnerable|finding.*identified|confirmed.*finding|\d+.*finding/i.test(taskActivity)
         matchRate = passed ? 100 : 0
-      } else if (expLower.includes('kripa') && expLower.includes('validat')) {
-        passed = /kripa|validator|validat.*finding|false.*positive|confirm.*finding/i.test(taskActivity)
+      } else if (expLower.includes('auditor') && expLower.includes('validat')) {
+        passed = /auditor|validator|validat.*finding|false.*positive|confirm.*finding/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('sqli') || (expLower.includes('sql') && expLower.includes('inject'))) {
         passed = /sql.*inject|sqli|injection.*detected|error.*sql|time.*based.*inject|boolean.*inject/i.test(taskActivity)
@@ -8347,8 +8347,8 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
       } else if (expLower.includes('remediat') || expLower.includes('recommend')) {
         passed = /remediat|recommend|fix.*vuln|mitigation|patch|how.*to.*fix/i.test(taskActivity)
         matchRate = passed ? 100 : 0
-      } else if (expLower.includes('vyasa') && expLower.includes('report')) {
-        passed = /vyasa|final.*report|pentest.*report|executive.*summary.*pentest/i.test(taskActivity)
+      } else if (expLower.includes('scribe') && expLower.includes('report')) {
+        passed = /scribe|final.*report|pentest.*report|executive.*summary.*pentest/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('login') || expLower.includes('session') || expLower.includes('authenticat')) {
         passed = /login.*success|session.*stored|authenticated|cookie.*stored|jwt.*stored|pentest-session\.json/i.test(taskActivity)
@@ -8369,20 +8369,20 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
         passed = /oob|interactsh|callback|collaborator|dns.*exfil|blind.*callback/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('parameter') && expLower.includes('discover')) {
-        passed = /arjun.*param|parameter.*discover|param.*found|hidden.*param|ffuf.*param/i.test(taskActivity)
+        passed = /scout.*param|parameter.*discover|param.*found|hidden.*param|ffuf.*param/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('master.*endpoint') || expLower.includes('endpoint.*map')) {
-        passed = /endpoint.*map|master.*endpoint|endpoint.*summary|EKLAVYA.*Endpoint/i.test(taskActivity)
+        passed = /endpoint.*map|master.*endpoint|endpoint.*summary|TRACER.*Endpoint/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('not vulnerable') || expLower.includes('no.*finding')) {
         passed = /not.*vulnerable|no.*vuln.*found|clean|no.*issues|0.*finding/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       // ── GENERIC SECURITY CHECK PATTERNS (work for any app) ──
       } else if (expLower.includes('authentication') && expLower.includes('session management')) {
-        passed = /session|auth|login|logout|cookie|jwt|token|satyaki/i.test(taskActivity)
+        passed = /session|auth|login|logout|cookie|jwt|token|keyring/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('information disclosure') || expLower.includes('error handling')) {
-        passed = /disclosure|phpinfo|debug|error.*page|stack trace|version.*disclosed|ashwatthama|server.*version/i.test(taskActivity)
+        passed = /disclosure|phpinfo|debug|error.*page|stack trace|version.*disclosed|forge|server.*version/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('security headers') || expLower.includes('x-frame-options') || expLower.includes('x.frame.options')) {
         passed = /x-frame-options|content-security-policy|csp|hsts|strict-transport|x-content-type/i.test(taskActivity)
@@ -8391,13 +8391,13 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
         passed = /httponly|secure.*flag|samesite|cookie.*flag|cookie.*secure/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('file inclusion') || expLower.includes('path traversal') || (expLower.includes('lfi') && !expLower.includes('showimage'))) {
-        passed = /lfi|path.*traversal|file.*inclusion|directory.*traversal|abhimanyu/i.test(taskActivity)
+        passed = /lfi|path.*traversal|file.*inclusion|directory.*traversal|vault/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       } else if (expLower.includes('http parameter pollution') || expLower.includes('input validation') || expLower.includes('hpp')) {
-        passed = /hpp|parameter.*pollution|input.*validation|nakul/i.test(taskActivity)
+        passed = /hpp|parameter.*pollution|input.*validation|viper/i.test(taskActivity)
         matchRate = passed ? 100 : 0
-      } else if (expLower.includes('kripa') && expLower.includes('validation')) {
-        passed = /kripa|false.positive|confirmed.*finding|phase 3\.5/i.test(taskActivity)
+      } else if (expLower.includes('auditor') && expLower.includes('validation')) {
+        passed = /auditor|false.positive|confirmed.*finding|phase 3\.5/i.test(taskActivity)
         matchRate = passed ? 100 : 0
       // ── LEGACY testphp-specific patterns (kept for backward compat) ──
       } else if (expLower.includes('newuser') || expLower.includes('secured/newuser')) {
@@ -8454,7 +8454,7 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
         llmRefined = refOut.llmRefined || 0
         if (llmRefined > 0) {
           log(`🧠 LLM refined ${llmRefined} regex-failed expectations`)
-          logActivity('SANJAY', `🧠 LLM grader refined ${llmRefined} expectations`, {
+          logActivity('NEXUS', `🧠 LLM grader refined ${llmRefined} expectations`, {
             type: 'grade-refined', squad, taskId, details: `${llmRefined} items promoted from regex-FAIL to LLM-PASS with evidence_quote`
           })
         } else if (refOut.disabled || refOut.reason === 'no-api-key-for-llm-fallback') {
@@ -8538,10 +8538,10 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
       })
     } catch {}
 
-    // Grade-KRIPA correlation: count per-specialist confirmed findings
+    // Grade-AUDITOR correlation: count per-specialist confirmed findings
     // This lets the quality tracker and learning loop see which agents' findings
-    // survive KRIPA validation vs get killed — a measure of finding quality, not just quantity.
-    const kripaCorrelation = {}
+    // survive AUDITOR validation vs get killed — a measure of finding quality, not just quantity.
+    const auditorCorrelation = {}
     try {
       const vfPath = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
       if (fs.existsSync(vfPath)) {
@@ -8549,7 +8549,7 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
           try {
             const f = JSON.parse(line)
             const ag = (f.original_agent || '').toLowerCase()
-            if (ag) kripaCorrelation[ag] = (kripaCorrelation[ag] || 0) + 1
+            if (ag) auditorCorrelation[ag] = (auditorCorrelation[ag] || 0) + 1
           } catch {}
         })
       }
@@ -8573,7 +8573,7 @@ async function gradeTask(agentId, taskId, squad, dispatch) {
     if (isa && Number.isFinite(isa.passRate)) {
       effPassRate = Number.isFinite(passRate) ? Math.round((passRate + isa.passRate) / 2) : isa.passRate
     }
-    return { passRate: effPassRate, genericPassRate: passRate, rawPassRate, severityMultiplier, passedCount, totalExp, gradeResults: gradeResultsFinal, llmRefined, kripaCorrelation, isa }
+    return { passRate: effPassRate, genericPassRate: passRate, rawPassRate, severityMultiplier, passedCount, totalExp, gradeResults: gradeResultsFinal, llmRefined, auditorCorrelation, isa }
 
   } catch (e) {
     log(`⚠️ Grading failed: ${e.message}`)
@@ -8755,41 +8755,41 @@ async function runSeparateGrader(taskId, taskTitle, squad) {
 // (~$100+ burned). Block recovery when: (a) a final report already exists for the task, OR
 // (b) ≥2 recovery dispatches already exist for it (a stuck-status loop, not a real orphan).
 // ── White-box adapter: normalize code-review findings → VALIDATED-FINDINGS jsonl ──
-// The code-review dispatcher emits only markdown (phase2/KRIPA-VERDICTS.md + per-feature
+// The code-review dispatcher emits only markdown (phase2/AUDITOR-VERDICTS.md + per-feature
 // reports). For a code-review iteration to aggregate into a combined white+black
-// engagement (and feed the merged VYASA report), its confirmed findings must land in
+// engagement (and feed the merged SCRIBE report), its confirmed findings must land in
 // VALIDATED-FINDINGS-<taskId>.jsonl — the format findingsForTask/the report reader use.
-// One cheap KRIPA pass converts the markdown verdicts into that jsonl. FAIL-SOFT:
+// One cheap AUDITOR pass converts the markdown verdicts into that jsonl. FAIL-SOFT:
 // any error logs and returns; the iteration still has its own FINAL-REPORT.
 async function normalizeCodeReviewFindings(taskId, outDir, deployUrl) {
   try {
     if (!outDir) outDir = `${agentPaths.INTEL_ROOT}/code-review/${taskId}`
-    const verdictsFile = `${outDir}/phase2/KRIPA-VERDICTS.md`
-    if (!fs.existsSync(verdictsFile)) { log(`🔁 cr-normalize: no KRIPA-VERDICTS for ${taskId} — skipping`); return }
+    const verdictsFile = `${outDir}/phase2/AUDITOR-VERDICTS.md`
+    if (!fs.existsSync(verdictsFile)) { log(`🔁 cr-normalize: no AUDITOR-VERDICTS for ${taskId} — skipping`); return }
     const outFile = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
-    const prompt = `You are KRIPA. Convert the white-box code-review verdicts into machine-readable validated findings for the engagement aggregator.
+    const prompt = `You are AUDITOR. Convert the white-box code-review verdicts into machine-readable validated findings for the engagement aggregator.
 
 Read:
 - ${verdictsFile} (table: feature | class | finding | verdict | evidence)
 - the cited per-feature reports under ${outDir}/phase2/**/*.md (file:line traces, CVSS, impact, remediation)
-${deployUrl ? `- ${outDir}/phase2/UTTARA-RUNTIME.md if present (runtime confirmation against ${deployUrl})` : ''}
+${deployUrl ? `- ${outDir}/phase2/PROBER-RUNTIME.md if present (runtime confirmation against ${deployUrl})` : ''}
 
-Keep ONLY verdicts that are CONFIRMED or NEEDS-LIVE (treat NEEDS-LIVE as CONFIRMED only if UTTARA reproduced it live; otherwise still include it as CONFIRMED source-side). OMIT DISPROVEN.
+Keep ONLY verdicts that are CONFIRMED or NEEDS-LIVE (treat NEEDS-LIVE as CONFIRMED only if PROBER reproduced it live; otherwise still include it as CONFIRMED source-side). OMIT DISPROVEN.
 
 Write STRICT JSON, ONE object per line, to ${outFile} (overwrite). Each line:
-{"id":"CR-<n>","title":"...","severity":"Critical|High|Medium|Low|Info","cvss_score":<number>,"cvss_vector":"CVSS:3.1/...","url":"<live URL if UTTARA reproduced it, else empty string>","file":"<source path>","line":<number>,"original_agent":"<phase2 specialist>","validation_status":"CONFIRMED","reproduction_method":"<file:line trace + curl/UTTARA step if live>","reproduction_result":"<evidence>","taskId":"${taskId}","source":"code-review-normalizer"}
+{"id":"CR-<n>","title":"...","severity":"Critical|High|Medium|Low|Info","cvss_score":<number>,"cvss_vector":"CVSS:3.1/...","url":"<live URL if PROBER reproduced it, else empty string>","file":"<source path>","line":<number>,"original_agent":"<phase2 specialist>","validation_status":"CONFIRMED","reproduction_method":"<file:line trace + curl/PROBER step if live>","reproduction_result":"<evidence>","taskId":"${taskId}","source":"code-review-normalizer"}
 
 EVERY line MUST include "taskId":"${taskId}" and "validation_status":"CONFIRMED". Write ONLY that file, then reply one line: wrote N validated findings.`
-    log(`🔁 cr-normalize: KRIPA → VALIDATED-FINDINGS-${taskId}.jsonl`)
-    await spawnAgent('kripa', taskId, prompt, `task-${taskId}-cr-normalize`, null)
+    log(`🔁 cr-normalize: AUDITOR → VALIDATED-FINDINGS-${taskId}.jsonl`)
+    await spawnAgent('auditor', taskId, prompt, `task-${taskId}-cr-normalize`, null)
     const n = fs.existsSync(outFile) ? fs.readFileSync(outFile, 'utf8').trim().split('\n').filter(Boolean).length : 0
     log(`✅ cr-normalize: ${n} validated finding(s) for ${taskId}`)
-    logActivity('KRIPA', `✅ White-box findings normalized (${n})`, { type: 'cr-normalize', squad: 'code-review', taskId })
+    logActivity('AUDITOR', `✅ White-box findings normalized (${n})`, { type: 'cr-normalize', squad: 'code-review', taskId })
   } catch (e) { log(`⚠️ cr-normalize ${taskId} failed (non-fatal): ${e.message}`) }
 }
 
 // ── Triage gate: generate the report on operator command (2026-06-17) ──
-// Runs VYASA standalone on the already-produced findings, filtered by the
+// Runs SCRIBE standalone on the already-produced findings, filtered by the
 // operator's triage verdicts (triage-<taskId>.json). Fired by a 'generate-report'
 // task-action. Self-contained (derives target from the goal/findings) so it does
 // not depend on the dispatch-time pipeline locals.
@@ -8807,18 +8807,18 @@ async function generateReportForTask(taskId) {
       if (fs.existsSync(vf)) { const first = (fs.readFileSync(vf, 'utf8').trim().split('\n').filter(Boolean)[0]); if (first) targetUrl = (JSON.parse(first).url || '') }
     }
   } catch {}
-  log(`📝 Generate-report: VYASA writing operator-triaged report for ${taskId}`)
-  logActivity('SANJAY', `📝 Generating report (operator-triaged)`, { type: 'generate-report', squad, taskId, projectId, details: 'VYASA writing report from operator-confirmed findings.' })
+  log(`📝 Generate-report: SCRIBE writing operator-triaged report for ${taskId}`)
+  logActivity('NEXUS', `📝 Generating report (operator-triaged)`, { type: 'generate-report', squad, taskId, projectId, details: 'SCRIBE writing report from operator-confirmed findings.' })
   try { task.status = 'generating-report'; task.statusMessage = 'Generating report'; task.lastUpdate = new Date().toISOString(); writeJSON(TASKS_FILE, tasks) } catch {}
   // engagement aggregation: if this task is an engagement with multiple iterations,
-  // VYASA reads findings + triage from ALL iterations and writes ONE combined report.
+  // SCRIBE reads findings + triage from ALL iterations and writes ONE combined report.
   let iters = [{ taskId: String(taskId), label: '', squad, kind: 'blackbox' }]
   try {
     const engFile = `${agentPaths.INTEL_ROOT}/engagement-${taskId}.json`
     if (fs.existsSync(engFile)) { const eng = JSON.parse(fs.readFileSync(engFile, 'utf8')); if (Array.isArray(eng.iterations) && eng.iterations.length) iters = eng.iterations }
   } catch {}
   const hasWhitebox = iters.some(i => i.kind === 'whitebox')
-  let prompt = buildVyasaReportPrompt(task.title || taskId, taskId, projectId, squad, targetUrl, goal, [], '')
+  let prompt = buildscribeReportPrompt(task.title || taskId, taskId, projectId, squad, targetUrl, goal, [], '')
   if (iters.length > 1) {
     const fileList = iters.map(it => {
       const wb = it.kind === 'whitebox'
@@ -8828,7 +8828,7 @@ async function generateReportForTask(taskId) {
     }).join('\n')
     prompt += `\n\n## ENGAGEMENT — ${iters.length} ITERATIONS (AUTHORITATIVE)\nThis engagement ran ${iters.length} independent iterations; aggregate them into ONE report. For EACH iteration read its files under ${agentPaths.INTEL_ROOT}/:\n${fileList}\nRules for EVERY iteration: INCLUDE ONLY findings whose triage verdict is "confirmed"; OMIT every "rejected"; apply each finding's operator severity / cvss / cvssVector override verbatim; weave operator notes into that finding's writeup; use findings-detail for description/impact/remediation/raw_request/poc. If an iteration has no triage file, include its CONFIRMED VALIDATED-FINDINGS.`
     if (hasWhitebox) {
-      prompt += `\n\n## CROSS-VIEW CORRELATION + DE-DUPLICATION (AUTHORITATIVE)\nThis engagement tested ONE system two ways — WHITE-BOX (source, file:line evidence) and BLACK-BOX (live, HTTP/URL evidence). Many findings are the SAME vulnerability from both sides. Correlate by root cause (same code path / endpoint / parameter / vuln class):\n- A vulnerability reported white-box AND black-box is ONE finding, NOT two — merge into a single entry carrying BOTH evidences (source file:line + fix from white-box, raw HTTP/curl/UTTARA repro from black-box), label it "Confirmed white-box + black-box", and use the WORSE severity/CVSS.\n- White-box-only → label "Source-confirmed (white-box)". Black-box-only → label "Runtime-confirmed (black-box)".\n- Emit a CORRELATION TABLE (finding | white-box evidence | black-box evidence | merged severity) BEFORE the detailed findings.\n- All executive summary counts MUST reflect the DE-DUPLICATED finding set, not the raw per-iteration totals.`
+      prompt += `\n\n## CROSS-VIEW CORRELATION + DE-DUPLICATION (AUTHORITATIVE)\nThis engagement tested ONE system two ways — WHITE-BOX (source, file:line evidence) and BLACK-BOX (live, HTTP/URL evidence). Many findings are the SAME vulnerability from both sides. Correlate by root cause (same code path / endpoint / parameter / vuln class):\n- A vulnerability reported white-box AND black-box is ONE finding, NOT two — merge into a single entry carrying BOTH evidences (source file:line + fix from white-box, raw HTTP/curl/PROBER repro from black-box), label it "Confirmed white-box + black-box", and use the WORSE severity/CVSS.\n- White-box-only → label "Source-confirmed (white-box)". Black-box-only → label "Runtime-confirmed (black-box)".\n- Emit a CORRELATION TABLE (finding | white-box evidence | black-box evidence | merged severity) BEFORE the detailed findings.\n- All executive summary counts MUST reflect the DE-DUPLICATED finding set, not the raw per-iteration totals.`
     } else {
       prompt += `\nCombine ALL confirmed findings across iterations into the Findings section and note which iteration each came from.`
     }
@@ -8837,11 +8837,11 @@ async function generateReportForTask(taskId) {
     prompt += `\n\n## OPERATOR TRIAGE (AUTHORITATIVE)\nThe operator has triaged the findings. Read ${triageFile} — JSON shaped { "verdicts": { "<finding id>": { "verdict": "confirmed"|"rejected", "severity": "<override>", "cvss": <0-10 override>, "cvssVector": "CVSS:3.1/…", "notes": "operator note" } } }. Rules:\n- INCLUDE ONLY findings whose verdict is "confirmed"; OMIT every "rejected" finding entirely.\n- The operator's severity, cvss score AND cvssVector OVERRIDE the scanner's — use them verbatim in each finding's CVSS line.\n- If a finding has operator notes, weave them into that finding's writeup (rationale / CVSS justification) — they are authoritative analyst input.\nAlso read ${agentPaths.INTEL_ROOT}/findings-detail-${taskId}.json if present (per-finding description/impact/remediation/raw_request/poc) and use it. If the triage file is absent, fall back to all CONFIRMED VALIDATED-FINDINGS.`
   }
   try {
-    await spawnAgent(PENTEST_REPORTER, taskId, prompt, `task-${taskId}-vyasa-triaged`, task.model || null)
+    await spawnAgent(PENTEST_REPORTER, taskId, prompt, `task-${taskId}-scribe-triaged`, task.model || null)
     const t2 = readJSON(TASKS_FILE) || []; const tk = t2.find(t => String(t.id) === String(taskId))
     if (tk) { tk.status = 'done'; tk.progress = 100; tk.statusMessage = 'Report generated'; tk.lastUpdate = new Date().toISOString(); writeJSON(TASKS_FILE, t2) }
     log(`✅ Generate-report: report written for ${taskId}`)
-    logActivity('VYASA', `✅ Report generated (operator-triaged)`, { type: 'report-done', squad, taskId, projectId })
+    logActivity('SCRIBE', `✅ Report generated (operator-triaged)`, { type: 'report-done', squad, taskId, projectId })
   } catch (e) { log(`❌ generate-report ${taskId} failed: ${e.message}`) }
 }
 
@@ -8858,17 +8858,17 @@ function amendTask(req) {
     try { fs.writeFileSync(scopePath, JSON.stringify(scope, null, 2)) } catch (e) { log(`⚠️ amend scope write failed: ${e.message}`) }
   }
   log(`✏️ Task ${taskId} amended (instructions:${!!req.instructions}, +scope:${(req.addScope || []).length})`)
-  logActivity('SANJAY', `✏️ Task ${taskId} amended`, { type: 'amend', taskId, projectId: req.projectId || '', details: String(req.instructions || (req.addScope || []).join(', ')).slice(0, 160) })
+  logActivity('NEXUS', `✏️ Task ${taskId} amended`, { type: 'amend', taskId, projectId: req.projectId || '', details: String(req.instructions || (req.addScope || []).join(', ')).slice(0, 160) })
 }
 
 // ── Enrich findings with report-quality structure for the triage view ──
-// Has KRIPA produce description/impact/remediation/raw_request/poc per finding →
+// Has AUDITOR produce description/impact/remediation/raw_request/poc per finding →
 // findings-detail-<taskId>.json (merged by the dashboard's /api/findings).
 async function enrichFindingsForTask(taskId) {
   const vf = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
   if (!fs.existsSync(vf)) { log(`🔎 enrich-findings: no validated findings for ${taskId}`); return }
   const outFile = `${agentPaths.INTEL_ROOT}/findings-detail-${taskId}.json`
-  const prompt = `You are KRIPA. Enrich each validated finding with report-quality structure for the operator's triage view.
+  const prompt = `You are AUDITOR. Enrich each validated finding with report-quality structure for the operator's triage view.
 
 Read ${vf} — one JSON finding per line (fields: id, title, severity, cvss_score, cvss_vector, url, method, reproduction_method, reproduction_result). Re-read the live source/evidence if needed; do not invent.
 
@@ -8882,9 +8882,9 @@ For EVERY finding id, produce:
 Write STRICT JSON to ${outFile}:
 { "<finding id>": { "description": "", "impact": "", "remediation": "", "raw_request": "", "poc": "" }, ... }
 Write ONLY that file. Then reply one line: enriched N findings.`
-  log(`🔎 Enrich-findings: ${taskId} (KRIPA)`)
-  logActivity('SANJAY', `🔎 Enriching findings detail`, { type: 'enrich-findings', taskId, details: 'KRIPA writing description/impact/remediation/raw-request/poc per finding.' })
-  try { await spawnAgent('kripa', taskId, prompt, `task-${taskId}-enrich`, null); log(`✅ Enrich-findings done: ${taskId}`) }
+  log(`🔎 Enrich-findings: ${taskId} (AUDITOR)`)
+  logActivity('NEXUS', `🔎 Enriching findings detail`, { type: 'enrich-findings', taskId, details: 'AUDITOR writing description/impact/remediation/raw-request/poc per finding.' })
+  try { await spawnAgent('auditor', taskId, prompt, `task-${taskId}-enrich`, null); log(`✅ Enrich-findings done: ${taskId}`) }
   catch (e) { log(`❌ enrich-findings ${taskId} failed: ${e.message}`) }
 }
 
@@ -8931,7 +8931,7 @@ function requeueForRetry(taskId, dispatchId, retryCount, delayMs = 60000) {
               writeJSON(TASKS_FILE, tasks)
             }
           } catch {}
-          logActivity('SANJAY', `🚫 Target unreachable — task completed with limited assessment (no more retries)`, {
+          logActivity('NEXUS', `🚫 Target unreachable — task completed with limited assessment (no more retries)`, {
             type: 'unreachable-completed', taskId
           })
           setTimeout(() => processQueue(), 2000)
@@ -8998,7 +8998,7 @@ async function dispatchToAgent(dispatch) {
       try { __scopeConfig = JSON.parse(fs.readFileSync(__scopePath, 'utf8')) } catch { /* leave null */ }
     }
     const { status: __scopeStatus, reason: __scopeReason } = __scopePrevalidator.validateDispatch(dispatch, __squadPolicy, __scopeConfig)
-    logActivity('SANJAY', `🛡️ Phase 0.0: scope pre-validate ${__scopeStatus} (${squad}) — ${__scopeReason}`, {
+    logActivity('NEXUS', `🛡️ Phase 0.0: scope pre-validate ${__scopeStatus} (${squad}) — ${__scopeReason}`, {
       type: 'scope-prevalidate', squad, taskId, projectId: projectId || '',
       details: `Status: ${__scopeStatus} | Reason: ${__scopeReason}`,
     })
@@ -9021,7 +9021,7 @@ async function dispatchToAgent(dispatch) {
     }
     // 'allowed' and 'warned' both continue. 'warned' is logged for audit.
   } catch (__spErr) {
-    logActivity('SANJAY', `⚠️ Phase 0.0 scope-prevalidate error (non-fatal): ${__spErr.message}`, {
+    logActivity('NEXUS', `⚠️ Phase 0.0 scope-prevalidate error (non-fatal): ${__spErr.message}`, {
       type: 'scope-prevalidate-error', squad, taskId, projectId: projectId || '',
       details: String(__spErr && __spErr.message || __spErr),
     })
@@ -9035,21 +9035,21 @@ async function dispatchToAgent(dispatch) {
   
   const leader = getSquadLeader(squad) || assignee
   const rawAgentId = leader.toLowerCase()
-  const agentId = AGENT_ID_MAP[leader] || rawAgentId  // map ROF/MAIN → 'main'
+  const agentId = AGENT_ID_MAP[leader] || rawAgentId  // map COMMAND/MAIN → 'main'
   
   // Clean stale locks
   cleanStaleLocks(agentId)
   
-  // processQueue already acquires the leader slot before calling dispatchToAgent
+  // processQueue already acquires teamleader slot before calling dispatchToAgent
   runningTasks.add(taskId)
   
   log(`🚀 DISPATCHING: ${taskTitle} → ${leader} (${squad})`)
   logEvent('TASK_DISPATCHED', { taskId, title: taskTitle, squad, assignee: leader })
   // (2026-04-20 #3) Optional Langfuse trace — no-op if not configured.
   try { langfuse.traceStart(taskId, taskTitle, { squad, assignee: leader, projectId: projectId || '' }) } catch {}
-  logActivity('SANJAY', `⚡ Dispatching task to ${leader}: ${taskTitle}`, {
+  logActivity('NEXUS', `⚡ Dispatching task to ${leader}: ${taskTitle}`, {
     type: 'dispatch', squad, taskId, projectId: projectId || '',
-    from_agent: 'SANJAY', to_agent: leader
+    from_agent: 'NEXUS', to_agent: leader
   })
   
   // Mark task as in-progress + capture model_profile attribution (G4 multi-model test)
@@ -9061,13 +9061,13 @@ async function dispatchToAgent(dispatch) {
       task.progress = 5
       task.startedAt = new Date().toISOString()
       // G4: capture which MODEL_PROFILE this dispatch ran under, and which model
-      // KRISHNA actually got (may be the env-driven override or modelRouter default).
+      // ATLAS actually got (may be the env-driven override or modelRouter default).
       // Used by scripts/g4-metrics.js to attribute findings to a model profile.
       task.model_profile = process.env.MODEL_PROFILE || 'default'
       try {
-        const krishnaResolved = modelRouter.getModelForAgent('KRISHNA', { squad })
-        task.krishna_model = krishnaResolved.model
-      } catch { task.krishna_model = '(unresolved)' }
+        const atlasResolved = modelRouter.getModelForAgent('ATLAS', { squad })
+        task.atlas_model = atlasResolved.model
+      } catch { task.atlas_model = '(unresolved)' }
       writeJSON(TASKS_FILE, tasks)
     }
   } catch {}
@@ -9121,7 +9121,7 @@ async function dispatchToAgent(dispatch) {
         spawnAgent, trackCosts: trackCostsLocal, updateProgress: updateProgressLocal,
         log, logActivity,
         buildCloudSpecialistPrompt, buildVarunaChainPrompt,
-        buildKripaCloudPrompt, buildVyasaCloudPrompt,
+        buildauditorCloudPrompt, buildscribeCloudPrompt,
         chainVerifier: freshRequire('./chain-verifier'),
       })
       // Finalize task
@@ -9184,7 +9184,7 @@ async function dispatchToAgent(dispatch) {
         spawnAgent, trackCosts: trackCostsLocal, updateProgress: updateProgressLocal,
         log, logActivity,
         buildNetworkSpecialistPrompt, buildShalyaChainPrompt,
-        buildKripaNetworkPrompt, buildVyasaNetworkPrompt,
+        buildauditorNetworkPrompt, buildscribeNetworkPrompt,
         chainVerifier: freshRequire('./chain-verifier'),
       })
       try {
@@ -9210,7 +9210,7 @@ async function dispatchToAgent(dispatch) {
   }
 
   // (2026-04-23) code-review squad routes through code-review-dispatcher module.
-  // White-box source code review — 6 framework specialists + UTTARA runtime validator.
+  // White-box source code review — 6 framework specialists + PROBER runtime validator.
   if (dispatchType === 'code-review') {
     try {
       const allCostsLocal = []
@@ -9328,7 +9328,7 @@ async function dispatchToAgent(dispatch) {
             const reGrade = await gradeTask(agentId, taskId, squad, dispatch)
             if (reGrade) {
               log(`📊 Smart retry result: ${gradeResult.passRate}% → ${reGrade.passRate}%`)
-              logActivity('SANJAY', `📊 Smart retry: ${gradeResult.passRate}% → ${reGrade.passRate}%`, {
+              logActivity('NEXUS', `📊 Smart retry: ${gradeResult.passRate}% → ${reGrade.passRate}%`, {
                 type: 'smart-retry-result', squad, taskId, projectId: projectId || '',
                 details: `Before: ${gradeResult.passRate}%\nAfter: ${reGrade.passRate}%\nRetry type: ${retryResult.retryType}`
               })
@@ -9404,34 +9404,34 @@ async function dispatchToAgent(dispatch) {
       }
 
 
-      // ── DHARMARAJ VERIFICATION (universal) ──
-      if (!dispatch.skipVerification && !dispatch.isRepair && shouldRunDharmaraj(squad)) {
-        log(`⚖️ Starting DHARMARAJ verification for ${squad} task ${taskId}`)
+      // ── ARBITER VERIFICATION (universal) ──
+      if (!dispatch.skipVerification && !dispatch.isRepair && shouldRunarbiter(squad)) {
+        log(`⚖️ Starting ARBITER verification for ${squad} task ${taskId}`)
         try {
           const verifyResult = await verificationLoop(taskId, taskTitle, squad, leader, dispatch)
           if (verifyResult) {
-            logActivity('SANJAY', `⚖️ Final verification: ${verifyResult.verdict} (${verifyResult.passRate}%)`, {
+            logActivity('NEXUS', `⚖️ Final verification: ${verifyResult.verdict} (${verifyResult.passRate}%)`, {
               type: 'verification-final', squad, taskId,
               details: `Verdict: ${verifyResult.verdict}\nPass Rate: ${verifyResult.passRate}%`
             })
             // Sprint B.3 (2026-05-09): publication-status banner. Annotate the
-            // report file when DHARMARAJ verdict is weak OR judge-verifier flagged
+            // report file when ARBITER verdict is weak OR judge-verifier flagged
             // any Critical/High as indeterminate. Idempotent + fail-soft.
             prependPublicationStatusBanner(taskId, verifyResult)
-            // FIX 1 (2026-05-09): real publication GATE. If DHARMARAJ verdict is
+            // FIX 1 (2026-05-09): real publication GATE. If ARBITER verdict is
             // FALSE_POSITIVE or PARTIAL<50%, move the report out of reports/ and
             // into reports-blocked/, mark task status='blocked'. Idempotent.
             if (shouldBlockPublication(verifyResult)) {
               const reason = verifyResult.verdict === 'FALSE_POSITIVE'
-                ? 'DHARMARAJ verdict: FALSE_POSITIVE'
-                : `DHARMARAJ verdict: PARTIAL (${verifyResult.passRate}% < 50%)`
+                ? 'ARBITER verdict: FALSE_POSITIVE'
+                : `ARBITER verdict: PARTIAL (${verifyResult.passRate}% < 50%)`
               blockReportPublication(taskId, verifyResult, reason)
             }
             // ── FEEDBACK LOOP (stocks) ──
             try { await processTaskFeedback(taskId, taskTitle, squad, leader, verifyResult, allCosts) } catch (fbErr) { log(`⚠️ Feedback loop error: ${fbErr.message}`) }
           }
         } catch (verifyErr) {
-          log(`⚠️ DHARMARAJ verification error (non-fatal): ${verifyErr.message}`)
+          log(`⚠️ ARBITER verification error (non-fatal): ${verifyErr.message}`)
         }
       }
       
@@ -9579,7 +9579,7 @@ async function dispatchToAgent(dispatch) {
             const reGrade = await gradeTask(agentId, taskId, squad, dispatch)
             if (reGrade) {
               log(`📊 Smart retry result: ${gradeResult.passRate}% → ${reGrade.passRate}%`)
-              logActivity('SANJAY', `📊 Smart retry: ${gradeResult.passRate}% → ${reGrade.passRate}%`, {
+              logActivity('NEXUS', `📊 Smart retry: ${gradeResult.passRate}% → ${reGrade.passRate}%`, {
                 type: 'smart-retry-result', squad, taskId, projectId: projectId || '',
                 details: `Before: ${gradeResult.passRate}%\nAfter: ${reGrade.passRate}%\nRetry type: ${retryResult.retryType}`
               })
@@ -9655,14 +9655,14 @@ async function dispatchToAgent(dispatch) {
       // Extract and save squad report (universal — works for any security squad)
       await extractAndSavePentestReport(taskId, squad)
 
-      // ── DHARMARAJ VERIFICATION LOOP (v2) ──
-      // After task completes, dispatch to DHARMARAJ for independent verification (universal)
-      if (!dispatch.skipVerification && !dispatch.isRepair && shouldRunDharmaraj(squad)) {
-        log(`⚖️ Starting DHARMARAJ verification for ${squad} task ${taskId}`)
+      // ── ARBITER VERIFICATION LOOP (v2) ──
+      // After task completes, dispatch to ARBITER for independent verification (universal)
+      if (!dispatch.skipVerification && !dispatch.isRepair && shouldRunarbiter(squad)) {
+        log(`⚖️ Starting ARBITER verification for ${squad} task ${taskId}`)
         try {
           const verifyResult = await verificationLoop(taskId, taskTitle, squad, leader, dispatch)
           if (verifyResult) {
-            logActivity('SANJAY', `⚖️ Final verification: ${verifyResult.verdict} (${verifyResult.passRate}%)`, {
+            logActivity('NEXUS', `⚖️ Final verification: ${verifyResult.verdict} (${verifyResult.passRate}%)`, {
               type: 'verification-final', squad, taskId,
               details: `Verdict: ${verifyResult.verdict}\nPass Rate: ${verifyResult.passRate}%`
             })
@@ -9671,8 +9671,8 @@ async function dispatchToAgent(dispatch) {
             // FIX 1 (2026-05-09): real publication GATE.
             if (shouldBlockPublication(verifyResult)) {
               const reason = verifyResult.verdict === 'FALSE_POSITIVE'
-                ? 'DHARMARAJ verdict: FALSE_POSITIVE'
-                : `DHARMARAJ verdict: PARTIAL (${verifyResult.passRate}% < 50%)`
+                ? 'ARBITER verdict: FALSE_POSITIVE'
+                : `ARBITER verdict: PARTIAL (${verifyResult.passRate}% < 50%)`
               blockReportPublication(taskId, verifyResult, reason)
             }
 
@@ -9684,7 +9684,7 @@ async function dispatchToAgent(dispatch) {
             try { await processTaskFeedback(taskId, taskTitle, squad, leader, verifyResult, allCosts) } catch (fbErr) { log(`⚠️ Feedback loop error: ${fbErr.message}`) }
           }
         } catch (verifyErr) {
-          log(`⚠️ DHARMARAJ verification error (non-fatal): ${verifyErr.message}`)
+          log(`⚠️ ARBITER verification error (non-fatal): ${verifyErr.message}`)
         }
       }
 
@@ -9782,14 +9782,14 @@ async function dispatchToAgent(dispatch) {
     }
     const memoryPreamble = getMemoryPreamble(leader, squad, taskMemContext)
     
-    // ── Run REAL crawl tools before dispatching KRISHNA ──
+    // ── Run REAL crawl tools before dispatching ATLAS ──
     let realEndpointMap = null
-    let endpointMapStr = 'EKLAVYA real crawl not yet run — run it as Phase 0.5'
+    let endpointMapStr = 'TRACER real crawl not yet run — run it as Phase 0.5'
     try {
       // (2026-04-27) Use shared extractor.
       const target = extractTargetUrl({ taskTitle, description: dispatch.description, goal: dispatch.goal, config: dispatch.config })
       if (target) {
-        realEndpointMap = await runEklavyaAgent(target, taskId)
+        realEndpointMap = await runtracerAgent(target, taskId)
         const MAX_INLINE_ENDPOINTS = 200
         const allEpLines = realEndpointMap.endpoints.map(e => `  ${e.method} ${e.path}${e.params.length ? ' [params: '+e.params.join(',')+']' : ''}`)
         const epList = allEpLines.slice(0, MAX_INLINE_ENDPOINTS).join('\n')
@@ -9806,9 +9806,9 @@ async function dispatchToAgent(dispatch) {
           return `  ${(f.method||'GET').toUpperCase()} ${f.action || '?'} \u2192 fields: [${fields.join(', ')}]`
         }).join('\n') || '  none found in crawl'
         let highlightAlerts = ''
-        if (highlights.phpinfo) highlightAlerts += `\n\u26a0\ufe0f  phpinfo.php FOUND at ${highlights.phpinfo} \u2014 DHARMA: check session.use_only_cookies + PHP version`
-        if (highlights.newuser) highlightAlerts += `\n\u26a0\ufe0f  secured/newuser.php FOUND at ${highlights.newuser} \u2014 KARNA + NAKUL: test all params`
-        if (highlights.showimage) highlightAlerts += `\n\u26a0\ufe0f  showimage.php FOUND at ${highlights.showimage} \u2014 ABHIMANYU: test file= param for LFI`
+        if (highlights.phpinfo) highlightAlerts += `\n\u26a0\ufe0f  phpinfo.php FOUND at ${highlights.phpinfo} \u2014 SENTRY: check session.use_only_cookies + PHP version`
+        if (highlights.newuser) highlightAlerts += `\n\u26a0\ufe0f  secured/newuser.php FOUND at ${highlights.newuser} \u2014 DRILL + VIPER: test all params`
+        if (highlights.showimage) highlightAlerts += `\n\u26a0\ufe0f  showimage.php FOUND at ${highlights.showimage} \u2014 VAULT: test file= param for LFI`
         endpointMapStr = `REAL CRAWL RESULTS (crawl4ai browser crawl \u2014 ${realEndpointMap.totalUrls} URLs discovered):
 
 Target: ${target}
@@ -9827,54 +9827,54 @@ ${postForms.slice(0, 50).map(e=>`  POST ${e.path} \u2192 params: [${e.params.joi
 FORMS.JSON SUMMARY (from browser form discovery):
 ${formsSummary}
 
-API ENDPOINTS (SAHDEV must test these):
+API ENDPOINTS (GATEWAY must test these):
   ${apiEpList}
 
 GENERIC HIGH-VALUE PARAM PATTERNS (apply to ANY endpoint from the crawl above):
-  - Image/file ID params (pic=, id=, img=, file=, item=, cat=) → KARNA: SQLi | ABHIMANYU: LFI
-  - Login forms (POST with username+password) → KARNA: SQLi on both params
-  - Signup/registration forms (POST with name/email/address) → KARNA: SQLi + NAKUL: XSS on ALL fields
-  - Search/filter params (q=, search=, query=, keyword=) → KARNA: SQLi + NAKUL: XSS
-  - File/path params (file=, page=, include=, src=, path=) → ABHIMANYU: LFI + NAKUL: RFI-XSS
-  - Redirect params (redirect=, next=, url=, return=) → BHEEM: SSRF + NAKUL: open-redirect-XSS
-  - Multi-value params (same param sent twice) → NAKUL: HPP-XSS test
+  - Image/file ID params (pic=, id=, img=, file=, item=, cat=) → DRILL: SQLi | VAULT: LFI
+  - Login forms (POST with username+password) → DRILL: SQLi on both params
+  - Signup/registration forms (POST with name/email/address) → DRILL: SQLi + VIPER: XSS on ALL fields
+  - Search/filter params (q=, search=, query=, keyword=) → DRILL: SQLi + VIPER: XSS
+  - File/path params (file=, page=, include=, src=, path=) → VAULT: LFI + VIPER: RFI-XSS
+  - Redirect params (redirect=, next=, url=, return=) → RELAY: SSRF + VIPER: open-redirect-XSS
+  - Multi-value params (same param sent twice) → VIPER: HPP-XSS test
 
-DHARMA: check version headers (X-Powered-By, Server), cookie flags (HttpOnly/Secure), X-Frame-Options on all pages.
+SENTRY: check version headers (X-Powered-By, Server), cookie flags (HttpOnly/Secure), X-Frame-Options on all pages.
 SPECIALISTS: The endpoint map above is source of truth — test EVERY endpoint from the crawl.
 
 ## WAF-SAFE DETECTION METHODOLOGY (use when WAF is detected in Phase 0)
 
 When WAF is present, standard payloads WILL be blocked. Switch to these detection-only techniques:
 
-**SQLi detection (KARNA):**
+**SQLi detection (DRILL):**
 - Probe: Send \`param=test'\` (single quote) → check response code/length vs \`param=test\`
 - If WAF blocks the quote: try \`param=test%27\` (URL-encoded) or \`param=test\\'\` (escaped)
 - Boolean: Compare response length of \`param=1\` vs \`param=2\` vs \`param=1 AND 1=1\`
 - Timing: \`param=1;WAITFOR DELAY '0:0:1'--\` (1 second, not 5 — less likely to trigger WAF)
 - Header injection: Add \`X-Forwarded-For: test'\` in request headers — WAFs often skip header inspection
 
-**XSS detection (NAKUL):**
+**XSS detection (VIPER):**
 - Probe: Send \`param=ROF12345\` → check if the string reflects in the response at all
-- If reflected: send \`param=ROF<12345\` → check if \`<\` appears raw or encoded (\`&lt;\`)
-- URL-encoded: \`param=ROF%3C12345\` if direct blocked
-- Header: Test reflection via \`Referer: ROF<12345\` header
+- If reflected: send \`param=COMMAND<12345\` → check if \`<\` appears raw or encoded (\`&lt;\`)
+- URL-encoded: \`param=COMMAND%3C12345\` if direct blocked
+- Header: Test reflection via \`Referer: COMMAND<12345\` header
 
-**SSRF detection (BHEEM):**
+**SSRF detection (RELAY):**
 - Only use OOB DNS callbacks — WAF cannot block DNS resolution on the server side
 - Use interactsh/burpcollaborator URLs — NOT direct IP probes
 
-**LFI detection (ABHIMANYU):**
+**LFI detection (VAULT):**
 - Path traversal with encoding: \`%2e%2e%2f\` instead of \`../\`
 - Null byte: \`..%00/etc/passwd\` (older PHP)
 - Double encoding: \`%252e%252e%252f\`
 
 **General rule: If endpoint returns "Request Rejected" or WAF block page → log it and MOVE ON. Do not retry the same endpoint 10 times.**`
-        // Log EKLAVYA activity entry
-        logActivity('EKLAVYA', `PHASE 0.5: Real crawl complete — ${realEndpointMap.totalUrls} URLs, ${realEndpointMap.endpoints.length} endpoints`, { taskId, squad, details: endpointMapStr })
+        // Log TRACER activity entry
+        logActivity('TRACER', `PHASE 0.5: Real crawl complete — ${realEndpointMap.totalUrls} URLs, ${realEndpointMap.endpoints.length} endpoints`, { taskId, squad, details: endpointMapStr })
       }
     } catch(crawlErr) {
       log(`⚠️  Pre-crawl failed: ${crawlErr.message}`)
-      endpointMapStr = `Pre-crawl failed: ${crawlErr.message}. EKLAVYA should run tools directly.`
+      endpointMapStr = `Pre-crawl failed: ${crawlErr.message}. TRACER should run tools directly.`
     }
 
     // ── Squad-aware prompt for sequential execution (non-pentest, non-stocks squads) ──
@@ -9891,25 +9891,25 @@ When WAF is present, standard payloads WILL be blocked. Switch to these detectio
 
 | Agent       | ONE Specialty (strict)                  | Phase  |
 |-------------|----------------------------------------|--------|
-| SATYAKI     | Session & Auth Manager (login + tokens) | 0 — if authenticated test |
-| EKLAVYA     | Web Crawler & Full Endpoint Discovery   | 0.5 — ALWAYS before testing |
-| ARJUN       | Recon & Attack Surface Mapping          | 1 — ALWAYS |
-| BHEEM       | SSRF (Server-Side Request Forgery)      | 2 |
-| NAKUL       | XSS (Cross-Site Scripting, DOM, Stored) | 2 |
-| KARNA       | SQLi (SQL Injection, all DB types)      | 2 |
-| DRAUPADI    | IDOR / BOLA / Broken Access Control     | 2 |
-| YUYUTSU     | Business Logic (race conditions, price, workflow) | 2 |
-| RUDRA       | OS Command Injection & RCE              | 2 |
-| ASHWATTHAMA | SSTI & Template Injection               | 2 |
-| KRITAVARMA  | XXE (XML External Entity Injection)     | 2 |
-| SHIKHANDI   | CSRF (Cross-Site Request Forgery)       | 2 |
-| ABHIMANYU   | LFI & Path Traversal (File Inclusion)   | 2 |
-| SAHDEV      | API Security (REST/GraphQL/JWT/BOLA)    | 3 |
-| DHARMA      | Security Headers, TLS, CORS, Cookies    | 3 — always |
+| KEYRING     | Session & Auth Manager (login + tokens) | 0 — if authenticated test |
+| TRACER     | Web Crawler & Full Endpoint Discovery   | 0.5 — ALWAYS before testing |
+| SCOUT       | Recon & Attack Surface Mapping          | 1 — ALWAYS |
+| RELAY       | SSRF (Server-Side Request Forgery)      | 2 |
+| VIPER       | XSS (Cross-Site Scripting, DOM, Stored) | 2 |
+| DRILL       | SQLi (SQL Injection, all DB types)      | 2 |
+| WARDEN    | IDOR / BOLA / Broken Access Control     | 2 |
+| LEDGER     | Business Logic (race conditions, price, workflow) | 2 |
+| RANGER       | OS Command Injection & RCE              | 2 |
+| FORGE | SSTI & Template Injection               | 2 |
+| SPECTRE  | XXE (XML External Entity Injection)     | 2 |
+| DECOY   | CSRF (Cross-Site Request Forgery)       | 2 |
+| VAULT   | LFI & Path Traversal (File Inclusion)   | 2 |
+| GATEWAY      | API Security (REST/GraphQL/JWT/BOLA)    | 3 |
+| SENTRY      | Security Headers, TLS, CORS, Cookies    | 3 — always |
 | KUBERA      | Container & Kubernetes Security         | 3 — if containers |
 | MAYA        | LLM/AI Security (prompt injection)      | 3 — if AI/LLM present |
-| KRIPA       | Finding Validator & False Positive Filter | 3.5 — ALWAYS before report |
-| VYASA       | Final Report (confirmed findings only)  | 4 — always last |
+| AUDITOR       | Finding Validator & False Positive Filter | 3.5 — ALWAYS before report |
+| SCRIBE       | Final Report (confirmed findings only)  | 4 — always last |
 `
 
     const prompt = `You are ${leader}. Here is your identity:
@@ -9928,12 +9928,12 @@ Task ID: ${taskId}
 Squad: ${squad}
 Priority: ${dispatch.priority || 'medium'}
 ${dispatch.goal ? `\n## USER'S GOAL FOR THIS ENGAGEMENT\n${dispatch.goal}\n\nKeep this goal in mind when prioritizing findings and writing the report.\n` : ''}
-## REAL ENDPOINT MAP (pre-crawled by SANJAY — tools already ran)
+## REAL ENDPOINT MAP (pre-crawled by NEXUS — tools already ran)
 
 ${endpointMapStr}
 
 CRITICAL: The above endpoint list is from REAL tool execution. Use it.
-Do NOT re-run EKLAVYA from scratch. EKLAVYA's work is done above.
+Do NOT re-run TRACER from scratch. TRACER's work is done above.
 Each specialist must cover every endpoint in the list for their bug class.
 
 ## KHATARNAK MANDATORY REQUIREMENTS — NON-NEGOTIABLE
@@ -9941,10 +9941,10 @@ Each specialist must cover every endpoint in the list for their bug class.
 These MUST appear in your activity log or the engagement fails grading:
 
 1. **State engagement type in Phase 0**: Log exactly → \`"Engagement Type: blackbox"\` (or greybox/whitebox as appropriate)
-2. **RUDRA runs nmap -sV in Phase 1**: RUDRA MUST execute \`nmap -sV TARGET_HOST\` and log results as → \`"RUDRA baseline nmap -sV scan"\` 
+2. **RANGER runs nmap -sV in Phase 1**: RANGER MUST execute \`nmap -sV TARGET_HOST\` and log results as → \`"RANGER baseline nmap -sV scan"\` 
 3. **Every finding must include reproduction steps**: All findings logged by ANY agent must include \`"reproduction"\` or \`"steps"\` with exact curl command or numbered steps
-4. **VYASA includes Overall Risk Rating**: VYASA must log → \`"Overall Risk: [Critical/High/Medium/Low]"\` in final report
-5. **VYASA includes Recommendations Summary**: VYASA must log → \`"Recommendations:"\` section with numbered list
+4. **SCRIBE includes Overall Risk Rating**: SCRIBE must log → \`"Overall Risk: [Critical/High/Medium/Low]"\` in final report
+5. **SCRIBE includes Recommendations Summary**: SCRIBE must log → \`"Recommendations:"\` section with numbered list
 6. **Log out-of-scope declaration in Phase 0**: Log exactly → \`"Out-of-scope testing: None performed"\` or \`"Out-of-scope: none"\`
 
 ## MANDATORY ENGAGEMENT WORKFLOW
@@ -9952,7 +9952,7 @@ These MUST appear in your activity log or the engagement fails grading:
 Execute in this exact sequence:
 
 ### PHASE 0 — SCOPE + AUTH SETUP + WAF DETECTION
-**MANDATORY Phase 0 logs (KRISHNA must write ALL of these):**
+**MANDATORY Phase 0 logs (ATLAS must write ALL of these):**
 \`\`\`
 Engagement Type: blackbox
 Out-of-scope testing: None performed
@@ -9962,7 +9962,7 @@ WAF Status: [detected/none] — [WAF type if detected]
 
 1. Log engagement type as: "Engagement Type: blackbox" (adjust if credentials provided → greybox)
 2. Log out-of-scope declaration: "Out-of-scope testing: None performed"
-3. If greybox/whitebox: SATYAKI → login with provided credentials, store session to ${agentPaths.INTEL_ROOT}/pentest-session.json
+3. If greybox/whitebox: KEYRING → login with provided credentials, store session to ${agentPaths.INTEL_ROOT}/pentest-session.json
 
 4. **WAF DETECTION (MANDATORY before any testing):**
    Run these checks FIRST:
@@ -9985,11 +9985,11 @@ WAF Status: [detected/none] — [WAF type if detected]
    - Response diff analysis: compare response LENGTH for \`param=test\` vs \`param=test'\` — size difference = suspected vuln
    - If WAF blocks even encoded probes → log "WAF blocks all probes for [endpoint]" and move to next endpoint
    - DO NOT flood the same endpoint — move on after 3 blocked attempts
-4. All Phase 2 specialists will use SATYAKI's session
+4. All Phase 2 specialists will use KEYRING's session
 
 ### PHASE 0.5 — ENDPOINT DISCOVERY (ALWAYS — before any testing)
 
-EKLAVYA MUST use exec tool to run these commands. No simulation. Real output only.
+TRACER MUST use exec tool to run these commands. No simulation. Real output only.
 
 Step 1 — Active crawl with real tools:
   exec: katana -u TARGET -d 5 -jc -jsl -aff -o /tmp/ek-katana-TASKID.txt 2>/dev/null
@@ -10010,63 +10010,63 @@ Step 4 — Save structured endpoint map:
   Each entry: {method: GET/POST, path: /endpoint, params: [list of param names]}
   Include GET URL params AND all POST form params
 
-Step 5 — KRISHNA reads this file before Phase 2 dispatch
+Step 5 — ATLAS reads this file before Phase 2 dispatch
   If file exists: pass full endpoint list to each specialist
   Each specialist: test EVERY endpoint in the list, not just 3-4
 
 ### PHASE 1 — RECON + BASELINE SCAN (ALWAYS)
-1. ARJUN → deep recon using EKLAVYA's endpoint map: subdomains, ports, tech stack, secrets
+1. SCOUT → deep recon using TRACER's endpoint map: subdomains, ports, tech stack, secrets
 2. Build complete Attack Surface Inventory
-3. **RUDRA → MANDATORY nmap -sV baseline scan** (runs IN PARALLEL with ARJUN):
+3. **RANGER → MANDATORY nmap -sV baseline scan** (runs IN PARALLEL with SCOUT):
    \`\`\`bash
-   nmap -sV --open -T4 TARGET_HOST -oN /tmp/rudra-nmap-sv.txt
+   nmap -sV --open -T4 TARGET_HOST -oN /tmp/ranger-nmap-sv.txt
    \`\`\`
-   RUDRA logs: \`"RUDRA baseline nmap -sV scan complete: [services found]"\`
+   RANGER logs: \`"RANGER baseline nmap -sV scan complete: [services found]"\`
 
 ### PHASE 2 — WEB VULNERABILITY DISCOVERY (Each agent = ONE bug class only)
 
-BEFORE dispatching Phase 2 agents, KRISHNA must:
-1. Read the EKLAVYA endpoint map file: ${agentPaths.INTEL_ROOT}/pentest-endpoints-TASKID.json
+BEFORE dispatching Phase 2 agents, ATLAS must:
+1. Read the TRACER endpoint map file: ${agentPaths.INTEL_ROOT}/pentest-endpoints-TASKID.json
 2. Extract the FULL endpoint list including all POST params
 3. Pass the complete endpoint list to EACH specialist in their dispatch message
 4. Each specialist must test EVERY endpoint — not just 3-4
 
 Each Phase 2 specialist must receive in their prompt:
-ENDPOINT MAP from EKLAVYA: [full list with methods and all params]
+ENDPOINT MAP from TRACER: [full list with methods and all params]
 MANDATE: Test EVERY endpoint. Do NOT stop after a few findings. Cover the full list.
 
 Run ALL applicable specialists:
-1. BHEEM → SSRF only: ALL URL/file/webhook/redirect params from endpoint map
-2. NAKUL → XSS only: ALL input fields ALL form params (GET + POST) including hpp/ params /secured/ paths ALL signup form fields
-3. KARNA → SQLi only: ALL GET params + ALL POST form params from endpoint map (image IDs, login forms, signup forms, search params)
-4. DRAUPADI → IDOR + BOLA + broken access control: all object IDs, access control, mass assignment, forced browsing
-5. YUYUTSU → Business Logic only: price/quantity, race conditions, workflow bypass
-6. RUDRA → OS Command Injection only: network tools, file ops, URL fetchers
-7. ASHWATTHAMA → SSTI only: template rendering endpoints
-8. KRITAVARMA → XXE only: all XML/SOAP/SVG/docx upload endpoints, XML parsers
-9. SHIKHANDI → CSRF only: all state-changing forms and API endpoints
-10. ABHIMANYU → LFI + Path Traversal only: file=, page=, include=, path= params
+1. RELAY → SSRF only: ALL URL/file/webhook/redirect params from endpoint map
+2. VIPER → XSS only: ALL input fields ALL form params (GET + POST) including hpp/ params /secured/ paths ALL signup form fields
+3. DRILL → SQLi only: ALL GET params + ALL POST form params from endpoint map (image IDs, login forms, signup forms, search params)
+4. WARDEN → IDOR + BOLA + broken access control: all object IDs, access control, mass assignment, forced browsing
+5. LEDGER → Business Logic only: price/quantity, race conditions, workflow bypass
+6. RANGER → OS Command Injection only: network tools, file ops, URL fetchers
+7. FORGE → SSTI only: template rendering endpoints
+8. SPECTRE → XXE only: all XML/SOAP/SVG/docx upload endpoints, XML parsers
+9. DECOY → CSRF only: all state-changing forms and API endpoints
+10. VAULT → LFI + Path Traversal only: file=, page=, include=, path= params
 
 ### PHASE 3 — SPECIALIZED DEEP DIVE (run applicable ones)
-- SAHDEV → API/JWT security (if APIs or auth tokens present)
-- DHARMA → Headers/TLS/CORS/Cookies (ALWAYS run)
+- GATEWAY → API/JWT security (if APIs or auth tokens present)
+- SENTRY → Headers/TLS/CORS/Cookies (ALWAYS run)
 - KUBERA → Container/K8s security (if Docker/K8s in scope)
 - MAYA → LLM/AI security (if AI features detected)
 - [Cloud scope → escalate to VARUNA squad: AGNI handles AWS/GCP/Azure]
 - [Network/protocol scope → escalate to SHALYA squad: GHATOTKACHA]
 - [AD/Kerberos scope → escalate to PARASHURAMA squad: INDRA]
 
-### PHASE 3.5 — VALIDATION (KRIPA — ALWAYS run before report)
-- Pass ALL suspected findings to KRIPA
-- KRIPA runs minimal re-confirmation probes per finding
-- KRIPA classifies: Confirmed / Likely / Suspected / False Positive
-- Only CONFIRMED findings proceed to VYASA
+### PHASE 3.5 — VALIDATION (AUDITOR — ALWAYS run before report)
+- Pass ALL suspected findings to AUDITOR
+- AUDITOR runs minimal re-confirmation probes per finding
+- AUDITOR classifies: Confirmed / Likely / Suspected / False Positive
+- Only CONFIRMED findings proceed to SCRIBE
 
-### PHASE 4 — FINAL REPORT (VYASA — uses only KRIPA-confirmed findings)
-- VYASA writes professional report with CONFIRMED findings only
+### PHASE 4 — FINAL REPORT (SCRIBE — uses only AUDITOR-confirmed findings)
+- SCRIBE writes professional report with CONFIRMED findings only
 - False positives excluded
 - Each finding has double-verified evidence
-- **VYASA MANDATORY activity log entries (must appear word-for-word):**
+- **SCRIBE MANDATORY activity log entries (must appear word-for-word):**
   - \`"Overall Risk: [Critical/High/Medium/Low]"\` — based on highest confirmed severity
   - \`"Recommendations: 1. [fix] 2. [fix] 3. [fix]..."\` — numbered list
   - \`"Executive Summary: [N] findings..."\` — non-technical executive summary
@@ -10074,13 +10074,13 @@ Run ALL applicable specialists:
   - Engagement type stated at top: \`"Engagement Type: blackbox"\`
   - Every finding must include exact \`"reproduction steps:"\` with curl command or numbered steps
 
-- **VYASA FULL REPORT ENTRY (MANDATORY — must be the LAST VYASA entry):**
-  After writing all individual entries, VYASA must write ONE final complete report as a single activity log entry:
-  echo '{"ts":"...","agent":"VYASA","action":"FULL_REPORT","details":"# Penetration Test Report\\n**Target:** TARGET\\n**Date:** DATE\\n**Engagement Type:** Blackbox\\n**Overall Risk:** RISK_EMOJI RISK_LEVEL\\n\\n---\\n\\n## Executive Summary\\nEXEC_SUMMARY_TEXT\\n\\n| Severity | Count |\\n|----------|-------|\\n| 🔴 Critical | N |\\n| 🟠 High | N |\\n| 🟡 Medium | N |\\n| 🟢 Low | N |\\n| **Total** | **N** |\\n\\n---\\n\\n## Scope & Coverage\\n**Endpoints Tested:** N\\n\\n### Tested\\n- ✅ SQL Injection\\n- ✅ XSS\\n- ✅ SSRF\\n- ✅ IDOR\\n- ✅ RCE/CMDi\\n- ✅ LFI/Path Traversal\\n- ✅ Security Headers\\n\\n### NOT Found (0 confirmed)\\n- ❌ [categories with zero findings]\\n\\n---\\n\\n## Findings\\n\\n### 🔴 Critical\\n\\n#### F-001: TITLE\\n**CVSS:** 9.8 | **Endpoint:** \`METHOD /path\` | **OWASP:** A03:2021\\n\\nDESCRIPTION\\n\\n\`\`\`bash\\ncurl -s REPRODUCTION_COMMAND\\n\`\`\`\\n\\n**Impact:** IMPACT\\n**Fix:** FIX\\n\\n---\\n\\n[repeat for all findings ordered Critical → High → Medium → Low]\\n\\n---\\n\\n## Recommendations\\n\\n| Priority | Finding | Fix | Timeline |\\n|----------|---------|-----|----------|\\n| 🔴 P0 | CRITICAL_FINDING | SPECIFIC_FIX | Immediate |\\n| 🟠 P1 | HIGH_FINDING | SPECIFIC_FIX | 24 hours |\\n\\n---\\n\\n*Report by KURUKSHETRA Pentest AI | VYASA*","taskId":"${taskId}","projectId":"${dispatch.projectId || ''}","squad":"${squad}"}' >> ${ACTIVITY_LOG}
+- **SCRIBE FULL REPORT ENTRY (MANDATORY — must be the LAST SCRIBE entry):**
+  After writing all individual entries, SCRIBE must write ONE final complete report as a single activity log entry:
+  echo '{"ts":"...","agent":"SCRIBE","action":"FULL_REPORT","details":"# Penetration Test Report\\n**Target:** TARGET\\n**Date:** DATE\\n**Engagement Type:** Blackbox\\n**Overall Risk:** RISK_EMOJI RISK_LEVEL\\n\\n---\\n\\n## Executive Summary\\nEXEC_SUMMARY_TEXT\\n\\n| Severity | Count |\\n|----------|-------|\\n| 🔴 Critical | N |\\n| 🟠 High | N |\\n| 🟡 Medium | N |\\n| 🟢 Low | N |\\n| **Total** | **N** |\\n\\n---\\n\\n## Scope & Coverage\\n**Endpoints Tested:** N\\n\\n### Tested\\n- ✅ SQL Injection\\n- ✅ XSS\\n- ✅ SSRF\\n- ✅ IDOR\\n- ✅ RCE/CMDi\\n- ✅ LFI/Path Traversal\\n- ✅ Security Headers\\n\\n### NOT Found (0 confirmed)\\n- ❌ [categories with zero findings]\\n\\n---\\n\\n## Findings\\n\\n### 🔴 Critical\\n\\n#### F-001: TITLE\\n**CVSS:** 9.8 | **Endpoint:** \`METHOD /path\` | **OWASP:** A03:2021\\n\\nDESCRIPTION\\n\\n\`\`\`bash\\ncurl -s REPRODUCTION_COMMAND\\n\`\`\`\\n\\n**Impact:** IMPACT\\n**Fix:** FIX\\n\\n---\\n\\n[repeat for all findings ordered Critical → High → Medium → Low]\\n\\n---\\n\\n## Recommendations\\n\\n| Priority | Finding | Fix | Timeline |\\n|----------|---------|-----|----------|\\n| 🔴 P0 | CRITICAL_FINDING | SPECIFIC_FIX | Immediate |\\n| 🟠 P1 | HIGH_FINDING | SPECIFIC_FIX | 24 hours |\\n\\n---\\n\\n*Report by ARCHON Pentest AI | SCRIBE*","taskId":"${taskId}","projectId":"${dispatch.projectId || ''}","squad":"${squad}"}' >> ${ACTIVITY_LOG}
 
   IMPORTANT: The details field must be properly escaped JSON string. Use \\n for newlines. Produce REAL data — not placeholders. All N counts must be actual numbers. All findings must be the real confirmed findings. All curl commands must be real reproduction steps.
 
-- **KRIPA MANDATORY activity log entries (per confirmed finding):**
+- **AUDITOR MANDATORY activity log entries (per confirmed finding):**
   - \`"CONFIRMED — [ID]: reproduction steps: curl -s 'ENDPOINT?PARAM=PAYLOAD'"\` — exact repro for each confirmed finding
 
 ## HOW TO INVOKE SPECIALISTS
@@ -10093,10 +10093,10 @@ ALL specialists must operate in DETECTION mode only:
 - Start with the MINIMAL single probe (one char, one payload)
 - Observe response (error, timing, reflection, status diff)
 - Mark as "Suspected" — do NOT escalate to full exploit
-- KRIPA will confirm; VYASA will report only confirmed findings
+- AUDITOR will confirm; SCRIBE will report only confirmed findings
 
 ## SUSPECTED FINDING SCHEMA (what specialists report)
-- **ID:** [AGENT]-[N] (e.g. NAKUL-001)
+- **ID:** [AGENT]-[N] (e.g. VIPER-001)
 - **Status:** Suspected-High / Suspected-Medium
 - **Type:** XSS / SQLi / SSRF / IDOR / CMDi / etc.
 - **Endpoint:** Full URL + method
@@ -10118,15 +10118,15 @@ Use agent-browser with stealth mode:
 
 ## ACTIVITY LOG FORMAT
 Write every step as JSONL immediately:
-echo '{"ts":"...","agent":"KRISHNA","action":"PHASE 1: RECON COMPLETE","details":"[full details]","taskId":"${taskId}","projectId":"${dispatch.projectId || ''}","squad":"${squad}"}' >> ${ACTIVITY_LOG}
-echo '{"ts":"...","agent":"ARJUN","action":"Recon findings","details":"[subdomains, ports, tech stack found]","taskId":"${taskId}","projectId":"${dispatch.projectId || ''}","squad":"${squad}"}' >> ${ACTIVITY_LOG}
+echo '{"ts":"...","agent":"ATLAS","action":"PHASE 1: RECON COMPLETE","details":"[full details]","taskId":"${taskId}","projectId":"${dispatch.projectId || ''}","squad":"${squad}"}' >> ${ACTIVITY_LOG}
+echo '{"ts":"...","agent":"SCOUT","action":"Recon findings","details":"[subdomains, ports, tech stack found]","taskId":"${taskId}","projectId":"${dispatch.projectId || ''}","squad":"${squad}"}' >> ${ACTIVITY_LOG}
 
 **CRITICAL: EVERY entry MUST include "taskId":"${taskId}" and "projectId":"${dispatch.projectId || ''}"**
 **Write entries IMMEDIATELY as you proceed — not at the end.**
 
-Mark task status as "done" when VYASA report is complete.
+Mark task status as "done" when SCRIBE report is complete.
 
-Execute now! Start with Phase 1 — ARJUN + RUDRA recon.`
+Execute now! Start with Phase 1 — SCOUT + RANGER recon.`
 
     } else {
       // ── Generic squad prompt (red-team, cloud, network, ai-security, any future squad) ──
@@ -10400,7 +10400,7 @@ Execute now! Start by reading your skills, then begin the assessment.`
 
           if (isUnreachable) {
             log(`🚫 Target unreachable — accepting limited assessment (${gradeResult.passRate}%), skipping retry loop`)
-            logActivity('SANJAY', `🚫 Target unreachable — limited assessment accepted (${gradeResult.passRate}%)`, {
+            logActivity('NEXUS', `🚫 Target unreachable — limited assessment accepted (${gradeResult.passRate}%)`, {
               type: 'unreachable-accepted', squad, taskId, projectId: dispatch.projectId || '',
               details: `Score: ${gradeResult.passRate}%\nReason: target behind WAF/firewall, all ports filtered\nAction: completed-limited (no retry)`
             })
@@ -10413,7 +10413,7 @@ Execute now! Start by reading your skills, then begin the assessment.`
             if (retryResult && retryResult.retryType === 'unreachable-skip') {
               // Target confirmed unreachable after retries — accept and move on
               log(`🚫 Smart retry confirms target unreachable — accepting limited result`)
-              logActivity('SANJAY', `🚫 Target confirmed unreachable — completed-limited`, {
+              logActivity('NEXUS', `🚫 Target confirmed unreachable — completed-limited`, {
                 type: 'unreachable-accepted', squad, taskId, projectId: dispatch.projectId || '',
                 details: `Score: ${gradeResult.passRate}%\nReason: ${retryResult.reason}`
               })
@@ -10422,7 +10422,7 @@ Execute now! Start by reading your skills, then begin the assessment.`
               const reGrade = await gradeTask(agentId, taskId, squad, dispatch)
               if (reGrade) {
                 log(`📊 Smart retry result: ${gradeResult.passRate}% → ${reGrade.passRate}%`)
-                logActivity('SANJAY', `📊 Smart retry: ${gradeResult.passRate}% → ${reGrade.passRate}%`, {
+                logActivity('NEXUS', `📊 Smart retry: ${gradeResult.passRate}% → ${reGrade.passRate}%`, {
                   type: 'smart-retry-result', squad, taskId, projectId: dispatch.projectId || '',
                   details: `Before: ${gradeResult.passRate}%\nAfter: ${reGrade.passRate}%\nRetry type: ${retryResult.retryType}`
                 })
@@ -10492,13 +10492,13 @@ Execute now! Start by reading your skills, then begin the assessment.`
         }
       }
       
-      // ── DHARMARAJ VERIFICATION (universal — other squads) ──
-      if (!dispatch.skipVerification && !dispatch.isRepair && shouldRunDharmaraj(squad)) {
-        log(`⚖️ Starting DHARMARAJ verification for ${squad} task ${taskId}`)
+      // ── ARBITER VERIFICATION (universal — other squads) ──
+      if (!dispatch.skipVerification && !dispatch.isRepair && shouldRunarbiter(squad)) {
+        log(`⚖️ Starting ARBITER verification for ${squad} task ${taskId}`)
         try {
           const verifyResult = await verificationLoop(taskId, taskTitle, squad, leader, dispatch)
           if (verifyResult) {
-            logActivity('SANJAY', `⚖️ Final verification: ${verifyResult.verdict} (${verifyResult.passRate}%)`, {
+            logActivity('NEXUS', `⚖️ Final verification: ${verifyResult.verdict} (${verifyResult.passRate}%)`, {
               type: 'verification-final', squad, taskId,
               details: `Verdict: ${verifyResult.verdict}\nPass Rate: ${verifyResult.passRate}%`
             })
@@ -10507,15 +10507,15 @@ Execute now! Start by reading your skills, then begin the assessment.`
             // FIX 1 (2026-05-09): real publication GATE.
             if (shouldBlockPublication(verifyResult)) {
               const reason = verifyResult.verdict === 'FALSE_POSITIVE'
-                ? 'DHARMARAJ verdict: FALSE_POSITIVE'
-                : `DHARMARAJ verdict: PARTIAL (${verifyResult.passRate}% < 50%)`
+                ? 'ARBITER verdict: FALSE_POSITIVE'
+                : `ARBITER verdict: PARTIAL (${verifyResult.passRate}% < 50%)`
               blockReportPublication(taskId, verifyResult, reason)
             }
             // ── FEEDBACK LOOP (other squads) ──
             try { await processTaskFeedback(taskId, taskTitle, squad, leader, verifyResult, typeof allCosts !== 'undefined' ? allCosts : []) } catch (fbErr) { log(`⚠️ Feedback loop error: ${fbErr.message}`) }
           }
         } catch (verifyErr) {
-          log(`⚠️ DHARMARAJ verification error (non-fatal): ${verifyErr.message}`)
+          log(`⚠️ ARBITER verification error (non-fatal): ${verifyErr.message}`)
         }
       }
 
@@ -10683,7 +10683,7 @@ function _processQueueInner() {
     log(`🩹 Healed ${healedCancels} cancelled-but-resurrected dispatch(es) — cancelledAt is sticky`)
   }
 
-  // Recover stale "processing" entries (e.g., SANJAY restart/crash mid-run)
+  // Recover stale "processing" entries (e.g., NEXUS restart/crash mid-run)
   // Only recover if: no agents currently running for this task AND task not done
   // Prevents infinite recovery loops when task is actively being processed
   let recovered = 0
@@ -11002,7 +11002,7 @@ function runStuckTaskWatchdog() {
           dispatch.retryCount = (dispatch.retryCount || 0) + 1
           delete dispatch.processedAt
 
-          logActivity(task.assignee || 'SANJAY',
+          logActivity(task.assignee || 'NEXUS',
             `♻️ Auto-recovery: stuck task re-queued (attempt ${dispatch.retryCount}/3 — ${Math.round(timeSinceActivity/60000)}min no activity)`,
             { taskId: String(task.id), squad: task.squad || '' })
 
@@ -11012,7 +11012,7 @@ function runStuckTaskWatchdog() {
           task.lastUpdate = new Date().toISOString()
           dispatch.status = 'failed'
 
-          logActivity(task.assignee || 'SANJAY',
+          logActivity(task.assignee || 'NEXUS',
             `❌ Task failed after 3 retry attempts — marking as failed`,
             { taskId: String(task.id), squad: task.squad || '' })
 
@@ -11148,11 +11148,10 @@ function replayAndRecover() {
 
 // ── File Watcher & Startup ──
 function startWatcher() {
-  log('👁️ SANJAY — THE ALL-SEEING DISPATCHER v2 — ONLINE')
+  log('👁️ NEXUS — ARCHON dispatcher ONLINE')
   log(`📂 Watching: ${DISPATCH_FILE}`)
-  log(`📅 Calendar: ${CALENDAR_FILE}`)
-  log(`🤖 Squad leaders: KRISHNA (pentest), CHANAKYA (stocks)`)
-  log('⚡ Mode: Event-driven + Parallel stocks + Calendar scheduler')
+  log(`🤖 Squad leaders: ATLAS (pentest), CURATOR (code-review / white-box)`)
+  log('⚡ Mode: Event-driven dispatch')
   log(`🧠 Memory: Per-agent memory + shared squad memory enabled`)
   log('')
   
@@ -11286,9 +11285,9 @@ function startWatcher() {
         // dir, OR concurrent tick beat us to it via fs.watch race), the file
         // stayed in the inbox and the next tick re-queued a DUPLICATE dispatch.
         // Evidence: on 2026-05-10 06:27:39.645, rename returned ENOENT and the
-        // task-log shows two SANJAY "Dispatching task to KRISHNA" entries 9.7s
+        // task-log shows two NEXUS "Dispatching task to ATLAS" entries 9.7s
         // apart, leading to two concurrent dispatchPentestParallel runs and
-        // the second EKLAVYA overwriting the first run's endpoint map (16716
+        // the second TRACER overwriting the first run's endpoint map (16716
         // URLs → 160 URLs). Atomic claim eliminates the race-window.
         let claimedPath
         try {
@@ -11409,7 +11408,7 @@ function startWatcher() {
               writeJSON(TASKS_FILE, tasks)
             }
           } catch (e) { log(`⚠️ cancel: task update failed: ${e.message}`) }
-          logActivity('SANJAY', `🛑 Task ${taskId} cancelled (${killed} children killed)`, {
+          logActivity('NEXUS', `🛑 Task ${taskId} cancelled (${killed} children killed)`, {
             type: 'task-cancelled', taskId, details: `Reason: ${signal.reason || 'user-cancel'}`
           })
           // Cleanup running registries so processQueue doesn't stall
@@ -11505,7 +11504,7 @@ function startWatcher() {
   // Boot-time stale-status sweep — see cleanStaleAgentStatus() for rationale.
   cleanStaleAgentStatus()
 
-  log('✅ SANJAY v3 active. Durable orchestrator: atomic writes, single writer, inbox, supervisor, dynamic discovery, per-task logs, task heartbeat. Waiting for tasks...\n')
+  log('✅ NEXUS v3 active. Durable orchestrator: atomic writes, single writer, inbox, supervisor, dynamic discovery, per-task logs, task heartbeat. Waiting for tasks...\n')
 }
 
 startWatcher()

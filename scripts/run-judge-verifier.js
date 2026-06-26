@@ -119,7 +119,7 @@ async function runJudge({ taskId, file, target, callLLM, outputDir, severityFilt
   const inferredTarget = target || findings[0]?.url || findings[0]?.target || ''
   // Round-6 fix: caller can override outputDir. Without override, defaults to
   // dirname of the input file. The Phase 3.9 hook in event-bus.js passes /root/intel/
-  // explicitly so VYASA can find JUDGED-FINDINGS at the path it reads from.
+  // explicitly so SCRIBE can find JUDGED-FINDINGS at the path it reads from.
   const effectiveOutputDir = outputDir || path.dirname(validatedFile)
   const effectiveTaskId = taskId || findings[0]?.taskId || 'unknown'
 

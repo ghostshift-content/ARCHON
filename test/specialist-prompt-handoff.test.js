@@ -77,7 +77,7 @@ test('handoff section enforces the max-3-handoffs-per-finding rule', () => {
 
 test('handoff section is concise (≤60 lines of content, focused pointer)', () => {
   // 2026-05-10: cap raised from 50 → 60 after commit 14bcdb4 added a worked
-  // JSON example inline (per pentest 1778394458903 — ASHWATTHAMA wrote a
+  // JSON example inline (per pentest 1778394458903 — FORGE wrote a
   // markdown sibling because the previous one-line `--create '<handoff-json>'`
   // helper left specialists reverse-engineering the JSON schema). The worked
   // example is intentional UX, but we still cap to keep the section a focused

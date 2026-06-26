@@ -32,7 +32,7 @@ function makeFixture(taskId, opts = {}) {
     created: '2026-05-06',
     progress: 100,
     model_profile: opts.profile || 'default',
-    krishna_model: opts.krishna || 'claude-opus-4-7',
+    atlas_model: opts.atlas || 'claude-opus-4-7',
     cost_usd: opts.cost ?? 142.30,
     duration_seconds: opts.duration ?? 4567,
   }]
@@ -67,12 +67,12 @@ test('collectMetrics captures model profile for cross-run comparison', () => {
   const taskId = 'TEST-3'
   const { validatedFile, tasksFile } = makeFixture(taskId, {
     profile: 'G4_test_sonnet',
-    krishna: 'claude-sonnet-4-6',
+    atlas: 'claude-sonnet-4-6',
     cost: 28.50,
   })
   const m = collectMetrics({ taskId, validatedFile, tasksFile })
   assert.strictEqual(m.model_profile, 'G4_test_sonnet')
-  assert.strictEqual(m.krishna_model, 'claude-sonnet-4-6')
+  assert.strictEqual(m.atlas_model, 'claude-sonnet-4-6')
   assert.strictEqual(m.metrics.cost_usd, 28.50)
 })
 

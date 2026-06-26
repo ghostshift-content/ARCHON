@@ -10,10 +10,10 @@
 //   - in-scope                  — host matches scope list (exact or wildcard)
 //   - infrastructure-dependency — host not in scope, but an in-scope asset
 //                                 demonstrably depends on it (payment infra
-//                                 for in-scope checkout, etc.). VYASA should
+//                                 for in-scope checkout, etc.). SCRIBE should
 //                                 include with explicit dependency note.
 //   - out-of-scope              — host doesn't match scope or any dependency.
-//                                 VYASA should omit OR mark clearly.
+//                                 SCRIBE should omit OR mark clearly.
 //
 // Scope-list shape (per-task config at /root/intel/scope-{taskId}.json):
 //   {
@@ -34,7 +34,7 @@ const SCOPE_STATUS = Object.freeze({
   INFRA_DEPENDENCY: 'infrastructure-dependency',
 })
 
-// Belt-and-suspenders URL resolution. Even after kripa-validated-builder
+// Belt-and-suspenders URL resolution. Even after auditor-validated-builder
 // emits canonical `finding.url`, defensive extraction protects against
 // in-flight findings, other-squad producers, and re-processed archives.
 // Priority: explicit fields > details > notes > evidence (string variant).

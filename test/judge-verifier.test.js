@@ -95,7 +95,7 @@ test('buildJudgePrompt anti-sycophancy: no agent name or task framing', () => {
   // Agent names and "verify this finding" / "confirm the exploit" framing
   // would tell the judge what answer to give.
   // Note: stage rubric LEGITIMATELY mentions exploitation as an analytical concept.
-  assert.doesNotMatch(p, /KRISHNA|ARJUN|DURYODHANA/, 'no agent names')
+  assert.doesNotMatch(p, /ATLAS|SCOUT|adversary/, 'no agent names')
   assert.doesNotMatch(p, /verify this finding|confirm this finding|confirm the exploit/i,
     'no confirmation-bias framing')
 })
@@ -115,7 +115,7 @@ test('buildJudgePrompt handles minimal finding', () => {
 
 test('buildJudgePrompt: when finding has `proof` (no `evidence`), the proof flows in', () => {
   const f = {
-    id: 'KRIPA-V-001',
+    id: 'AUDITOR-V-001',
     title: 'Akamai WAF Bypass',
     severity: 'High',
     description: 'Main returns 403, locale subdomain returns 200',
@@ -128,10 +128,10 @@ test('buildJudgePrompt: when finding has `proof` (no `evidence`), the proof flow
 })
 
 test('buildJudgePrompt: anti-sycophancy — analyst `impact` claim is NOT shown to judge', () => {
-  // Why: `impact` is the analyst's confident assertion of severity ("Attacker CAN..."),
+  // Why: `impact` is analyst's confident assertion of severity ("Attacker CAN..."),
   // which primes Stage B/C to defer. Retro validation 2026-05-07 caught that including
   // it flipped 7/8 downgrades → 0/8 confirms by anchoring. Judge must derive impact
-  // from evidence, not inherit it from the analyst.
+  // from evidence, not inherit it from analyst.
   const f = {
     title: 'Bypass', severity: 'High', description: 'd',
     impact: 'Attacker CAN access full Oracle RightNow application bypassing WAF',
@@ -142,10 +142,10 @@ test('buildJudgePrompt: anti-sycophancy — analyst `impact` claim is NOT shown 
 })
 
 test('buildJudgePrompt: anti-sycophancy — gate12 threat-model classification is NOT shown', () => {
-  // Why: gate12.attacker_privilege / trust_boundary are the analyst's prior threat-model
+  // Why: gate12.attacker_privilege / trust_boundary are analyst's prior threat-model
   // classification. Showing them anchors the judge on Stage B before independent
   // reasoning. Stage B must derive from evidence (e.g., proof shows no Cookie header
-  // → unauthenticated), not from the analyst's claim.
+  // → unauthenticated), not from analyst's claim.
   const f = {
     title: 'X', severity: 'High', description: 'd',
     gate12: { attacker_privilege: 'unauthenticated', trust_boundary: 'authentication_boundary' },
@@ -176,7 +176,7 @@ test('buildJudgePrompt: still reads `evidence` field (legacy schema)', () => {
 
 // ── Sprint A foundation fix: object-shaped evidence (production reality) ──
 //
-// Real specialists (SHIKHANDI etc.) emit `evidence` as a structured OBJECT
+// Real specialists (DECOY etc.) emit `evidence` as a structured OBJECT
 // like { baseline_command, csrf_command, control_command, key_difference }.
 // The original prompt-builder used `f.proof || f.evidence || f.repro_method`
 // then template-literal interpolated the result — coercing objects to the

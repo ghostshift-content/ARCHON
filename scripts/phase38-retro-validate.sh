@@ -4,7 +4,7 @@
 # Retroactively run Phase 3.8 (browser-verifier) on browser-relevant findings.
 # Reads either per-task or global VALIDATED-FINDINGS.jsonl. Auto-builds recipes
 # for finding types we know how to validate (XSS family); marks others as
-# "needs_manual_recipe" so VYASA / human reviewer knows which Phase 3.8
+# "needs_manual_recipe" so SCRIBE / human reviewer knows which Phase 3.8
 # candidates couldn't be auto-tested.
 #
 # Use cases:

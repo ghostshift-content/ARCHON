@@ -48,8 +48,8 @@ const SAFETY_PERIMETER = [
   'suppression-ledger.js', 'learning-loop.js',            // self-improvement safety machinery
   'auto-applier.js', 'goal-evaluator.js',
   path.sep + 'eval' + path.sep,                           // per-squad test sets
-  path.sep + 'dharmaraj' + path.sep,                      // the judge persona
-  path.sep + 'kripa' + path.sep,                          // the independent verifier persona
+  path.sep + 'arbiter' + path.sep,                      // the judge persona
+  path.sep + 'auditor' + path.sep,                          // the independent verifier persona
 ]
 function _assertNotPerimeter(targetPath) {
   let resolved

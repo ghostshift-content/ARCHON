@@ -2,7 +2,7 @@
 //
 // Per-task telemetry over /root/intel/handoffs/{inbox,done,failed}. Counts
 // each handoff that names this task as source_task_id, broken down by
-// inbox/done/failed and by target_squad. VYASA injects these stats into
+// inbox/done/failed and by target_squad. SCRIBE injects these stats into
 // the report so "cross-squad handoffs fired N times" is provable, not
 // claimed.
 

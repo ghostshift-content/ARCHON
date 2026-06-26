@@ -1,7 +1,7 @@
 // test/js-bundle-analyzer.test.js
 // Covers the JS-bundle endpoint discovery module. Surfaced as a gap during
 // the 2026-05-11 bounty-PoC session — the framework missed /api/v1/printLog
-// because EKLAVYA crawled .js URLs but never analyzed their contents.
+// because TRACER crawled .js URLs but never analyzed their contents.
 
 const assert = require('node:assert')
 const { test } = require('node:test')

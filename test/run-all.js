@@ -60,7 +60,7 @@ const SKIP_FILES = new Set([
   'specialist-prompt-size.test.js',    // ceiling raised by A→Z coverage mandate
   'squad-framework.test.js',           // asserts stocks/cloud/network squad config
   'target-classifier.test.js',         // needs seeded target-profile-rules
-  'vyasa-trajectory-aware.test.js',
+  'scribe-trajectory-aware.test.js',
 ])
 
 let totalPassed = 0

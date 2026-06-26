@@ -1,7 +1,7 @@
 // runner/run-agent-bridge.js
 //
 // LEGACY SHAPE TRANSLATOR — the seam that lets the old event-bus call sites
-// (spawnAgent, DHARMARAJ judge, spot-check, sequential dispatch) consume the
+// (spawnAgent, ARBITER judge, spot-check, sequential dispatch) consume the
 // AgentRunner port WITHOUT changing any of their downstream contracts.
 //
 // The legacy world speaks `{ code, output, cost, model }` where:

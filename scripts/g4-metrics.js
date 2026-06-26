@@ -62,7 +62,7 @@ function collectMetrics({ taskId, validatedFile, tasksFile }) {
     task_id: String(taskId),
     target: task.title || task.goal || '(unknown)',
     model_profile: task.model_profile || 'default',
-    krishna_model: task.krishna_model || '(unknown)',
+    atlas_model: task.atlas_model || '(unknown)',
     captured_at: new Date().toISOString(),
     metrics: {
       findings_total: findings.length,

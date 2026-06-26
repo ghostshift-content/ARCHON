@@ -182,11 +182,11 @@ test('convertMarkerToHandoffArgs maps marker → createHandoff camelCase args', 
     marker,
     sourceTaskId: 'task-123',
     sourceSquad: 'pentest',
-    sourceAgent: 'ASHWATTHAMA',
+    sourceAgent: 'FORGE',
   })
   assert.strictEqual(args.sourceTaskId, 'task-123')
   assert.strictEqual(args.sourceSquad, 'pentest')
-  assert.strictEqual(args.sourceAgent, 'ASHWATTHAMA')
+  assert.strictEqual(args.sourceAgent, 'FORGE')
   assert.strictEqual(args.sourceFindingId, 'ASH-CONFIG-001')
   assert.strictEqual(args.targetSquad, 'cloud-security')
   assert.strictEqual(args.targetCapability, 'data-residency')

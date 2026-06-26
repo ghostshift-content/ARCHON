@@ -16,7 +16,7 @@ const FAKE_PERM = {
 }
 
 test('skips entire run when env flag not set', async () => {
-  delete process.env.KURUKSHETRA_ACTIVE_POC
+  delete process.env.archon_ACTIVE_POC
   const r = await runner.runActivePocsForTask({
     taskId: 't1', permission: FAKE_PERM, findings: [],
   })
@@ -25,7 +25,7 @@ test('skips entire run when env flag not set', async () => {
 })
 
 test('matches finding to probe by capability+squad', async () => {
-  process.env.KURUKSHETRA_ACTIVE_POC = 'enabled'
+  process.env.archon_ACTIVE_POC = 'enabled'
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poc-run-'))
   const findings = [
     { id: 'F-1', url: 'https://webvpn.us.example.com/+webvpn+/index.html',
@@ -49,12 +49,12 @@ test('matches finding to probe by capability+squad', async () => {
   assert.strictEqual(r.probes_run, 1)
   assert.ok(r.audit_path)
   assert.ok(fs.existsSync(r.audit_path))
-  delete process.env.KURUKSHETRA_ACTIVE_POC
+  delete process.env.archon_ACTIVE_POC
   fs.rmSync(tmpDir, { recursive: true, force: true })
 })
 
 test('respects scope_domains filter', async () => {
-  process.env.KURUKSHETRA_ACTIVE_POC = 'enabled'
+  process.env.archon_ACTIVE_POC = 'enabled'
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'poc-run-'))
   const findings = [
     { id: 'F-1', url: 'https://different-host.com/vpn',
@@ -73,6 +73,6 @@ test('respects scope_domains filter', async () => {
   })
   assert.strictEqual(r.probes_run, 0)
   assert.ok(r.skipped_reasons.some(x => /scope/.test(x.reason)))
-  delete process.env.KURUKSHETRA_ACTIVE_POC
+  delete process.env.archon_ACTIVE_POC
   fs.rmSync(tmpDir, { recursive: true, force: true })
 })

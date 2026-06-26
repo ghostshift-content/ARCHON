@@ -18,7 +18,7 @@ const ok = (label, cond, extra = '') => cond ? (console.log(`  ✓ ${label}`), p
 
 function seed() {
   const tasks = JSON.parse(fs.readFileSync(tasksFile, 'utf8'))
-  tasks.push({ id: TID, squad: 'pentest-squad', assignee: 'KRISHNA', status: 'awaiting-triage', progress: 90, title: 'E2E UI Test', goal: 'e2e', createdAt: '2026-01-01T00:00:00Z', lastUpdate: '2026-01-01T00:00:00Z' })
+  tasks.push({ id: TID, squad: 'pentest-squad', assignee: 'ATLAS', status: 'awaiting-triage', progress: 90, title: 'E2E UI Test', goal: 'e2e', createdAt: '2026-01-01T00:00:00Z', lastUpdate: '2026-01-01T00:00:00Z' })
   fs.writeFileSync(tasksFile, JSON.stringify(tasks, null, 2))
   fs.writeFileSync(vfFile, [
     // High WITH a vector (8.8) — severity should render High

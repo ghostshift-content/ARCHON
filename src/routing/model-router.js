@@ -103,7 +103,7 @@ function resolveFamily(family) {
 function _roleForAgent(agentName, squad) {
   const cfg = loadModelConfig()
   const agentKey = String(agentName || '').toLowerCase()
-  // (2026-04-20) Per-squad overrides take precedence. Dual-use agents (BHISHMA
+  // (2026-04-20) Per-squad overrides take precedence. Dual-use agents (veteran
   // exists in both pentest and stocks) need different roles depending on which
   // squad dispatched them. Fall back to flat agent_roles, then vuln_specialist.
   if (squad && cfg.squad_agent_roles && cfg.squad_agent_roles[squad]?.[agentKey]) {
@@ -395,7 +395,7 @@ function _hardcodedFallback() {
     },
     agent_roles: {},
     complexity_scoring: { signals: [], tiers: [] },
-    deny_family_downgrade_for: ['kripa', 'krishna', 'chanakya', 'vyasa', 'dharmaraj'],
+    deny_family_downgrade_for: ['auditor', 'atlas', 'chanakya', 'scribe', 'arbiter'],
   }
 }
 

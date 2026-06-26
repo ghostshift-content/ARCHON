@@ -143,7 +143,7 @@ function categorize(finding) {
 
 /**
  * Generate defensive actions from task findings
- * Called after KRIPA validation, before VYASA report
+ * Called after AUDITOR validation, before SCRIBE report
  */
 function generateDefensiveActions(taskId, targetUrl) {
   const activityLog = path.join(INTEL_DIR, 'ACTIVITY-LOG.jsonl')
@@ -157,7 +157,7 @@ function generateDefensiveActions(taskId, targetUrl) {
       const e = JSON.parse(line)
       if (String(e.taskId) !== String(taskId)) continue
       const action = (e.action || '').toUpperCase()
-      if ((action.includes('CONFIRMED') && action.includes('FINDING')) || (e.agent === 'KRIPA' && action.includes('CONFIRMED'))) {
+      if ((action.includes('CONFIRMED') && action.includes('FINDING')) || (e.agent === 'AUDITOR' && action.includes('CONFIRMED'))) {
         confirmed.push(e)
       }
     } catch {}
@@ -204,7 +204,7 @@ function generateDefensiveActions(taskId, targetUrl) {
 }
 
 /**
- * Format defensive actions for VYASA report injection
+ * Format defensive actions for SCRIBE report injection
  */
 function formatForReport(actions) {
   if (!actions || actions.length === 0) return ''

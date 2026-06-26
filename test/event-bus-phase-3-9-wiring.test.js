@@ -1,7 +1,7 @@
 // test/event-bus-phase-3-9-wiring.test.js
 //
 // Module-level grep test confirming Phase 3.9 (Judge Verifier) is wired
-// between Phase 3.8 (browser-verifier) and Phase 4 (VYASA) in event-bus.js.
+// between Phase 3.8 (browser-verifier) and Phase 4 (SCRIBE) in event-bus.js.
 //
 // Why a grep test, not a runtime test: event-bus.js is a long-running daemon
 // with side-effecting init; integration testing it would require spinning up
@@ -39,12 +39,12 @@ test('event-bus.js Phase 3.9 hook sits between Phase 3.8 and Phase 4', () => {
   assert.ok(idx39 > 0, 'Phase 3.9 marker present')
   assert.ok(idx4 > 0, 'Phase 4 marker present')
   assert.ok(idx38 < idx39, 'Phase 3.9 must come AFTER Phase 3.8')
-  assert.ok(idx39 < idx4, 'Phase 3.9 must come BEFORE Phase 4 VYASA')
+  assert.ok(idx39 < idx4, 'Phase 3.9 must come BEFORE Phase 4 SCRIBE')
 })
 
 test('event-bus.js Phase 3.9 has env-flag rollback path', () => {
-  // KURUKSHETRA_PHASE_3_9 disabled → skip the hook (rollback for emergencies)
-  assert.match(EVENT_BUS, /KURUKSHETRA_PHASE_3_9/, 'must support env-flag rollback')
+  // archon_PHASE_3_9 disabled → skip the hook (rollback for emergencies)
+  assert.match(EVENT_BUS, /archon_PHASE_3_9/, 'must support env-flag rollback')
 })
 
 test('event-bus.js Phase 3.9 is fail-soft (try/catch wrap)', () => {

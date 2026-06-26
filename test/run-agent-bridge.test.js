@@ -81,7 +81,7 @@ function makeAbortableRunAgent() {
 
 test('success → output JSON-parses to a CLI envelope with REAL cost numbers; code 0', async () => {
   const res = await bridgeSpawnAgent(
-    { agentName: 'ARJUN', taskId: 't1', model: 'claude-sonnet-4-6', userPrompt: 'hi' },
+    { agentName: 'SCOUT', taskId: 't1', model: 'claude-sonnet-4-6', userPrompt: 'hi' },
     { _runAgent: makeOkRunAgent('the answer', 0.0042) }
   )
   assert.strictEqual(res.code, 0)

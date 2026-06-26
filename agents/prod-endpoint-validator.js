@@ -2,7 +2,7 @@
 //
 // 2026-05-15: Catches findings that claim PRODUCTION impact but validated
 // against sandbox/test/uat/dev endpoints. Q#8 surfaced this hard:
-// F-002 was titled "PROD PayPal CRITICAL", but KRIPA's actual probe hit
+// F-002 was titled "PROD PayPal CRITICAL", but AUDITOR's actual probe hit
 // api.sandbox.paypal.com — Jay tested api.paypal.com and got
 // invalid_client. The framework's "9 confirmed" claim was inflated because
 // nobody checked "is the validation endpoint actually production?"

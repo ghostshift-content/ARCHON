@@ -3,7 +3,7 @@ const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see path
 // test/publication-banner.test.js
 //
 // Sprint B.3 (2026-05-09): publication-status banner — annotate report files
-// when DHARMARAJ verdict is weak OR judge-verifier flagged Critical/High as
+// when ARBITER verdict is weak OR judge-verifier flagged Critical/High as
 // indeterminate. Banner is prepended after verificationLoop completes.
 //
 // The function lives in event-bus.js (large file, no test-friendly export).
@@ -18,8 +18,8 @@ const path = require('node:path')
 const SRC = fs.readFileSync(path.resolve(__dirname, '..', 'event-bus.js'), 'utf-8')
 
 test('event-bus.js defines prependPublicationStatusBanner', () => {
-  assert.match(SRC, /function prependPublicationStatusBanner\s*\(\s*taskId\s*,\s*dharmarajResult\s*\)/,
-    'function signature must match (taskId, dharmarajResult)')
+  assert.match(SRC, /function prependPublicationStatusBanner\s*\(\s*taskId\s*,\s*arbiterResult\s*\)/,
+    'function signature must match (taskId, arbiterResult)')
 })
 
 test('banner reads JUDGED-FINDINGS to count indeterminate Critical/High', () => {
@@ -36,7 +36,7 @@ test('banner triggers on FALSE_POSITIVE OR PARTIAL<70%', () => {
   const fnStart = SRC.indexOf('function prependPublicationStatusBanner')
   const fnSlice = SRC.slice(fnStart, fnStart + 4000)
   assert.match(fnSlice, /FALSE_POSITIVE/,
-    'must trigger on DHARMARAJ FALSE_POSITIVE')
+    'must trigger on ARBITER FALSE_POSITIVE')
   assert.match(fnSlice, /PARTIAL/,
     'must consider PARTIAL verdict')
   assert.match(fnSlice, /passRate\s*<\s*70/,
@@ -61,7 +61,7 @@ test('banner is fail-soft (try/catch wrapping)', () => {
 test('banner does NOT trigger on clean run (CONFIRMED + no indeterminate)', () => {
   const fnStart = SRC.indexOf('function prependPublicationStatusBanner')
   const fnSlice = SRC.slice(fnStart, fnStart + 4000)
-  assert.match(fnSlice, /if\s*\(\s*!dharmarajWeak\s*&&\s*!judgeWeak\s*\)\s*return/,
+  assert.match(fnSlice, /if\s*\(\s*!arbiterWeak\s*&&\s*!judgeWeak\s*\)\s*return/,
     'must short-circuit when both signals are clean')
 })
 

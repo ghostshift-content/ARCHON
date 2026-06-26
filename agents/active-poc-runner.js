@@ -50,7 +50,7 @@ async function runActivePocsForTask({
   probeRegistry = null, auditDir = DEFAULT_AUDIT_DIR,
 }) {
   if (!policy.envIsEnabled()) {
-    return { skipped: true, skip_reason: 'env KURUKSHETRA_ACTIVE_POC not enabled',
+    return { skipped: true, skip_reason: 'env archon_ACTIVE_POC not enabled',
       probes_run: 0, skipped_reasons: [], audit_path: null }
   }
   if (!permission) {

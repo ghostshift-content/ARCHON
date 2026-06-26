@@ -6,13 +6,13 @@ const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see path
 //
 // Production audit on /root/intel/pentest/VALIDATED-FINDINGS.jsonl found:
 //   - severity in 3 case variants ("High", "high", "medium") — case-sensitive comparisons silently miss half
-//   - 42/48 findings missing `title` (DHARMA family uses `id` only; DURYODHANA family has both)
+//   - 42/48 findings missing `title` (SENTRY family uses `id` only; adversary family has both)
 //   - 22 distinct key signatures (every agent stamps own `{agent}_ts`)
-//   - Two schema families: DHARMA-style (id, original_agent, validation_status) and
-//     DURYODHANA-style (findingId, type, agent, evidence as object)
+//   - Two schema families: SENTRY-style (id, original_agent, validation_status) and
+//     adversary-style (findingId, type, agent, evidence as object)
 //
 // This module normalizes finding records to a canonical shape before they hit
-// the judge, browser-verifier, or VYASA. Belt-and-suspenders: the judge prompt's
+// the judge, browser-verifier, or SCRIBE. Belt-and-suspenders: the judge prompt's
 // extractEvidence already JSON-stringifies object evidence; normalization makes
 // downstream comparisons (severity case, id presence) reliable too.
 
@@ -38,7 +38,7 @@ test('normalizeFinding: severity defaults to Medium if missing or unrecognized',
   assert.strictEqual(normalizeFinding({ severity: 'urgent' }).severity, 'Medium', 'unrecognized labels default to Medium')
 })
 
-test('normalizeFinding: findingId is mapped to id when id missing (DURYODHANA family)', () => {
+test('normalizeFinding: findingId is mapped to id when id missing (adversary family)', () => {
   const f = normalizeFinding({ findingId: 'X-123', type: 'csrf', severity: 'High' })
   assert.strictEqual(f.id, 'X-123', 'findingId should populate id when id is missing')
   assert.strictEqual(f.findingId, 'X-123', 'findingId is preserved (no destructive renaming)')
@@ -51,9 +51,9 @@ test('normalizeFinding: existing id wins over findingId when both present', () =
 })
 
 test('normalizeFinding: title is synthesized from id when missing', () => {
-  const f = normalizeFinding({ id: 'KARNA-SQLI-001', severity: 'High' })
+  const f = normalizeFinding({ id: 'DRILL-SQLI-001', severity: 'High' })
   assert.ok(f.title, 'title must be populated')
-  assert.match(f.title, /KARNA-SQLI-001/, 'title should reference the id when no original title')
+  assert.match(f.title, /DRILL-SQLI-001/, 'title should reference the id when no original title')
 })
 
 test('normalizeFinding: title falls back to type when both id and title missing', () => {
@@ -165,7 +165,7 @@ test('validateFinding: returns {valid:true, finding, warnings:[]} for complete r
     title: 'CSRF',
     severity: 'Medium',
     validation_status: 'confirmed',
-    original_agent: 'NAKUL',
+    original_agent: 'VIPER',
     taskId: '1234567890',
   })
   assert.strictEqual(result.valid, true)
@@ -177,7 +177,7 @@ test('validateFinding: auto-repairs missing severity → Medium + warning', () =
   const fs = require('../agents/finding-schema')
   const result = fs.validateFinding({
     id: 'F-002', title: 'X', validation_status: 'confirmed',
-    original_agent: 'NAKUL', taskId: '123',
+    original_agent: 'VIPER', taskId: '123',
   })
   assert.strictEqual(result.valid, true)
   assert.strictEqual(result.finding.severity, 'Medium')
@@ -188,7 +188,7 @@ test('validateFinding: auto-synthesizes missing id', () => {
   const fs = require('../agents/finding-schema')
   const result = fs.validateFinding({
     title: 'X', severity: 'Low', validation_status: 'confirmed',
-    original_agent: 'NAKUL', taskId: '123',
+    original_agent: 'VIPER', taskId: '123',
   })
   assert.strictEqual(result.valid, true)
   assert.match(result.finding.id, /^F-AUTO-/)
@@ -199,7 +199,7 @@ test('validateFinding: auto-synthesizes missing title from id', () => {
   const fs = require('../agents/finding-schema')
   const result = fs.validateFinding({
     id: 'F-003', severity: 'Low', validation_status: 'confirmed',
-    original_agent: 'NAKUL', taskId: '123',
+    original_agent: 'VIPER', taskId: '123',
   })
   assert.strictEqual(result.finding.title, 'F-003')
 })
@@ -217,7 +217,7 @@ test('validateFinding: handles missing optional fields gracefully', () => {
   const fs = require('../agents/finding-schema')
   const result = fs.validateFinding({
     id: 'F-004', title: 'Y', severity: 'High',
-    validation_status: 'confirmed', original_agent: 'NAKUL', taskId: '123',
+    validation_status: 'confirmed', original_agent: 'VIPER', taskId: '123',
     // no notes, details, url — all optional
   })
   assert.strictEqual(result.valid, true)

@@ -18,17 +18,17 @@ test('event-bus.js requires pentest-browser-recipe-constructor from ./agents/ (n
   assert.doesNotMatch(SRC, /freshRequire\(['"]\.\/pentest-browser-recipe-constructor['"]\)/)
 })
 
-test('event-bus.js dispatches Phase 3.8 AFTER Offensive Vaccine and BEFORE VYASA', () => {
+test('event-bus.js dispatches Phase 3.8 AFTER Offensive Vaccine and BEFORE SCRIBE', () => {
   // Existing Offensive Vaccine block emits 'Offensive Vaccine: <N> defensive actions'
-  // Existing VYASA dispatch is preceded by 'Phase 4: VYASA writing final report'
+  // Existing SCRIBE dispatch is preceded by 'Phase 4: SCRIBE writing final report'
   const idxOffensiveVaccine = SRC.indexOf('Offensive Vaccine: ${defActions.length}')
   const idxBrowserVerify = SRC.indexOf('verifyAll(')
-  const idxVyasa = SRC.indexOf('Phase 4: VYASA writing final report')
+  const idxscribe = SRC.indexOf('Phase 4: SCRIBE writing final report')
   assert.ok(idxOffensiveVaccine > 0, 'Offensive Vaccine block missing')
   assert.ok(idxBrowserVerify > 0, 'browser-verifier call missing')
-  assert.ok(idxVyasa > 0, 'VYASA dispatch missing')
+  assert.ok(idxscribe > 0, 'SCRIBE dispatch missing')
   assert.ok(idxOffensiveVaccine < idxBrowserVerify, 'browser-verifier must come AFTER Offensive Vaccine')
-  assert.ok(idxBrowserVerify < idxVyasa, 'browser-verifier must come BEFORE VYASA')
+  assert.ok(idxBrowserVerify < idxscribe, 'browser-verifier must come BEFORE SCRIBE')
 })
 
 test('event-bus.js logs the Phase 3.8 banner', () => {
@@ -47,7 +47,7 @@ test('event-bus.js skips Phase 3.8 when no browser-relevant findings', () => {
   assert.match(SRC, /browserCandidates\.length\s*===\s*0|!browserCandidates\.length|recipes\.length\s*===\s*0/)
 })
 
-test('event-bus.js wraps Phase 3.8 in try/catch (best-effort, never blocks VYASA)', () => {
+test('event-bus.js wraps Phase 3.8 in try/catch (best-effort, never blocks SCRIBE)', () => {
   // Find the browser-verifier call and walk up looking for the enclosing try.
   // Use a generous 8000-char window — the inner block has grown over multiple
   // sprints with diagnostic logging, parser logic, etc., but the outer

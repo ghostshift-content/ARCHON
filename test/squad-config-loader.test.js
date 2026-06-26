@@ -17,9 +17,9 @@ beforeEach(() => {
 })
 
 describe('loadSquadConfig', () => {
-  test('returns correct leader for pentest squad (KRISHNA)', () => {
+  test('returns correct leader for pentest squad (ATLAS)', () => {
     const cfg = loader.loadSquadConfig('pentest')
-    assert.equal(cfg.leader, 'KRISHNA', `expected KRISHNA, got ${cfg.leader}`)
+    assert.equal(cfg.leader, 'ATLAS', `expected ATLAS, got ${cfg.leader}`)
     assert.equal(cfg.squad, 'pentest')
   })
 
@@ -106,13 +106,13 @@ describe('getAllSquadConfigs', () => {
 describe('clearCache + reload', () => {
   test('clearCache allows re-reading — returns same valid config after reload', () => {
     const first = loader.loadSquadConfig('pentest')
-    assert.equal(first.leader, 'KRISHNA')
+    assert.equal(first.leader, 'ATLAS')
 
     loader.clearCache()
 
     // After clearing, re-loading should succeed and return same values
     const second = loader.loadSquadConfig('pentest')
-    assert.equal(second.leader, 'KRISHNA')
+    assert.equal(second.leader, 'ATLAS')
     assert.equal(second.squad, 'pentest')
     assert.equal(second.modelTier, first.modelTier)
   })

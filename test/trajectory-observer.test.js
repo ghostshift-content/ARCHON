@@ -37,11 +37,11 @@ const { buildObserverPrompt } = require('../agents/trajectory-observer')
 
 test('buildObserverPrompt includes agent goal and output', () => {
   const prompt = buildObserverPrompt({
-    agent: 'KARNA',
+    agent: 'DRILL',
     goal: 'Probe discovered endpoints for SQL injection',
     output: 'Tested /search?q= with quote — got 500 error in 2.1s, sqlmap confirmed boolean blind.',
   })
-  assert.match(prompt, /KARNA/)
+  assert.match(prompt, /DRILL/)
   assert.match(prompt, /SQL injection/)
   assert.match(prompt, /sqlmap confirmed boolean blind/)
   assert.match(prompt, /STRICT JSON ONLY/)
@@ -61,12 +61,12 @@ test('buildObserverPrompt anti-sycophancy: NO downstream verdicts visible', () =
     agent: 'X', goal: 'Y', output: 'Z',
     // These are EVERYTHING that would prime the observer.
     // The function must IGNORE them even if passed.
-    kripa_verdict: 'CONFIRMED',
+    auditor_verdict: 'CONFIRMED',
     judge_verdict: 'confirmed',
     notes: 'analyst says this is critical',
     severity_original: 'High',
   })
-  assert.doesNotMatch(prompt, /CONFIRMED/, 'KRIPA verdict must not appear')
+  assert.doesNotMatch(prompt, /CONFIRMED/, 'AUDITOR verdict must not appear')
   assert.doesNotMatch(prompt, /critical/, 'analyst notes must not appear')
   assert.doesNotMatch(prompt, /severity_original/, 'severity must not anchor')
 })
@@ -138,14 +138,14 @@ test('logObservation: appends one JSON line to the file', () => {
   const tmp = path.join(os.tmpdir(), `traj-obs-${Date.now()}-${Math.random().toString(36).slice(2)}.jsonl`)
   try {
     logObservation({
-      task_id: 'T1', agent: 'KARNA', verdict: 'on-track',
+      task_id: 'T1', agent: 'DRILL', verdict: 'on-track',
       first_failed_dim: null, reason: 'good', output_bytes: 100, elapsed_ms: 1000, model: 'claude-haiku-4-5',
     }, tmp)
     const lines = fs.readFileSync(tmp, 'utf-8').split('\n').filter(Boolean)
     assert.strictEqual(lines.length, 1)
     const parsed = JSON.parse(lines[0])
     assert.strictEqual(parsed.task_id, 'T1')
-    assert.strictEqual(parsed.agent, 'KARNA')
+    assert.strictEqual(parsed.agent, 'DRILL')
     assert.strictEqual(parsed.verdict, 'on-track')
     assert.strictEqual(parsed.schema_version, '1')
     assert.ok(parsed.observed_at, 'observed_at must be set')
@@ -205,12 +205,12 @@ test('observeSpecialistOutput: end-to-end with mock LLM returns observation', as
       verdict: 'on-track', first_failed_dim: null, reason: 'looks good',
     })
     const obs = await observeSpecialistOutput({
-      agent: 'KARNA', taskId: 'T1', goal: 'find SQLi',
+      agent: 'DRILL', taskId: 'T1', goal: 'find SQLi',
       output: 'tested /search?q= got 500',
       callLLM, logFile: tmp,
     })
     assert.strictEqual(obs.verdict, 'on-track')
-    assert.strictEqual(obs.agent, 'KARNA')
+    assert.strictEqual(obs.agent, 'DRILL')
     assert.strictEqual(obs.task_id, 'T1')
     assert.ok(obs.output_bytes > 0)
     assert.ok(obs.observed_at)
@@ -289,16 +289,16 @@ test('readTrajectoryLog: returns only canonical schema_version entries', () => {
   try {
     const lines = [
       // Canonical entries (must be returned)
-      JSON.stringify({ schema_version: '1', task_id: 'T1', agent: 'KARNA', verdict: 'on-track' }),
-      JSON.stringify({ schema_version: '1', task_id: 'T2', agent: 'ARJUN', verdict: 'off-track' }),
+      JSON.stringify({ schema_version: '1', task_id: 'T1', agent: 'DRILL', verdict: 'on-track' }),
+      JSON.stringify({ schema_version: '1', task_id: 'T2', agent: 'SCOUT', verdict: 'off-track' }),
       // Polluted: missing schema_version
-      JSON.stringify({ task_id: 'T3', agent: 'ASHWATTHAMA', verdict: 'CONFIRMED' }),
+      JSON.stringify({ task_id: 'T3', agent: 'FORGE', verdict: 'CONFIRMED' }),
       // Polluted: wrong schema_version
       JSON.stringify({ schema_version: '0', task_id: 'T4', agent: 'X', verdict: 'HONEST' }),
       // Polluted: numeric instead of string
       JSON.stringify({ schema_version: 1, task_id: 'T5', agent: 'X', verdict: 'DISPROVEN' }),
       // Canonical again
-      JSON.stringify({ schema_version: '1', task_id: 'T6', agent: 'BHEEM', verdict: 'crashed' }),
+      JSON.stringify({ schema_version: '1', task_id: 'T6', agent: 'RELAY', verdict: 'crashed' }),
     ]
     fs.writeFileSync(tmp, lines.join('\n') + '\n')
     const records = readTrajectoryLog(tmp)
@@ -368,12 +368,12 @@ test('readTrajectoryLog: filters real pollution sample (live pentest 17783944589
   const tmp = path.join(os.tmpdir(), `traj-live-${Date.now()}-${Math.random().toString(36).slice(2)}.jsonl`)
   try {
     const lines = [
-      JSON.stringify({ schema_version: '1', task_id: '1778394458903', agent: 'KARNA', verdict: 'on-track', reason: 'concrete artefact' }),
+      JSON.stringify({ schema_version: '1', task_id: '1778394458903', agent: 'DRILL', verdict: 'on-track', reason: 'concrete artefact' }),
       // The shell-echo pollution shape:
-      JSON.stringify({ task_id: '1778394458903', specialist: 'ASHWATTHAMA', verdict: 'CONFIRMED', evidence: '...' }),
-      JSON.stringify({ task_id: '1778394458903', specialist: 'RUDRA', verdict: 'HONEST', evidence: '...' }),
-      JSON.stringify({ task_id: '1778394458903', specialist: 'ARJUN', verdict: 'DISPROVEN', evidence: '...' }),
-      JSON.stringify({ schema_version: '1', task_id: '1778394458903', agent: 'BHEEM', verdict: 'off-track', reason: 'wrong domain' }),
+      JSON.stringify({ task_id: '1778394458903', specialist: 'FORGE', verdict: 'CONFIRMED', evidence: '...' }),
+      JSON.stringify({ task_id: '1778394458903', specialist: 'RANGER', verdict: 'HONEST', evidence: '...' }),
+      JSON.stringify({ task_id: '1778394458903', specialist: 'SCOUT', verdict: 'DISPROVEN', evidence: '...' }),
+      JSON.stringify({ schema_version: '1', task_id: '1778394458903', agent: 'RELAY', verdict: 'off-track', reason: 'wrong domain' }),
     ].join('\n')
     fs.writeFileSync(tmp, lines)
     const records = readTrajectoryLog(tmp)

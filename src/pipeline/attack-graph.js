@@ -91,7 +91,7 @@ class AttackGraph {
 
   /**
    * Mark a node as validated — reduces cost of connected edges by 50%
-   * Called after KRIPA confirms a finding
+   * Called after AUDITOR confirms a finding
    */
   validateNode(nodeId) {
     const node = this.nodes.get(nodeId)
@@ -294,7 +294,7 @@ function buildGraphFromFindings(taskId, targetUrl) {
 }
 
 /**
- * Format attack chains for KRISHNA chain analysis injection
+ * Format attack chains for ATLAS chain analysis injection
  */
 function formatChainsForAnalysis(graph) {
   if (!graph || graph.nodes.size === 0) return ''
@@ -315,8 +315,8 @@ function formatChainsForAnalysis(graph) {
 }
 
 /**
- * Update graph with KRIPA validation results — marks validated nodes, reduces costs
- * Called after KRIPA phase completes
+ * Update graph with AUDITOR validation results — marks validated nodes, reduces costs
+ * Called after AUDITOR phase completes
  */
 function updateGraphWithValidation(taskId) {
   const graphFile = path.join(INTEL_DIR, `attack-graph-${taskId}.json`)
@@ -326,30 +326,30 @@ function updateGraphWithValidation(taskId) {
   const activityLog = path.join(INTEL_DIR, 'ACTIVITY-LOG.jsonl')
   if (!fs.existsSync(activityLog)) return graph
 
-  // Find KRIPA confirmed findings
+  // Find AUDITOR confirmed findings
   const lines = fs.readFileSync(activityLog, 'utf-8').split('\n').filter(Boolean)
-  const kripaConfirmed = []
+  const auditorConfirmed = []
   for (const line of lines) {
     try {
       const e = JSON.parse(line)
       if (String(e.taskId) !== String(taskId)) continue
-      if (e.agent === 'KRIPA' && (e.action || '').includes('CONFIRMED')) {
-        kripaConfirmed.push(e.action)
+      if (e.agent === 'AUDITOR' && (e.action || '').includes('CONFIRMED')) {
+        auditorConfirmed.push(e.action)
       }
     } catch {}
   }
 
-  if (kripaConfirmed.length === 0) return graph
+  if (auditorConfirmed.length === 0) return graph
 
-  // Match KRIPA confirmations to graph nodes and validate them
+  // Match AUDITOR confirmations to graph nodes and validate them
   let validatedCount = 0
   for (const [nodeId, node] of graph.nodes) {
     if (node.type !== NODE_TYPES.VULN && node.type !== NODE_TYPES.FINDING) continue
     if (node.properties?.validated) continue // Already validated
 
     const nodeLabel = (node.label || '').toLowerCase()
-    // Check if any KRIPA confirmation matches this node
-    for (const confirmation of kripaConfirmed) {
+    // Check if any AUDITOR confirmation matches this node
+    for (const confirmation of auditorConfirmed) {
       const confLower = confirmation.toLowerCase()
       // Match by keywords overlap
       const nodeWords = nodeLabel.split(/\s+/).filter(w => w.length > 4)
@@ -364,7 +364,7 @@ function updateGraphWithValidation(taskId) {
   }
 
   graph.save()
-  return { graph, validatedCount, totalKripa: kripaConfirmed.length }
+  return { graph, validatedCount, totalauditor: auditorConfirmed.length }
 }
 
 /**

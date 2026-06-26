@@ -138,9 +138,9 @@ test('getPriorityOrderForSquad returns array (not a filter)', () => {
   const order = tc.getPriorityOrderForSquad('pentest', profile)
   assert.ok(Array.isArray(order), 'must return array')
   assert.ok(order.length > 0, 'should have priority list for pentest+spa+saml')
-  // First few should include nakul and arjun (SPA priority) and/or abhimanyu (SAML)
-  assert.ok(order.includes('nakul') || order.includes('arjun'),
-    `expected nakul/arjun in priority, got: ${order.join(',')}`)
+  // First few should include viper and scout (SPA priority) and/or vault (SAML)
+  assert.ok(order.includes('viper') || order.includes('scout'),
+    `expected viper/scout in priority, got: ${order.join(',')}`)
 })
 
 test('getPriorityOrderForSquad returns [] for unknown squad (no-op fallback)', () => {

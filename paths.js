@@ -1,6 +1,6 @@
 // /root/agents/paths.js
 // THE single resolver chokepoint for persona + squad paths (restructure Phase 1, 2026-06-07).
-// Design: docs/research/2026-06-07-kurukshetra-restructure-design.md
+// Design: docs/research/2026-06-07-archon-restructure-design.md
 //
 // Contract:
 //   - NO case transformation: callers pass the exact name they always did
@@ -79,7 +79,7 @@ function config() {
 // Phase-3 ownership map: persona dir name → home relative to AGENTS_ROOT.
 // Runtime-read from ownership.json (mtime-cached) so populating it + flipping
 // personaMode is a config cutover, NOT a code change. Legacy mode never consults it.
-// Universal agents (kripa, vyasa, dharmaraj, rof) → '_universal'.
+// Universal agents (auditor, scribe, arbiter, command) → '_universal'.
 let _own = null
 let _ownMtime = 0
 function ownership() {
@@ -97,7 +97,7 @@ function ownership() {
 
 function personaCode(name) {
   // lowercase — ownership keys + on-disk dirs are all lowercase, and the dashboard
-  // mirror (agent-paths.ts) lowercases too. Without this, personaCode('ARJUN') →
+  // mirror (agent-paths.ts) lowercases too. Without this, personaCode('SCOUT') →
   // a broken flat path while the dashboard resolves it correctly (GATE-121 parity).
   const n = String(name).toLowerCase()
   if (config().personaMode === 'nested') {

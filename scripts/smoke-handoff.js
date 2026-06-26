@@ -40,7 +40,7 @@ async function main() {
   const created = createHandoff({
     sourceTaskId: 'SMOKE-T1',
     sourceSquad: 'pentest',
-    sourceAgent: 'ASHWATTHAMA',
+    sourceAgent: 'FORGE',
     sourceFindingId: 'SMOKE-F1',
     targetSquad: 'cloud-security',
     targetCapability: 'data-residency',

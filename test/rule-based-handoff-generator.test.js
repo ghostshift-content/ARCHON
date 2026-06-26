@@ -1,6 +1,6 @@
 // test/rule-based-handoff-generator.test.js
 //
-// Covers the rule-based deterministic post-DHARMA handoff generator. The
+// Covers the rule-based deterministic post-SENTRY handoff generator. The
 // module exists because empirical data across rounds 7/8c/9 showed 0 organic
 // specialist handoffs even with prompt + worked example. These tests lock in
 // the behaviors that close the gap: severity gating, rule matching,
@@ -164,7 +164,7 @@ test('Medium/Low/Info findings never match any rule (severity gate)', () => {
     findings: [mediumWithCloud],
     sourceTaskId: 't-x',
     sourceSquad: 'pentest',
-    sourceAgent: 'NAKUL',
+    sourceAgent: 'VIPER',
     createHandoff: () => { createCalled = true; return { handoff_id: 'h-fake' } },
   })
   assert.strictEqual(createCalled, false, 'createHandoff should not fire for Medium')
@@ -203,18 +203,18 @@ test('buildHandoffArgs synthesizes well-formed createHandoff args', () => {
     reproduction_result: '200 with sensitive data',
     rationale: 'BANNED-ANALYST',
     notes: 'BANNED-NOTES',
-    original_agent: 'EKLAVYA',
+    original_agent: 'TRACER',
   }
   const rule = RULES.find(r => r.id === 'cloud-provider-touched')
   const args = buildHandoffArgs({
     finding, rule,
     sourceTaskId: 'task-99',
     sourceSquad: 'pentest',
-    sourceAgent: 'EKLAVYA',
+    sourceAgent: 'TRACER',
   })
   assert.strictEqual(args.sourceTaskId, 'task-99')
   assert.strictEqual(args.sourceSquad, 'pentest')
-  assert.strictEqual(args.sourceAgent, 'EKLAVYA')
+  assert.strictEqual(args.sourceAgent, 'TRACER')
   assert.strictEqual(args.sourceFindingId, 'F-42')
   assert.strictEqual(args.targetSquad, 'cloud-security')
   assert.strictEqual(args.targetCapability, 'cloud-misconfig')
@@ -239,7 +239,7 @@ test('integrated: high finding flows through createHandoff and lands as canonica
     {
       id: 'F-INT-1',
       severity: 'High',
-      original_agent: 'BHEEM',
+      original_agent: 'RELAY',
       url: 'https://bucket.s3.amazonaws.com/secret-data',
       reproduction_method: 'curl https://bucket.s3.amazonaws.com/secret-data',
       reproduction_result: '200 OK with PII payload',
@@ -250,7 +250,7 @@ test('integrated: high finding flows through createHandoff and lands as canonica
     findings,
     sourceTaskId: 'integration-1',
     sourceSquad: 'pentest',
-    sourceAgent: 'BHEEM',
+    sourceAgent: 'RELAY',
     createHandoff: wrappedCreate,
   })
   assert.strictEqual(result.created.length, 1)
@@ -283,7 +283,7 @@ test('idempotence: calling generateHandoffsForTask twice with same finding hits 
   const finding = {
     id: 'F-IDEM-1',
     severity: 'High',
-    original_agent: 'NAKUL',
+    original_agent: 'VIPER',
     url: 'https://bucket.s3.amazonaws.com/x',
     reproduction_method: 'GET /x',
     details: 'supply chain via cdn.jsdelivr.net and 10.0.0.5 internal',
@@ -295,7 +295,7 @@ test('idempotence: calling generateHandoffsForTask twice with same finding hits 
     findings: [finding],
     sourceTaskId: 'idem-1',
     sourceSquad: 'pentest',
-    sourceAgent: 'NAKUL',
+    sourceAgent: 'VIPER',
     createHandoff: wrappedCreate,
   })
   assert.ok(r1.created.length <= protocol.MAX_HANDOFFS_PER_FINDING)
@@ -306,7 +306,7 @@ test('idempotence: calling generateHandoffsForTask twice with same finding hits 
     findings: [finding],
     sourceTaskId: 'idem-1',
     sourceSquad: 'pentest',
-    sourceAgent: 'NAKUL',
+    sourceAgent: 'VIPER',
     createHandoff: wrappedCreate,
   })
   // No new handoffs accepted (the protocol's MAX_HANDOFFS_PER_FINDING fires)

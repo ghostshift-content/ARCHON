@@ -42,7 +42,7 @@ function writeFixtureLine(file, overrides) {
     ts: new Date().toISOString(),
     taskId: 'fixture-task',
     squad: 'pentest',
-    agentName: 'KRISHNA',
+    agentName: 'ATLAS',
     passed: 8,
     total: 10,
     passRate: 0.8,
@@ -68,7 +68,7 @@ test('recordRunQuality writes correct JSONL with passRate computed', async () =>
   qt.recordRunQuality({
     taskId: 'task-001',
     squad: 'pentest',
-    agentName: 'KRISHNA',
+    agentName: 'ATLAS',
     passed: 8,
     total: 10,
     gradeScore: 80,  // as 0-100 — should normalise to 0.8
@@ -88,7 +88,7 @@ test('recordRunQuality writes correct JSONL with passRate computed', async () =>
   assert.ok(line.ts, 'ts should be set')
   assert.strictEqual(line.taskId, 'task-001')
   assert.strictEqual(line.squad, 'pentest')
-  assert.strictEqual(line.agentName, 'KRISHNA')
+  assert.strictEqual(line.agentName, 'ATLAS')
   assert.strictEqual(line.passed, 8)
   assert.strictEqual(line.total, 10)
   assert.strictEqual(line.passRate, 0.8, 'passRate should be passed/total')

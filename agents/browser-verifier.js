@@ -9,7 +9,7 @@
 //   - Cloud-security: cross-origin browser fetch checks
 //   - Code-review: accessibility / UX claim validation
 //
-// This module knows NOTHING about findings, pentest, KRIPA, or any specific
+// This module knows NOTHING about findings, pentest, AUDITOR, or any specific
 // finding types. It just executes a recipe and returns a verdict.
 //
 // Security model:

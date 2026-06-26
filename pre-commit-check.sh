@@ -18,7 +18,7 @@ green(){ printf '\033[32m%s\033[0m\n' "$1"; }
 dim()  { printf '\033[2m%s\033[0m\n' "$1"; }
 
 bold "════════════════════════════════════════════════════════════════════"
-bold " Kurukshetra pre-commit check"
+bold " ARCHON pre-commit check"
 bold "════════════════════════════════════════════════════════════════════"
 
 # 1. Unit tests

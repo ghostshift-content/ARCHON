@@ -13,7 +13,7 @@ console.log('CVSS 3.1 calculator:')
 // Known vectors → official base scores
 const vectors = [
   ['CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H', 9.8],  // critical, full impact
-  ['CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N', 5.3],  // info disclosure (RUDRA finding)
+  ['CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N', 5.3],  // info disclosure (RANGER finding)
   ['CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H', 10.0], // scope changed → 10.0
   ['CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:L/I:L/A:N', 2.9],  // low (local, high-complexity)
   ['CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H', 8.8],  // authn RCE
