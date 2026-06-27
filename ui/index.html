@@ -152,10 +152,13 @@
                   <button type="button" data-cls="lfi">LFI / path traversal</button>
                   <button type="button" data-cls="api">API (REST/GraphQL/JWT)</button>
                   <button type="button" data-cls="business-logic">Business logic</button>
+                  <button type="button" data-custom="1" id="ptCustomChip">＋ Custom / abuse-driven</button>
                 </div>
-                <div class="hint" style="margin:14px 0 6px">Custom focus <span style="color:var(--fg-dim)">(free text — anything not in the chips above)</span></div>
-                <textarea class="textarea" id="ptCustomFocus" placeholder="e.g. web cache poisoning / deception · HTTP request smuggling · OAuth/SSO flow abuse · password-reset token reuse · GraphQL batching · race conditions on checkout" style="min-height:64px"></textarea>
-                <div class="hint">The squad prioritises this in recon + testing. Combine with chips, or use it alone for a single bespoke focus.</div></div>
+                <div id="ptCustomFocusWrap" style="display:none">
+                  <div class="hint" style="margin:14px 0 6px">Custom / abuse-driven test cases <span style="color:var(--fg-dim)">(free text — anything not in the chips above)</span></div>
+                  <textarea class="textarea" id="ptCustomFocus" placeholder="e.g. web cache poisoning / deception · HTTP request smuggling · OAuth/SSO flow abuse · password-reset token reuse · GraphQL batching · race conditions on checkout"></textarea>
+                  <div class="hint">The squad prioritises this in recon + testing. Combine with chips, or use it alone for a single bespoke focus.</div>
+                </div></div>
             </div>
 
             <div class="field" id="fGoalField"><label id="fGoalLabel">Goal / target <span class="req">*</span></label><textarea class="textarea" id="fGoal" placeholder="What should the squad attack? Red-team: objective. Network: CIDR/host. Cloud: account/region."></textarea></div>

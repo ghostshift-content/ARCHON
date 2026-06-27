@@ -587,8 +587,12 @@ $('#fSquad').addEventListener('change', updateDispatchInfo)
 $$('#fPriority button').forEach(b => b.onclick = () => { $$('#fPriority button').forEach(x => x.classList.remove('on')); b.classList.add('on') })
 $$('#crMode button').forEach(b => b.onclick = () => { $$('#crMode button').forEach(x => x.classList.remove('on')); b.classList.add('on') })
 $$('#ptType button').forEach(b => b.onclick = () => { $$('#ptType button').forEach(x => x.classList.remove('on')); b.classList.add('on'); $('#ptFocusField').style.display = b.dataset.v === 'feature' ? 'block' : 'none' })
-// focus-class chips: multi-select toggle (none on = full A→Z)
-$$('#ptFocusClasses button').forEach(b => b.onclick = () => b.classList.toggle('on'))
+// focus-class chips: multi-select toggle (none on = full A→Z). The "Custom /
+// abuse-driven" chip (data-custom) reveals the free-text box instead of being a class.
+$$('#ptFocusClasses button').forEach(b => b.onclick = () => {
+  b.classList.toggle('on')
+  if (b.dataset.custom) { $('#ptCustomFocusWrap').style.display = b.classList.contains('on') ? 'block' : 'none'; if (b.classList.contains('on')) $('#ptCustomFocus').focus() }
+})
 // ── test-type mode: Black-box / White-box / White+Black → reshape the form ──
 function applyPtMode(mode) {
   const wb = mode === 'whitebox', both = mode === 'both', bb = mode === 'blackbox'
@@ -644,9 +648,10 @@ $('#fSubmit').onclick = async () => {
       const featureFocus = $('#ptFocus').value.trim()
       if (testType === 'feature' && !featureFocus) { toast('Focus required', 'Name the features to focus on', 'err'); $('#ptFocus').focus(); return }
       const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean)
-      const meta = { targetUrl, testType, inScope: lines('#ptInScope'), outOfScope: lines('#ptOutScope'), credentials, skipRecon: $('#ptSkipRecon').checked, focusClasses: $$('#ptFocusClasses button.on').map(b => b.dataset.cls) }
+      const meta = { targetUrl, testType, inScope: lines('#ptInScope'), outOfScope: lines('#ptOutScope'), credentials, skipRecon: $('#ptSkipRecon').checked, focusClasses: $$('#ptFocusClasses button.on').map(b => b.dataset.cls).filter(Boolean) }
       if (testType === 'feature') meta.featureFocus = featureFocus
-      const customFocus = $('#ptCustomFocus').value.trim(); if (customFocus) meta.customFocus = customFocus
+      const customFocus = $('#ptCustomChip').classList.contains('on') ? $('#ptCustomFocus').value.trim() : ''
+      if (customFocus) meta.customFocus = customFocus
       if (mode === 'both') {
         if (!sourceDir) { toast('Source directory required', 'White + Black needs a URL and a source directory', 'err'); $('#ptSourceDir').focus(); return }
         meta.sourceDir = sourceDir   // preset auto-detected
@@ -661,7 +666,7 @@ $('#fSubmit').onclick = async () => {
   $('#fSubmit').disabled = true
   const r = await api('POST', '/api/dispatch', body)
   $('#fSubmit').disabled = false
-  if (r && !r.error) { toast('Dispatched ✓', `${r.assignee} · ${r.taskId}`, 'ok'); $('#fGoal').value = ''; $('#fTitle').value = ''; $('#crSourceDir').value = ''; $('#ptSourceDir').value = ''; $('#ptCustomFocus').value = ''; $$('#ptMode button').forEach(x => x.classList.toggle('on', x.dataset.v === 'blackbox')); applyPtMode('blackbox'); show('tasks'); tick() }
+  if (r && !r.error) { toast('Dispatched ✓', `${r.assignee} · ${r.taskId}`, 'ok'); $('#fGoal').value = ''; $('#fTitle').value = ''; $('#crSourceDir').value = ''; $('#ptSourceDir').value = ''; $('#ptCustomFocus').value = ''; const cc = $('#ptCustomChip'); if (cc) cc.classList.remove('on'); $('#ptCustomFocusWrap').style.display = 'none'; $$('#ptMode button').forEach(x => x.classList.toggle('on', x.dataset.v === 'blackbox')); applyPtMode('blackbox'); show('tasks'); tick() }
   else toast('Dispatch failed', r && r.error, 'err')
 }
 
