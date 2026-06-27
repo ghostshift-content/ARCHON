@@ -190,7 +190,10 @@ function buildPentestMeta(body) {
   const skipRecon = m.skipRecon === true
   // focused scan: run only specific vuln classes instead of full A→Z (empty = full)
   const focusClasses = cleanFocus(m.focusClasses)
-  return { targetUrl, testType, ...(featureFocus ? { featureFocus } : {}), inScope, outOfScope, credentials, triageGate, severityProfile, skipRecon, focusClasses }
+  // custom focus: free-text directive for vulns/areas not in the chip list
+  // (e.g. cache poisoning, request smuggling, OAuth abuse). Steers recon + testing.
+  const customFocus = String(m.customFocus || '').trim().slice(0, 600)
+  return { targetUrl, testType, ...(featureFocus ? { featureFocus } : {}), inScope, outOfScope, credentials, triageGate, severityProfile, skipRecon, focusClasses, ...(customFocus ? { customFocus } : {}) }
 }
 
 // Write the per-task scope config (Phase 0.0 + 3.06 consume it) + a human/agent-
@@ -205,7 +208,12 @@ function writePentestArtifacts(taskId, meta) {
 
 **Target:** ${meta.targetUrl}
 **Test type:** ${meta.testType === 'feature' ? `Feature-driven — focus: ${meta.featureFocus || '(unspecified)'}` : 'Full end-to-end'}
+${meta.customFocus ? `
+## ⭐ PRIORITY FOCUS (operator directive — test this first and thoroughly)
+${meta.customFocus}
 
+This is a specific, operator-requested focus that may not map to a standard specialist lane. During recon AND testing, prioritise it: research the technique, find the relevant surface, and attempt it before/alongside standard coverage. Report results for it explicitly.
+` : ''}
 ## In scope
 ${meta.inScope.map(h => `- ${h}`).join('\n') || '- (none)'}
 
@@ -232,6 +240,7 @@ const FOCUS_LABEL = { 'access-control': 'Access control', idor: 'IDOR', bola: 'B
 function cleanFocus(arr) { return Array.isArray(arr) ? [...new Set(arr.map(c => String(c).toLowerCase()).filter(c => FOCUS_CLASSES.includes(c)))] : [] }
 function deriveIterationLabel(meta) {
   if (Array.isArray(meta.focusClasses) && meta.focusClasses.length) return meta.focusClasses.map(c => FOCUS_LABEL[c] || c).join(' + ')
+  if (meta.customFocus) return 'Focus: ' + String(meta.customFocus).slice(0, 36)
   if (meta.testType === 'feature' && meta.featureFocus) return 'Feature: ' + String(meta.featureFocus).slice(0, 40)
   return 'Full scan'
 }
@@ -339,10 +348,11 @@ function createDispatch(body) {
 
     // write scope config + engagement brief, then compose a concise goal (≤512, sanitized)
     const briefPath = writePentestArtifacts(taskId, meta)
+    const focusNote = meta.customFocus ? ` PRIORITY FOCUS: ${meta.customFocus}.` : ''
     const scopeNote = combined ? 'black-box (live) — paired with a white-box source review'
       : meta.testType === 'feature' ? `feature-driven (focus: ${(meta.featureFocus || '').slice(0, 120)})`
       : 'full end-to-end'
-    goal = `Pentest ${meta.targetUrl} — ${scopeNote}. ${meta.credentials.length} test account(s); scope + credentials in engagement brief: ${briefPath}. In-scope/out-of-scope enforced via scope config — never test out-of-scope hosts.`.slice(0, 500)
+    goal = `Pentest ${meta.targetUrl} — ${scopeNote}.${focusNote} ${meta.credentials.length} test account(s); scope + credentials in engagement brief: ${briefPath}. In-scope/out-of-scope enforced via scope config — never test out-of-scope hosts.`.slice(0, 500)
     fallbackTitle = combined ? `Engagement: ${hostOf(meta.targetUrl)} (white+black)` : `Pentest: ${hostOf(meta.targetUrl)}`
   }
   const req = {

@@ -646,6 +646,7 @@ $('#fSubmit').onclick = async () => {
       const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean)
       const meta = { targetUrl, testType, inScope: lines('#ptInScope'), outOfScope: lines('#ptOutScope'), credentials, skipRecon: $('#ptSkipRecon').checked, focusClasses: $$('#ptFocusClasses button.on').map(b => b.dataset.cls) }
       if (testType === 'feature') meta.featureFocus = featureFocus
+      const customFocus = $('#ptCustomFocus').value.trim(); if (customFocus) meta.customFocus = customFocus
       if (mode === 'both') {
         if (!sourceDir) { toast('Source directory required', 'White + Black needs a URL and a source directory', 'err'); $('#ptSourceDir').focus(); return }
         meta.sourceDir = sourceDir   // preset auto-detected
@@ -660,7 +661,7 @@ $('#fSubmit').onclick = async () => {
   $('#fSubmit').disabled = true
   const r = await api('POST', '/api/dispatch', body)
   $('#fSubmit').disabled = false
-  if (r && !r.error) { toast('Dispatched ✓', `${r.assignee} · ${r.taskId}`, 'ok'); $('#fGoal').value = ''; $('#fTitle').value = ''; $('#crSourceDir').value = ''; $('#ptSourceDir').value = ''; $$('#ptMode button').forEach(x => x.classList.toggle('on', x.dataset.v === 'blackbox')); applyPtMode('blackbox'); show('tasks'); tick() }
+  if (r && !r.error) { toast('Dispatched ✓', `${r.assignee} · ${r.taskId}`, 'ok'); $('#fGoal').value = ''; $('#fTitle').value = ''; $('#crSourceDir').value = ''; $('#ptSourceDir').value = ''; $('#ptCustomFocus').value = ''; $$('#ptMode button').forEach(x => x.classList.toggle('on', x.dataset.v === 'blackbox')); applyPtMode('blackbox'); show('tasks'); tick() }
   else toast('Dispatch failed', r && r.error, 'err')
 }
 
