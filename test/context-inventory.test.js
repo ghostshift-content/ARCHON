@@ -36,25 +36,9 @@ if (pentestBuilder) {
      /ARCHON methodology/.test(pentestBuilder[0]))
 }
 
-// Cloud SCRIBE prompt must require Context Inventory too
-const cloudBuilder = src.match(/function buildscribeCloudPrompt[\s\S]{0,3000}/)
-ok('buildscribeCloudPrompt exists', !!cloudBuilder)
-if (cloudBuilder) {
-  ok('cloud SCRIBE prompt contains "Context Inventory" header',
-     /Context Inventory/.test(cloudBuilder[0]))
-  ok('cloud SCRIBE prompt specifies cloud-specific columns (Resource/Exposure/Access control)',
-     /Resource \(ARN\/project\/sub\/cluster\)[\s\S]{0,200}Exposure[\s\S]{0,200}Access control/.test(cloudBuilder[0]))
-  ok('cloud SCRIBE prompt requires Verdict column tied to findings',
-     /Verdict \(protected\/vulnerable\/partial\)/.test(cloudBuilder[0]))
-  ok('cloud SCRIBE prompt lists Context Inventory in Structure directive',
-     /Structure: [\s\S]{0,300}Context Inventory/.test(cloudBuilder[0]))
-}
-
 // Goal-leak scrub must still be present (regression — don't break earlier fix)
 ok('pentest SCRIBE still calls scrubBaselineFromGoal',
    pentestBuilder && /scrubBaselineFromGoal\(goalContext\)/.test(pentestBuilder[0]))
-ok('cloud SCRIBE still calls scrubBaselineFromGoal',
-   cloudBuilder && /scrubBaselineFromGoal\(goalContext\)/.test(cloudBuilder[0]))
 
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

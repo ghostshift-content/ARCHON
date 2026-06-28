@@ -57,7 +57,6 @@ const SKIP_FILES = new Set([
   'publication-blocking-gate.test.js', // hardcoded /root/intel paths
   'scrub-goal-paths.test.js',          // /root/intel path placeholders
   'specialist-prompt-handoff.test.js',
-  'specialist-prompt-size.test.js',    // ceiling raised by A→Z coverage mandate
   'squad-framework.test.js',           // asserts stocks/cloud/network squad config
   'target-classifier.test.js',         // needs seeded target-profile-rules
   'scribe-trajectory-aware.test.js',

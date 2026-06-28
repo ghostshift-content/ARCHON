@@ -65,10 +65,10 @@ test('banner does NOT trigger on clean run (CONFIRMED + no indeterminate)', () =
     'must short-circuit when both signals are clean')
 })
 
-test('all 3 verificationLoop call sites invoke the banner', () => {
+test('all verificationLoop call sites invoke the banner', () => {
   const callSites = SRC.match(/prependPublicationStatusBanner\s*\(\s*taskId\s*,\s*verifyResult\s*\)/g) || []
-  assert.strictEqual(callSites.length, 3,
-    `expected 3 call sites (stocks/pentest/other squads), got ${callSites.length}`)
+  assert.strictEqual(callSites.length, 2,
+    `expected 2 call sites (pentest/code-review), got ${callSites.length}`)
 })
 
 // ── Functional test using a real event-bus.js function (require + exercise) ──
