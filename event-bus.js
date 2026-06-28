@@ -87,7 +87,7 @@ const _taskMissedSignals = {}
 //
 // Limitation: only the top-level module is invalidated. If the patched module transitively
 // requires a helper, that helper stays cached. Applied only to dispatcher entry points
-// (cloud-dispatcher, network-dispatcher, code-review-dispatcher) and chain-verifier — not
+// (code-review-dispatcher) and chain-verifier — not
 // blanket cleared, because most utility modules hold valid one-time state.
 function freshRequire(modulePath) {
   try { delete require.cache[require.resolve(modulePath)] } catch {}
