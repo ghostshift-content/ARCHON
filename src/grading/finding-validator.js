@@ -2,7 +2,7 @@
 const __roots = require('../../paths') // portable roots (KURU_*_ROOT) — see paths.js
 // /root/agents/finding-validator.js
 //
-// autonomous per-finding validator. Where the regular grader evaluates a WHOLE task,
+// Autonomous per-finding validator. Where the regular grader evaluates a WHOLE task,
 // this validates a SINGLE finding with an independent-context LLM call. Each finding
 // gets:
 //   - confidence (0..1) — how sure the validator is it's real + exploitable

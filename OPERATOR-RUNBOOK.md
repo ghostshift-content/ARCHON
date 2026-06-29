@@ -198,7 +198,7 @@ there.
 
 ---
 
-## 6b. Autonomous mode (AI-driven, autonomous)
+## 6b. Autonomous mode (AI-driven)
 
 ARCHON reasons about the target and adapts payloads to it — you don't configure this,
 it happens inside the run:
