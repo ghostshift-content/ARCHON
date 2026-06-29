@@ -5297,50 +5297,7 @@ async function dispatchPentestParallel(dispatch) {
       }
     }
 
-    // Wave 2: second-half specialists in parallel with reflexion critique injected
-    let batch3Results = []
-    if (!budgetExceeded && wave2Agents.length > 0) {
-      log(`🔄 Phase 2 Wave 2 — ${wave2Agents.length} specialists in parallel${_batch1Critique ? ' [reflexion active]' : ''}: ${wave2Agents.map(a => a.toUpperCase()).join(', ')}`)
-      logEvent('PHASE_START', { taskId, phase: 'vuln-wave2', agents: wave2Agents.map(a => a.toUpperCase()) })
-      logActivity('NEXUS', `🔄 Phase 2 Wave 2 (parallel): ${wave2Agents.map(a => a.toUpperCase()).join(', ')}`, {
-        type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
-        details: `All wave-2 specialists running simultaneously${_batch1Critique ? ' with reflexion context' : ''}`
-      })
-      updateProgress(45, `Phase 2 Wave 2: ${wave2Agents.length} specialists running in parallel`)
-
-      // Record wave 2 assignments + whether reflexion was used
-      const reflexionUsed = !!_batch1Critique
-      wave2Agents.forEach(a => { _agentWaveMap[a] = 2; _agentReflexionMap[a] = reflexionUsed })
-
-      const wave2Results = await Promise.all(wave2Agents.map(agent => {
-        const basePrompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
-        const prompt = basePrompt + (_batch1Critique || '') + (_fastVerifiedContext || '')
-        return spawnWithRetry(agent, prompt, undefined)
-      }))
-      batch3Results = wave2Results
-      trackCosts(wave2Results)
-
-      // Budget check after wave 2
-      const budget = getCostBudget(squad)
-      if (totalCost > budget) {
-        log(`💰 BUDGET EXCEEDED after wave 2: $${totalCost.toFixed(2)} > $${budget} limit`)
-        logActivity('NEXUS', `💰 Budget exceeded — skipping conditional specialists`, { type: 'budget-exceeded', squad, taskId })
-        _enforceBudgetCap(taskId, squad, totalCost, budget, taskTitle)
-        budgetExceeded = true
-      }
-    }
-
-    // ── Conditional Batch 5: Specialist agents dispatched based on detected attack surface ──
-    const conditionalResults = []
-    try {
-      // Read endpoint map and activity log to detect what surface exists
-      const endpointData = fs.existsSync(`${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json`) 
-        ? fs.readFileSync(`${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json`, 'utf-8') : ''
-      // Fast path — serialize entries back to lowercase for the regex scans below.
-      const reconActivity = readTaskActivity(taskId)
-        .map(e => JSON.stringify(e)).join('\n').toLowerCase()
-      
-      // ── Phase 2.5: Fast-verify — Haiku quick-check on top wave 1 confirmed finding ──
+    // ── Phase 2.5: Fast-verify — Haiku quick-check on top wave 1 confirmed finding ──
     // Runs BEFORE wave 2. Picks the single most significant wave 1 confirmed finding
     // and runs a fast (Haiku, 2-min cap) agent to verify it with actual HTTP request.
     // If verified, wave 2 agents get FAST-VERIFIED context — they can chain with confidence.
@@ -5389,6 +5346,49 @@ async function dispatchPentestParallel(dispatch) {
         log(`⚠️ Phase 2.5 fast-verify error (non-fatal): ${e.message}`)
       }
     }
+
+    // Wave 2: second-half specialists in parallel with reflexion critique injected
+    let batch3Results = []
+    if (!budgetExceeded && wave2Agents.length > 0) {
+      log(`🔄 Phase 2 Wave 2 — ${wave2Agents.length} specialists in parallel${_batch1Critique ? ' [reflexion active]' : ''}: ${wave2Agents.map(a => a.toUpperCase()).join(', ')}`)
+      logEvent('PHASE_START', { taskId, phase: 'vuln-wave2', agents: wave2Agents.map(a => a.toUpperCase()) })
+      logActivity('NEXUS', `🔄 Phase 2 Wave 2 (parallel): ${wave2Agents.map(a => a.toUpperCase()).join(', ')}`, {
+        type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
+        details: `All wave-2 specialists running simultaneously${_batch1Critique ? ' with reflexion context' : ''}`
+      })
+      updateProgress(45, `Phase 2 Wave 2: ${wave2Agents.length} specialists running in parallel`)
+
+      // Record wave 2 assignments + whether reflexion was used
+      const reflexionUsed = !!_batch1Critique
+      wave2Agents.forEach(a => { _agentWaveMap[a] = 2; _agentReflexionMap[a] = reflexionUsed })
+
+      const wave2Results = await Promise.all(wave2Agents.map(agent => {
+        const basePrompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+        const prompt = basePrompt + (_batch1Critique || '') + (_fastVerifiedContext || '')
+        return spawnWithRetry(agent, prompt, undefined)
+      }))
+      batch3Results = wave2Results
+      trackCosts(wave2Results)
+
+      // Budget check after wave 2
+      const budget = getCostBudget(squad)
+      if (totalCost > budget) {
+        log(`💰 BUDGET EXCEEDED after wave 2: $${totalCost.toFixed(2)} > $${budget} limit`)
+        logActivity('NEXUS', `💰 Budget exceeded — skipping conditional specialists`, { type: 'budget-exceeded', squad, taskId })
+        _enforceBudgetCap(taskId, squad, totalCost, budget, taskTitle)
+        budgetExceeded = true
+      }
+    }
+
+    // ── Conditional Batch 5: Specialist agents dispatched based on detected attack surface ──
+    const conditionalResults = []
+    try {
+      // Read endpoint map and activity log to detect what surface exists
+      const endpointData = fs.existsSync(`${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json`) 
+        ? fs.readFileSync(`${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json`, 'utf-8') : ''
+      // Fast path — serialize entries back to lowercase for the regex scans below.
+      const reconActivity = readTaskActivity(taskId)
+        .map(e => JSON.stringify(e)).join('\n').toLowerCase()
 
     // Build full-run reflexion context for conditional specialists — they run AFTER
       // waves 1+2 complete, so they see ALL prior findings. This prevents retesting
