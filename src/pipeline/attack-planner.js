@@ -12,6 +12,8 @@
 
 'use strict'
 
+const { checklistText: wstgChecklist } = require('../core/coverage-map')
+
 // Canonical classes the pentest specialists cover (used to bucket hypotheses).
 const VULN_CLASSES = [
   'access-control', 'idor', 'auth', 'sqli', 'xss', 'ssrf', 'rce', 'command-injection',
@@ -35,6 +37,10 @@ AEM CVEs); if WordPress, WP-specific; etc. Be specific and evidence-driven, not 
 
 Target: ${targetUrl || '(unknown)'}
 Environment fingerprint: ${fpLine}
+
+WALK THIS WSTG COVERAGE MAP (the A-Z checklist) against the target — make sure every applicable area has
+at least one hypothesis where the evidence supports it; note any area the surface makes irrelevant:
+${wstgChecklist()}
 
 RECON / FINDINGS SO FAR:
 ${(reconDump || '(none)').slice(0, 6000)}

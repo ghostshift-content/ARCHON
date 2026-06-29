@@ -24,6 +24,6 @@ test('SCRIBE prompt update is INSIDE buildscribeReportPrompt body', () => {
   // Locate the function and ensure the BROWSER-VERIFICATION reference is within ~1500 chars after
   const fnStart = SRC.indexOf('function buildscribeReportPrompt')
   assert.ok(fnStart > 0, 'buildscribeReportPrompt missing')
-  const fnSlice = SRC.slice(fnStart, fnStart + 8000)
+  const fnSlice = SRC.slice(fnStart, fnStart + 9000)
   assert.match(fnSlice, /BROWSER-VERIFICATION/)
 })

@@ -1,0 +1,113 @@
+# OWASP Web Security Testing Guide (WSTG) — the A-Z coverage checklist
+# Reference: https://owasp.org/www-project-web-security-testing-guide/
+# This is the master "what to check" map. ATLAS walks it against the target
+# fingerprint; each category is owned by a specialist (see `owner`). The code-side
+# source of truth + coverage computation lives in src/core/coverage-map.js.
+
+items:
+  - id: "WSTG-INFO"
+    name: "Information Gathering"
+    category: "Recon"
+    owner: ["scout", "tracer"]
+    checks:
+      - "Fingerprint web server, framework, and specific product/version"
+      - "Enumerate content, entry points, and exposed paths"
+      - "Map the application's surface (subdomains, APIs, JS bundles)"
+
+  - id: "WSTG-CONF"
+    name: "Configuration & Deployment Management"
+    category: "Configuration"
+    owner: ["scout", "sentry"]
+    checks:
+      - "Exposed admin/management interfaces, default credentials surface"
+      - "Security headers, TLS configuration, CORS policy"
+      - "Backup/old files, source leakage, verbose error pages"
+
+  - id: "WSTG-IDNT"
+    name: "Identity Management"
+    category: "Identity"
+    owner: ["keyring"]
+    checks:
+      - "Registration / provisioning flows"
+      - "Account enumeration via login/reset/registration responses"
+      - "Role/permission definitions"
+
+  - id: "WSTG-ATHN"
+    name: "Authentication"
+    category: "Authentication"
+    owner: ["keyring"]
+    checks:
+      - "Credential transport, lockout, default/weak credentials"
+      - "MFA bypass, password-reset flow weaknesses"
+      - "Authentication bypass (forced browsing, parameter tampering)"
+
+  - id: "WSTG-ATHZ"
+    name: "Authorization"
+    category: "Authorization"
+    owner: ["warden"]
+    checks:
+      - "IDOR / BOLA — object access across users (needs test accounts)"
+      - "Privilege escalation (horizontal + vertical)"
+      - "Path traversal / forced browsing to privileged functions"
+
+  - id: "WSTG-SESS"
+    name: "Session Management"
+    category: "Session"
+    owner: ["keyring"]
+    checks:
+      - "Cookie attributes, session fixation, session timeout"
+      - "JWT signing/algorithm/claims tampering"
+      - "Logout + concurrent-session handling"
+
+  - id: "WSTG-INPV"
+    name: "Input Validation"
+    category: "Injection"
+    owner: ["viper", "drill", "relay", "vault", "spectre", "ranger"]
+    checks:
+      - "SQL / NoSQL / LDAP / command injection"
+      - "XSS family (reflected, stored, DOM)"
+      - "SSRF, XXE, SSTI, LFI / path traversal, header/CRLF injection"
+
+  - id: "WSTG-ERRH"
+    name: "Error Handling"
+    category: "Error Handling"
+    owner: ["all"]
+    checks:
+      - "Information leakage via error messages / stack traces"
+      - "Differential responses that aid enumeration"
+
+  - id: "WSTG-CRYP"
+    name: "Cryptography"
+    category: "Cryptography"
+    owner: ["sentry"]
+    checks:
+      - "Weak TLS / cipher configuration"
+      - "Weak or absent token/data signing"
+      - "Sensitive data sent/stored without encryption"
+
+  - id: "WSTG-BUSL"
+    name: "Business Logic"
+    category: "Business Logic"
+    owner: ["ledger"]
+    checks:
+      - "Workflow/state abuse, value/quantity manipulation"
+      - "Race conditions on critical operations"
+      - "Circumventing intended process limits"
+
+  - id: "WSTG-CLNT"
+    name: "Client-Side"
+    category: "Client-Side"
+    owner: ["decoy", "viper"]
+    checks:
+      - "DOM-based XSS, CSRF, clickjacking"
+      - "postMessage / CORS / WebSocket weaknesses"
+      - "Client-side storage + open redirect"
+
+  - id: "WSTG-APIT"
+    name: "API Testing"
+    category: "API"
+    owner: ["gateway"]
+    checks:
+      - "REST / GraphQL authorization + mass assignment"
+      - "JWT/API-key handling, rate-limit gaps"
+      - "Excessive data exposure, BOLA on API objects"

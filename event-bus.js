@@ -3866,6 +3866,8 @@ Opus 4.7 defaults to shorter responses than prior models. This report is an EXCE
 Required output: 40KB+ markdown, all 8 sections fully populated, complete reproduction curl commands per finding, full CVSS:3.1 vectors (AV:N/AC:L/...), OWASP category mapping, defensive config snippets.
 Per finding, ALWAYS include the concrete IMPACT (the finding's "impact" field — what an attacker actually gains). If a finding has a "proof_of_execution" (from the gated Exploit-Prover), show it as a PROOF OF IMPACT block: the exact benign payload/command fired and the response proving execution (nonce). Mark such findings "Impact PROVEN (live PoC)" — these are the strongest evidence in the report.
 If followup-plan-${taskId}.json exists (cat it), add a "Recommended Next Round / Attack Chains" section listing those ranked follow-up + chaining hypotheses — what a deeper engagement should chase next.
+Add a "Coverage (WSTG)" section that walks this A-Z checklist and states, per area, whether it was tested (with the finding/evidence) or NOT reached (and why — not applicable to this stack, or out of time). Honesty about untested areas is required:
+${(() => { try { return require('./src/core/coverage-map').checklistText() } catch { return '' } })()}
 Do NOT abbreviate. Do NOT summarize findings. Do NOT skip sections. The reader is a senior security engineer who needs every detail to fix the issues.
 
 ${goalSection}${MUST_GATES}

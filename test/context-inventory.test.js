@@ -23,7 +23,7 @@ const src = fs.readFileSync((__roots.AGENTS_ROOT + '/event-bus.js'), 'utf-8')
 // after GATE-55 fix added the browser_validation_skipped marker instructions
 // before the Context Inventory section. Context Inventory now sits at offset
 // ~12000 within the function.
-const pentestBuilder = src.match(/function buildscribeReportPrompt[\s\S]{0,14000}/)
+const pentestBuilder = src.match(/function buildscribeReportPrompt[\s\S]{0,16000}/)
 ok('buildscribeReportPrompt exists', !!pentestBuilder)
 if (pentestBuilder) {
   ok('pentest SCRIBE prompt contains "Context Inventory" header',
