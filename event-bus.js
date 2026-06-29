@@ -27,6 +27,7 @@ const vMemory = require('./src/learning/versioned-memory')
 const memoryRanker = require('./src/learning/memory-ranker')
 const offensiveVaccine = require('./src/safety/offensive-vaccine')
 const attackGraph = require('./src/pipeline/attack-graph')
+const { phaseEnabled } = require('./src/pipeline/pentest-phases') // pipeline depth = config (squad.json enabledPhases)
 const modelRouter = require('./src/routing/model-router')
 const anthropicKey = require('./src/integrations/anthropic-key')
 const hybridGrader = (() => { try { return require('./src/grading/grader') } catch { return null } })()
@@ -4600,7 +4601,7 @@ async function dispatchPentestParallel(dispatch) {
     let _spotCheckMisses = []
     try {
       const currentScore = _getTaskComplexityScore(taskId)
-      if (currentScore < 4) {
+      if (phaseEnabled('1.5', squad) && currentScore < 4) {
         log(`🔎 Phase 1.5: Spot-checking Haiku recon output (complexity=${currentScore})`)
         const spotResult = await runReconSpotCheck({ taskId, targetUrl, squad, projectId, endpointMapFile })
         _spotCheckMisses = (spotResult && Array.isArray(spotResult.misses)) ? spotResult.misses : []
@@ -4626,7 +4627,7 @@ async function dispatchPentestParallel(dispatch) {
     try {
       const __jsAnalyzer = require('./agents/js-bundle-analyzer')
       const jsUrls = __jsAnalyzer.readJsUrlsForTask(taskId)
-      if (jsUrls.length > 0) {
+      if (phaseEnabled('1.6', squad) && jsUrls.length > 0) {
         log(`🔬 Phase 1.6: Analyzing ${jsUrls.length} JS bundle(s) for hidden endpoints`)
         ;(async () => {
           try {
@@ -5035,7 +5036,7 @@ async function dispatchPentestParallel(dispatch) {
     // If verified, wave 2 agents get FAST-VERIFIED context — they can chain with confidence.
     // Cost: ~$0.01-0.05. Fail-soft: never blocks wave 2.
     let _fastVerifiedContext = ''
-    if (!budgetExceeded) {
+    if (phaseEnabled('2.5', squad) && !budgetExceeded) {
       try {
         const lfForVerify = fs.existsSync(`${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`)
           ? fs.readFileSync(`${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`, 'utf-8').trim().split('\n').filter(Boolean)
@@ -5193,7 +5194,7 @@ async function dispatchPentestParallel(dispatch) {
     // Fail-soft, zero LLM calls, pure file analysis.
     try {
       const __lfPath = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
-      if (fs.existsSync(__lfPath)) {
+      if (phaseEnabled('2.9', squad) && fs.existsSync(__lfPath)) {
         const __lfAll = fs.readFileSync(__lfPath, 'utf-8').trim().split('\n').filter(Boolean)
           .map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
         const byUrl = {}
@@ -5461,7 +5462,7 @@ Be brief and specific. This is an adversarial check.`
       // SCRIBE reads prod_validation_warning to downgrade or annotate.
       try {
         const __prodValidator = require('./agents/prod-endpoint-validator')
-        if (fs.existsSync(__bw.path) && __bw.count > 0) {
+        if (phaseEnabled('3.062', squad) && fs.existsSync(__bw.path) && __bw.count > 0) {
           const lines = fs.readFileSync(__bw.path, 'utf-8').trim().split('\n').filter(Boolean)
           const findings = lines.map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
           const audited = __prodValidator.auditFindings(findings)
@@ -5591,7 +5592,7 @@ Be brief and specific. This is an adversarial check.`
         const __aPocPolicy = require('./agents/active-poc-policy')
         const __aPocRunner = require('./agents/active-poc-runner')
         const __taskCfg = (typeof taskConfig === 'object' && taskConfig) || {}
-        if (__taskCfg.engagement_mode === 'active-poc' && __aPocPolicy.envIsEnabled()) {
+        if (phaseEnabled('3.08', squad) && __taskCfg.engagement_mode === 'active-poc' && __aPocPolicy.envIsEnabled()) {
           const __valid = __aPocPolicy.validatePermission(__taskCfg)
           if (__valid.ok) {
             ;(async () => {
