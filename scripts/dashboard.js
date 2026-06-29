@@ -72,7 +72,17 @@ function tasks() {
     const prev = byId.get(t.id)
     if (!prev || Object.keys(t).length >= Object.keys(prev).length) byId.set(t.id, t)
   }
+  // Active tasks (running / awaiting the operator) sort ABOVE terminal ones, THEN by time.
+  // This keeps a fresh dispatch visible even when stale tasks carry future timestamps from a
+  // clock that was wrong before a reboot (else newest-first buries the new task below them).
+  const _activeRank = t => {
+    const s = String(t.status || '').toLowerCase()
+    if (['in-progress', 'processing', 'generating-report'].includes(s)) return 0
+    if (['awaiting-triage', 'queued', 'pending'].includes(s)) return 1
+    return 2 // done / cancelled / failed
+  }
   return [...byId.values()].sort((a, b) =>
+    _activeRank(a) - _activeRank(b) ||
     String(b.lastUpdate || b.createdAt || '').localeCompare(String(a.lastUpdate || a.createdAt || '')))
 }
 
