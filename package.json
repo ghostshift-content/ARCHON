@@ -14,7 +14,6 @@
     "setup": "node scripts/setup-local.js",
     "start": "node event-bus.js",
     "dashboard": "node scripts/dashboard.js",
-    "verify": "node verify-framework.js",
     "test": "node test/run-all.js",
     "test:ui": "bash scripts/e2e.sh",
     "test:bun": "bun test"

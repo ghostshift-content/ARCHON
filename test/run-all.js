@@ -23,13 +23,11 @@ const files = fs.readdirSync(TEST_DIR)
 const BUN_FILES = new Set([
   'agent-runner.test.js',
   'run-agent-bridge.test.js',
-  'meter-probe.test.js',
   'grader.test.js',
   'phase-envelope.test.js',
   'suppression-ledger.test.js',
   'quality-tracker.test.js',
   'squad-config-loader.test.js',
-  'changelog-watcher.test.js',
   'episode-record.test.js',
   'learning-loop.test.js',
   'goal-evaluator.test.js',
@@ -52,11 +50,9 @@ const SKIP_FILES = new Set([
   'handoff-cost-caps.test.js',
   'handoff-resolver.test.js',
   'handoff-watcher.test.js',
-  'model-router.test.js',              // asserts stocks/multi-squad routing
   'publication-blocking-gate.test.js', // hardcoded /root/intel paths
   'scrub-goal-paths.test.js',          // /root/intel path placeholders
   'specialist-prompt-handoff.test.js',
-  'squad-framework.test.js',           // asserts stocks/cloud/network squad config
   'target-classifier.test.js',         // needs seeded target-profile-rules
   'scribe-trajectory-aware.test.js',
 ])
