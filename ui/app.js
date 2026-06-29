@@ -196,6 +196,12 @@ function render(s) {
   // if the detail page is open, keep its overview / live logs current
   if (currentView === 'task' && tdSub === 'overview') renderTaskOverview()
   if (currentView === 'task' && tdSub === 'log') renderTaskLogs()
+  // findings tab: refresh live ONLY while the run is in-progress (no triage yet to clobber),
+  // so validated findings appear on the tab as they land
+  if (currentView === 'task' && tdSub === 'findings') {
+    const t = (s.tasks || []).find(x => String(x.id) === String(tdTaskId))
+    if (t && t.status === 'in-progress') loadFindings()
+  }
 
   const active = s.tasks.filter(t => t.status === 'in-progress').length
   const done = s.tasks.filter(t => ['completed', 'done'].includes(t.status)).length
@@ -325,6 +331,22 @@ function artLabel(name) {
   const m = name.replace(/-t-\d+-[a-f0-9]+/i, '').replace(/\.(json|jsonl|md)$/i, '').replace(/^pentest-/, '')
   return { 'brief': 'Engagement brief', 'env-fingerprint': 'Environment fingerprint', 'tech-stack': 'Tech stack', 'target-profile': 'Target profile', 'scope': 'Scope', 'endpoints': 'Discovered endpoints', 'live-findings': 'Raw findings (live)', 'engagement': 'Engagement', 'triage': 'Triage verdicts' }[m] || m.replace(/[-_]/g, ' ')
 }
+// attack-surface snapshot box at the top of the Testing-logs tab
+function renderReconBox(r) {
+  const box = $('#tdReconBox'); if (!box) return
+  if (!r || (!r.ports.length && !r.product && !r.endpoints && !r.notablePaths.length)) { box.innerHTML = ''; return }
+  const chips = (arr, cls) => arr.map(x => `<span class="rchip ${cls || ''}">${esc(x)}</span>`).join('')
+  const facts = [
+    r.ports.length ? `<div class="rrow"><span class="rk">Open ports</span><div class="rv">${chips(r.ports, 'port')}</div></div>` : '',
+    r.product ? `<div class="rrow"><span class="rk">Product</span><div class="rv">${esc(r.product)}${r.server ? ` <span class="dim">· ${esc(r.server)}</span>` : ''}</div></div>` : '',
+    r.waf ? `<div class="rrow"><span class="rk">WAF</span><div class="rv">${esc(r.waf)}</div></div>` : '',
+    r.frameworks.length ? `<div class="rrow"><span class="rk">Stack</span><div class="rv">${chips(r.frameworks)}</div></div>` : '',
+    r.endpoints ? `<div class="rrow"><span class="rk">Surface</span><div class="rv"><span class="rchip">${r.endpoints.total} URLs</span>${r.endpoints.apis ? `<span class="rchip">${r.endpoints.apis} APIs</span>` : ''}${r.endpoints.forms ? `<span class="rchip">${r.endpoints.forms} forms</span>` : ''}</div></div>` : '',
+    r.notablePaths.length ? `<div class="rrow"><span class="rk">Notable paths</span><div class="rv">${chips(r.notablePaths, 'path')}</div></div>` : '',
+    r.cveCandidates.length ? `<div class="rrow"><span class="rk">CVE leads</span><div class="rv">${chips(r.cveCandidates, 'cve')}</div></div>` : '',
+  ].filter(Boolean).join('')
+  box.innerHTML = `<div class="reconhead">Attack surface</div>${facts}`
+}
 async function renderTaskLogs() {
   const tid = tdTaskId
   const stream = $('#tdLogStream'), arts = $('#tdLogArtifacts')
@@ -335,6 +357,7 @@ async function renderTaskLogs() {
   tdLogLoaded = true
   const acts = (r && r.activity) || []
   const artifacts = (r && r.artifacts) || []
+  renderReconBox(r && r.recon)
   arts.innerHTML = artifacts.length
     ? `<div class="art-lbl">Raw results — download</div>` + artifacts.map(a =>
         `<a class="art" href="/api/report?f=${encodeURIComponent(a.rel)}" download="${esc(a.name)}" title="${esc(a.name)} · ${(a.size / 1024).toFixed(1)} KB">

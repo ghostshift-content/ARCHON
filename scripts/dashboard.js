@@ -532,7 +532,41 @@ function logsForTask(taskId) {
     }
   } catch {}
   artifacts.sort((a, b) => a.name.localeCompare(b.name))
-  return { taskId: id, engagementId: E || id, activity, artifacts }
+  return { taskId: id, engagementId: E || id, activity, artifacts, recon: reconSummary([...ids], activity) }
+}
+// Attack-surface snapshot for the top of the Testing-logs tab: open ports (parsed
+// from the recon activity line) + the env fingerprint + endpoint counts. Fail-soft.
+function reconSummary(ids, activity) {
+  const out = { ports: [], product: '', server: '', waf: '', frameworks: [], notablePaths: [], cveCandidates: [], endpoints: null }
+  // open ports — pull "N/PROTO" tokens from the recon-complete activity entry
+  try {
+    const portRe = /\b(\d{1,5}\/[A-Za-z]{2,8})\b/g
+    for (const a of activity) {
+      const txt = `${a.action || ''} ${a.details || ''}`
+      if (!/open port|recon complete|nmap/i.test(txt)) continue
+      const m = txt.match(portRe)
+      if (m) { for (const p of m) if (!out.ports.includes(p)) out.ports.push(p) }
+    }
+  } catch {}
+  // env fingerprint (structured) — first iteration that has one
+  for (const tid of ids) {
+    const ef = readJSON(`env-fingerprint-${tid}.json`, null)
+    if (!ef) continue
+    out.product = ef.product || ''
+    out.server = ef.server || ''
+    out.waf = (ef.waf && ef.waf.present) ? (ef.waf.vendor || 'detected') : ''
+    out.frameworks = Array.isArray(ef.frameworks) ? ef.frameworks : []
+    out.notablePaths = Array.isArray(ef.notable_paths) ? ef.notable_paths.slice(0, 12) : []
+    out.cveCandidates = Array.isArray(ef.cve_candidates) ? ef.cve_candidates.slice(0, 8) : []
+    break
+  }
+  for (const tid of ids) {
+    const ep = readJSON(`pentest-endpoints-${tid}.json`, null)
+    if (!ep) continue
+    out.endpoints = { total: ep.totalUrls || 0, apis: (ep.apiEndpoints || []).length, forms: (ep.forms || []).length, js: (ep.jsFiles || []).length }
+    break
+  }
+  return out
 }
 function enrichFindings(body) {
   const taskId = String(body.taskId || '').trim()

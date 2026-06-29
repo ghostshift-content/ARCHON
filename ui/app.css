@@ -342,6 +342,17 @@ ol.fsteps li { font-size: 13px; line-height: 1.5; }
 .act .msg { color: var(--fg-mut); min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 
 /* Testing-logs tab */
+.reconbox { border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); padding: 12px 14px; margin-bottom: 14px; }
+.reconbox:empty { display: none; }
+.reconhead { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--accent-2); font-weight: 700; margin-bottom: 9px; }
+.reconbox .rrow { display: flex; gap: 12px; align-items: baseline; padding: 4px 0; }
+.reconbox .rk { min-width: 110px; flex-shrink: 0; color: var(--fg-dim); font-size: 12px; }
+.reconbox .rv { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; font-size: 12.5px; color: var(--fg); align-items: baseline; }
+.reconbox .rv .dim { color: var(--fg-dim); }
+.rchip { display: inline-block; padding: 2px 8px; border-radius: 6px; background: var(--bg-3, rgba(148,163,184,.12)); border: 1px solid var(--line); font-size: 11.5px; font-family: var(--mono); overflow-wrap: anywhere; }
+.rchip.port { color: #34d399; border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.1); }
+.rchip.path { color: var(--accent-2); }
+.rchip.cve { color: #fbbf24; border-color: rgba(251,191,36,.38); background: rgba(251,191,36,.1); }
 .loghead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
 .loghead h3 { margin: 0; }
 .artifacts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
