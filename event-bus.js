@@ -2901,6 +2901,60 @@ async function runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerpri
   }
 }
 
+// ── Stage 3 — Re-planning loop (Phase 3.087) ──────────────────────────────────
+// After exploitation, ATLAS re-reads the findings + proofs and emits the ranked
+// follow-ups + CHAINS still worth chasing (autonomous "what's left until dry"). Writes
+// followup-plan-<taskId>.json for SCRIBE. Auto-chasing is opt-in + hop-capped
+// (ARCHON_AUTONOMY=enabled, ARCHON_AUTONOMY_HOPS) — default just records the plan,
+// so the production daemon never runs away or ships unverified re-dispatch.
+async function runReplanLoop({ taskId, targetUrl, squad, projectId, fingerprint, dispatch }) {
+  const planner = require('./src/pipeline/attack-planner')
+  try {
+    let findingsDump = ''
+    try {
+      const lf = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
+      if (fs.existsSync(lf)) findingsDump = fs.readFileSync(lf, 'utf8').slice(-7000)
+    } catch {}
+    const fp = fingerprint || {}
+    const fpLine = [fp.product && `Product: ${fp.product}`, fp.waf?.present && `WAF: ${fp.waf.vendor || 'present'}`].filter(Boolean).join(' · ') || '(unknown)'
+    const prompt = `You are ATLAS. Round 1 of the pentest is done. Below are the accumulated findings + any live
+proofs. Identify what is LEFT to fully compromise this target: (a) unexplored high-value attack paths, and
+(b) CHAINS between confirmed findings (e.g. SSRF → cloud metadata → creds → RCE). Only NEW or chaining
+hypotheses — do NOT repeat already-confirmed ones. Be stack-specific.
+
+Target: ${targetUrl} · Fingerprint: ${fpLine}
+FINDINGS + PROOFS:
+${findingsDump || '(none)'}
+
+Output ONE JSON array, same shape as the attack plan: {"endpoint","params","vuln_class","hypothesis","why",
+"priority"(1-5),"suggested_specialist","cve"}. 0-10 entries, ranked. If nothing is left, output [].`
+    const { text } = await runAgent({
+      agentName: 'ATLAS', taskId, model: modelRouter.resolve('atlas'), effort: 'high', userPrompt: prompt, timeoutMs: 90000,
+    })
+    const followup = planner.normalizePlan(text)
+    fs.writeFileSync(`${agentPaths.INTEL_ROOT}/followup-plan-${taskId}.json`, JSON.stringify(followup, null, 2))
+    log(`🔁 Phase 3.087 re-plan: ${followup.length} follow-up/chain hypotheses → followup-plan-${taskId}.json`)
+    logActivity('ATLAS', `🔁 Re-plan: ${followup.length} follow-up/chain hypotheses`, {
+      type: 'replan', squad, taskId, projectId: projectId || '', details: planner.planSummary(followup),
+    })
+    // Opt-in, hop-capped autonomy signal (no inline re-dispatch in the daemon).
+    const fresh = followup.filter(h => h.priority >= 4)
+    const hops = Number(dispatch && dispatch.autonomyHops || 0)
+    const cap = Number(process.env.ARCHON_AUTONOMY_HOPS || 1)
+    if (fresh.length) {
+      if (process.env.ARCHON_AUTONOMY === 'enabled' && hops < cap) {
+        log(`🔁 ${fresh.length} high-value follow-up(s) — autonomy hop ${hops + 1}/${cap}: re-dispatch the engagement with these as the focus to chase them (verified).`)
+      } else {
+        log(`🔁 ${fresh.length} high-value follow-up(s) recorded for the report${process.env.ARCHON_AUTONOMY === 'enabled' ? ` (hop cap ${cap} reached)` : ' (set ARCHON_AUTONOMY=enabled to auto-chase, hop-capped)'}.`)
+      }
+    }
+    return followup
+  } catch (e) {
+    log(`⚠️ Phase 3.087 re-plan failed (non-fatal): ${e.message}`)
+    return []
+  }
+}
+
 // ── Stage 2b — gated Exploit-Prover (Phase 3.085) ────────────────────────────
 // For CONFIRMED exploitable findings, generate + fire a BENIGN env-specific
 // payload that PROVES impact (RCE → echo a nonce) → proof_of_execution. Fires
@@ -3811,6 +3865,7 @@ A verified chain of 2 mediums = 1 Critical in the report.
 Opus 4.7 defaults to shorter responses than prior models. This report is an EXCEPTION — it must be comprehensive and detailed.
 Required output: 40KB+ markdown, all 8 sections fully populated, complete reproduction curl commands per finding, full CVSS:3.1 vectors (AV:N/AC:L/...), OWASP category mapping, defensive config snippets.
 Per finding, ALWAYS include the concrete IMPACT (the finding's "impact" field — what an attacker actually gains). If a finding has a "proof_of_execution" (from the gated Exploit-Prover), show it as a PROOF OF IMPACT block: the exact benign payload/command fired and the response proving execution (nonce). Mark such findings "Impact PROVEN (live PoC)" — these are the strongest evidence in the report.
+If followup-plan-${taskId}.json exists (cat it), add a "Recommended Next Round / Attack Chains" section listing those ranked follow-up + chaining hypotheses — what a deeper engagement should chase next.
 Do NOT abbreviate. Do NOT summarize findings. Do NOT skip sections. The reader is a senior security engineer who needs every detail to fix the issues.
 
 ${goalSection}${MUST_GATES}
@@ -5733,6 +5788,11 @@ Be brief and specific. This is an adversarial check.`
     try {
       await runExploitProver({ taskId, squad, projectId, taskConfig: (typeof taskConfig === 'object' && taskConfig) || {}, fingerprint: envFingerprint })
     } catch (proverErr) { log(`⚠️ Phase 3.085 wrapper error (non-fatal): ${proverErr.message}`) }
+
+    // ── PHASE 3.087 — Re-planning loop: ATLAS ranks the follow-ups + chains left ──
+    try {
+      await runReplanLoop({ taskId, targetUrl, squad, projectId, fingerprint: envFingerprint, dispatch })
+    } catch (replanErr) { log(`⚠️ Phase 3.087 wrapper error (non-fatal): ${replanErr.message}`) }
 
     // ── PHASE 3.4: Build Attack Graph + Validate with AUDITOR results (Level 3) ──
     let graphContext = ''
