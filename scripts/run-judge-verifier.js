@@ -26,7 +26,7 @@ const { judgeFindings, judgeFindingsWithPromotion, judgeFindingsWithConsensus, P
 const { readFindingsFile } = require('../agents/finding-schema')
 
 const INTEL_DIR = __roots.INTEL_ROOT
-const CLAUDE_BIN = process.env.KURU_CLAUDE_BIN || '/root/.local/bin/claude'
+const CLAUDE_BIN = process.env.KURU_CLAUDE_BIN || 'claude'
 const LLM_TIMEOUT_MS = 90_000
 
 // 2026-05-10: was hardcoded `claude-haiku-4-5`. Now resolves from

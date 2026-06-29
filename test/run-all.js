@@ -24,7 +24,6 @@ const BUN_FILES = new Set([
   'agent-runner.test.js',
   'run-agent-bridge.test.js',
   'meter-probe.test.js',
-  'shadow-runner.test.js',
   'grader.test.js',
   'phase-envelope.test.js',
   'suppression-ledger.test.js',

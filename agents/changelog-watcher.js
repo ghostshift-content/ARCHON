@@ -30,7 +30,7 @@ const { spawnSync } = require('child_process')
 // ---------------------------------------------------------------------------
 
 const DEFAULTS = {
-  claudeBinPath: process.env.KURU_CLAUDE_BIN || '/root/.local/bin/claude',
+  claudeBinPath: process.env.KURU_CLAUDE_BIN || 'claude',
   packageJsonPath: path.resolve(__dirname, '../package.json'),
   nodeModulesDir: path.resolve(__dirname, '../node_modules'),
   agentRunnerPath: path.resolve(__dirname, 'runner/agent-runner.js'),

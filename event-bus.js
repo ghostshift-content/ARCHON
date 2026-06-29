@@ -3337,10 +3337,6 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
         }
       } catch (_markerErr) { /* fail-soft: marker post-processor must never break the pipeline */ }
 
-      // (2026-06-04) SHADOW (cli-vs-sdk pre-cutover diff) hook RETIRED here — its
-      // whole purpose was to measure the cli↔sdk delta BEFORE this migration; that
-      // window closes at the bridge cutover. shadow-runner.js + its tests stay.
-
       // ── Episode Record (upgraded 2026-06-05): real findingCount + suppressionCount ──
       // gradeScore is 0 here (gradeTask() hasn't run yet) — updateTaskGrade() patches
       // it retroactively once the task-level grade is known. findingCount and

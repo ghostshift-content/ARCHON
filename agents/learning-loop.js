@@ -119,7 +119,7 @@ function distill({ episodes = [], baseline = {} } = {}) {
   const FAILURE_LESSONS = {
     timeout: 'Recurring timeouts: be more targeted — pick the 3 most likely attack vectors per endpoint, not exhaustive. Write partial findings before timeout. Use shorter curl timeouts (--max-time 10).',
     rate_limit: 'Recurring rate-limit hits: add 2-3s sleep between requests. Use --max-time 15. Check for X-RateLimit-Remaining header before bulk testing.',
-    scope_block: 'Recurring scope blocks: read scope config first (cat /root/intel/scope-*.json). Verify each endpoint is in-scope before testing. Log DISPROVEN for out-of-scope attempts.',
+    scope_block: 'Recurring scope blocks: read the task scope config first (the scope-*.json for this task in the data layer). Verify each endpoint is in-scope before testing. Log DISPROVEN for out-of-scope attempts.',
     output_malform: 'Recurring output format errors: write findings as valid JSON objects. Test your JSON with python3 -c "import json; json.loads(line)" before appending. Use single quotes in shell echo commands.',
     target_unreach: 'Recurring unreachable targets: run a quick reachability check (curl -sI --max-time 5 URL) before deep testing. If unreachable, log DISPROVEN and stop early.',
     no_findings: 'Recurring zero-findings runs: broaden your methodology — test adjacent attack surface, vary payloads, try unauthenticated vs authenticated paths. Log what you disproved explicitly.',
@@ -575,8 +575,8 @@ if (require.main === module) {
         applied: a.applied + (r.applied || 0),
       }), { proposals: 0, patterns: 0, applied: 0 })
       console.log(`Done. Patterns: ${total.patterns}, Proposals: ${total.proposals}, Applied: ${total.applied}`)
-      console.log('Log: /root/intel/learning-proposals.jsonl')
-      console.log('Applied log: /root/intel/applied-proposals.jsonl')
+      console.log(`Log: ${DEFAULT_OUT_DIR}/learning-proposals.jsonl`)
+      console.log(`Applied log: ${DEFAULT_OUT_DIR}/applied-proposals.jsonl`)
       if (process.env.LEARNING_AUTO === 'off') console.log('NOTE: LEARNING_AUTO=off — kill-switch active, no applies ran')
     })
     .catch(e => { console.error('Learning loop error:', e.message); process.exit(1) })
