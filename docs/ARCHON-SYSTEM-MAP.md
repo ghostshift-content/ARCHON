@@ -284,6 +284,8 @@ Dispatched as `squad:'code-review'` (or via the pentest form's Static/White-box 
 
 > Biggest leverage first. Each item notes **risk/effort** and the contributing map(s). Many maps independently flagged the same root causes — those are merged here.
 
+> **Status update (2026-06-29): Tier 0 resolved.** #1 Phase-2.5/Wave-2 crash fixed (commit `01749de`); #2 `npm test` was an un-bootstrapped env, now green at 108 passed / 0 failed / 16 skipped (`e73a086`, `b53cce6`); #3 active-poc env var aligned to `ARCHON_ACTIVE_POC`, kept OFF by operator decision (`884062d`); #4 chain `finding_ids` threaded through to SCRIBE + ARBITER bridge fixed (`1a4639b`); #5 dead A2A handoffs gated off (`d9f787d`); #6 white-box scope target-extraction fixed (`c086abc`) — the remaining scope-model decision for white-box dispatch (URL-hostname vs source-path scope) is deferred pending operator input. Regression tests added for each. The analysis below is preserved as-shipped.
+
 ### Tier 0 — Silent show-stoppers (core function broken, no error surfaced)
 
 1. **`_fastVerifiedContext` `ReferenceError` aborts every full-roster scan after Wave 1.** The wave-2 dispatch at `event-bus.js:5317` references a `let` declared in a *later* sibling block → throws → caught by the outer catch → no Wave 2, no AUDITOR, no judge, **no report**. Focused scans (≤4 specialists) survive. Strongly consistent with the recent commit "surface ALL pentest findings (was showing zero)". **Fix:** hoist the `let` to function scope (one line) and actually run Phase 2.5 before Wave 2. *Risk: low. Effort: trivial.* Confirm this is fully resolved before anything else. [pipeline]
