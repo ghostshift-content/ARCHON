@@ -47,9 +47,8 @@ picks it up on its poll cycle (schema in the upstream `/root/intel/CLAUDE.md`).
   from `paths.js` (`const agentPaths = require('./paths')` → `agentPaths.INTEL_ROOT`).
 - **`.env.local` autoload** lives at the top of `paths.js`, keyed off its own directory,
   so it works no matter where the process is launched.
-- The original cutover was done by an AST codemod (`tools/_codemod-roots.js`) that
-  rewrote ~470 hardcoded literals into `paths.js`-derived expressions. It's kept in
-  `tools/` if you ever need to re-sweep after a big merge.
+- The original cutover (2026-06-07) rewrote ~470 hardcoded `/root/...` literals into
+  `paths.js`-derived expressions via a one-time AST codemod.
 
 ## What runs locally vs. what needs the full server
 

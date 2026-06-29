@@ -1462,25 +1462,11 @@ function readTaskActivity(taskId) {
   return merged
 }
 
-function logDisproven(agent, technique, target, reason, taskId, squad) {
-  logActivity(agent, `DISPROVEN: ${technique} on ${target} — ${reason}`, {
-    type: 'disproven', squad, taskId, technique, target, reason
-  })
-}
-
 function readJSON(file) {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf-8'))
   } catch {
     return []
-  }
-}
-
-function readJSONObj(file) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf-8'))
-  } catch {
-    return {}
   }
 }
 

@@ -43,7 +43,6 @@ const HAS_BUN = spawnSync('bun', ['--version'], { stdio: 'ignore' }).status === 
 const SKIP_FILES = new Set([
   'browser-verifier.test.js',          // playwright timeout (pre-existing)
   'event-bus-task-actions-dedup.test.js',
-  'finding-validator.test.js',
   'handoff-cost-caps.test.js',
   'handoff-resolver.test.js',
   'handoff-watcher.test.js',
