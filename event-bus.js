@@ -3683,11 +3683,22 @@ proceed normally — assumptions stay implicit.
   error | inconclusive. A blocked/sanitized result is signal (adapt), not a dead end.
 `
 
+  // nmap heart-truth block (Phase 0.4) — every open port/service on the host, read FIRST.
+  let nmapBlock = ''
+  try {
+    const _nmapFile = `${agentPaths.INTEL_ROOT}/nmap-${taskId}.json`
+    if (fs.existsSync(_nmapFile)) {
+      const { nmapPromptBlock } = require('./src/pipeline/nmap-scan')
+      nmapBlock = nmapPromptBlock(JSON.parse(fs.readFileSync(_nmapFile, 'utf8')), _nmapFile)
+    }
+  } catch {}
+
   return PENTEST_COVERAGE + `\nYou are ${agentUpper}, pentest specialist in ${squad}. Target: ${targetUrl}. Task: ${taskTitle}. TaskID: ${taskId}. WAF: ${wafStatus || 'unknown'}.
 ${goalLine}${techLine}${profileFragment}${MUST_GATES}${feedbackCtx}${liveFindings}${graphCtx}
-${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
+${nmapBlock}${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
 Read your skill: cat ${agentPaths.skillsDir(agentLower)}/*/SKILL.md
 Read bypass refs: cat ${agentPaths.skillsDir(agentLower)}/*/references/*.md 2>/dev/null
+Read nmap heart-truth (Phase 0.4 — every open port/service): cat ${agentPaths.INTEL_ROOT}/nmap-${taskId}.json 2>/dev/null
 Read endpoints: cat ${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json 2>/dev/null
 Read endpoint-models (Phase 1.8): cat ${agentPaths.INTEL_ROOT}/endpoint-models-${taskId}.jsonl 2>/dev/null
 Read env fingerprint (Phase 0.6): cat ${agentPaths.INTEL_ROOT}/env-fingerprint-${taskId}.json 2>/dev/null
@@ -4575,6 +4586,38 @@ async function dispatchPentestParallel(dispatch) {
     } catch (e) {
       log(`⚠️ WAF detection failed: ${e.message}`)
       wafStatus = 'detection failed — assume present'
+    }
+
+    // ── Phase 0.4: nmap service scan — the HEART TRUTH. Deterministic, daemon-run,
+    // BEFORE the recon agents. Discovers every open port/service on the host (all 65535
+    // ports) so the whole pipeline keys off ground truth, not just the single URL the
+    // operator typed. Writes nmap-<taskId>.json that buildPentestSpecialistPrompt injects
+    // into every recon + specialist prompt. Fail-soft. ──
+    if (phaseEnabled('0.4', squad)) {
+      try {
+        const { runNmapScan, nmapSummary } = require('./src/pipeline/nmap-scan')
+        log(`🛰️ Phase 0.4: nmap -sV -p- full service scan (heart truth) on ${targetUrl}`)
+        updateProgress(7, 'Phase 0.4: nmap full port + service scan')
+        logActivity('NEXUS', `🛰️ Phase 0.4: nmap full -p- service scan started`, {
+          type: 'nmap-scan', squad, taskId, projectId: projectId || '',
+          details: `Deterministic nmap -sV -p- --min-rate 3000 -T4 on the host (all 65535 ports). The heart-truth artifact every recon + specialist agent reads.`,
+        })
+        const nmap = await runNmapScan(targetUrl, { timeoutMs: 8 * 60 * 1000 })
+        try { fs.writeFileSync(`${agentPaths.INTEL_ROOT}/nmap-${taskId}.json`, JSON.stringify(nmap, null, 2)) } catch {}
+        if (nmap.ok && nmap.ports.length) {
+          log(`🛰️ Phase 0.4: nmap found ${nmap.ports.length} open port(s): ${nmapSummary(nmap)}`)
+          logActivity('NEXUS', `🛰️ Phase 0.4: nmap — ${nmap.ports.length} open ports (${nmap.httpServices.length} web)`, {
+            type: 'nmap-scan', squad, taskId, projectId: projectId || '',
+            details: `Open ports/services: ${nmapSummary(nmap)}\nWeb services to test: ${nmap.httpServices.join(', ') || '(none)'}`,
+          })
+        } else {
+          log(`⚠️ Phase 0.4: nmap produced no open ports (${nmap.error || 'none found'}) — continuing with URL-based recon`)
+          logActivity('NEXUS', `⚠️ Phase 0.4: nmap no open ports (${nmap.error || 'none'})`, {
+            type: 'nmap-scan', squad, taskId, projectId: projectId || '',
+            details: `nmap returned no open ports — continuing with URL-based recon. ${nmap.error || ''}`,
+          })
+        }
+      } catch (e) { log(`⚠️ Phase 0.4 nmap (non-fatal): ${e.message}`) }
     }
 
     // ── Phase 0.1: Auth type detection — INFORM agents, don't restrict ──

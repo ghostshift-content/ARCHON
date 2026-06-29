@@ -543,8 +543,16 @@ function logsForTask(taskId) {
 // from the recon activity line) + the env fingerprint + endpoint counts. Fail-soft.
 function reconSummary(ids, activity) {
   const out = { ports: [], product: '', server: '', waf: '', frameworks: [], notablePaths: [], cveCandidates: [], endpoints: null }
-  // open ports — pull "N/PROTO" tokens from the recon-complete activity entry
-  try {
+  // open ports — AUTHORITATIVE from the Phase 0.4 nmap heart-truth artifact when present
+  for (const tid of ids) {
+    const nm = readJSON(`nmap-${tid}.json`, null)
+    if (nm && nm.ok && Array.isArray(nm.ports) && nm.ports.length) {
+      out.ports = nm.ports.map(p => `${p.port}/${p.service || p.proto}`)
+      break
+    }
+  }
+  // fallback: parse "N/PROTO" tokens from the recon activity entry if no nmap artifact yet
+  if (!out.ports.length) try {
     const portRe = /\b(\d{1,5}\/[A-Za-z]{2,8})\b/g
     for (const a of activity) {
       const txt = `${a.action || ''} ${a.details || ''}`
