@@ -84,6 +84,10 @@ function cleanup() {
   ok('combined: pentest dispatch queued', !!ptD)
   ok('combined: code-review dispatch queued with sourceDir', !!crD && crD.meta && crD.meta.sourceDir === srcDir)
   ok('combined: code-review deployUrl bridged to live URL', crD && crD.meta && crD.meta.deployUrl === 'https://combo.test')
+  ok('combined: cr scope in_scope includes the source tree (Phase 0.0 source-target match)',
+    (() => { const s = JSON.parse(fs.readFileSync(F(`scope-${cr.taskId}.json`), 'utf8')); return Array.isArray(s.in_scope) && s.in_scope.includes(srcDir) })())
+  ok('combined: cr scope still includes the URL hostname (PROBER live hits)',
+    (() => { const s = JSON.parse(fs.readFileSync(F(`scope-${cr.taskId}.json`), 'utf8')); return s.in_scope.includes('combo.test') })())
 
   // mixed-squad aggregation: a black-box live finding + a white-box source finding
   seedFindings(CE, [{ id: 'BB-1', severity: 'High', cvss_score: 7.4, title: 'Reflected XSS (live)', url: 'http://combo.test/q' }])
@@ -99,6 +103,20 @@ function cleanup() {
   ok('combined: triage routed to white-box iteration', JSON.parse(fs.readFileSync(F(`triage-${cr.taskId}.json`), 'utf8')).verdicts['WB-1'].verdict === 'rejected')
   ok('combined: black-box iteration finding stays confirmed (no cross-impact)', (() => { try { const v = JSON.parse(fs.readFileSync(F(`triage-${CE}.json`), 'utf8')).verdicts['BB-1']; return !v || v.verdict === 'confirmed' } catch { return true } })())
   ok('combined: rejection reflected on reload', d.findingsForTask(CE).findings.find(f => f.id === 'WB-1').triage.verdict === 'rejected')
+
+  // ── STANDALONE white-box code review (no engagement): Phase 0.0 must ALLOW it ──
+  const wbSrc = path.resolve(__dirname, '..')   // guaranteed-absolute existing dir
+  const wb = d.createDispatch({ squad: 'code-review', meta: { sourceDir: wbSrc } })
+  track(wb.taskId)
+  ok('standalone code-review: scope file written', fs.existsSync(F(`scope-${wb.taskId}.json`)))
+  ok('standalone code-review: source tree is in_scope',
+    (() => { const s = JSON.parse(fs.readFileSync(F(`scope-${wb.taskId}.json`), 'utf8')); return Array.isArray(s.in_scope) && s.in_scope.includes(wbSrc) })())
+  ok('standalone code-review: Phase 0.0 validateDispatch ALLOWS the dispatch end-to-end', (() => {
+    const pol = require('../agents/squad-policy/code-review')
+    const { validateDispatch } = require('../agents/scope-prevalidator')
+    const scope = JSON.parse(fs.readFileSync(F(`scope-${wb.taskId}.json`), 'utf8'))
+    return validateDispatch({ taskId: wb.taskId, meta: { sourceDir: wbSrc } }, pol, scope).status === 'allowed'
+  })())
 
   cleanup()
   console.log(`\n${passed} passed, ${failed} failed`)

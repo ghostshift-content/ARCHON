@@ -313,7 +313,18 @@ function createDispatch(body) {
   const meta = isCodeReview ? buildCodeReviewMeta(body) : isPentest ? buildPentestMeta(body) : null
   const taskId = 't-' + Date.now() + '-' + crypto.randomBytes(2).toString('hex')
   let fallbackTitle = goal
-  if (isCodeReview) fallbackTitle = `Code review: ${path.basename(meta.sourceDir)}`
+  if (isCodeReview) {
+    fallbackTitle = `Code review: ${path.basename(meta.sourceDir)}`
+    // Phase 0.0 scope gate is fail-closed and runs for every squad. A static
+    // source review is authorized by the operator-provided source tree, so seed
+    // a scope config listing it as in-scope (path-based match in
+    // squad-policy/code-review.matchesScope). Without this the dispatch
+    // hard-blocks with "no scope config".
+    try {
+      fs.writeFileSync(path.join(INTEL, `scope-${taskId}.json`),
+        JSON.stringify({ in_scope: [meta.sourceDir], out_of_scope: [], infra_dependencies: {} }, null, 2))
+    } catch {}
+  }
   if (isPentest) {
     // engagement: this first dispatch is iteration 1 (black-box, live). Record the
     // engagement sidecar so later iterations can inherit scope/creds and findings
@@ -334,8 +345,12 @@ function createDispatch(body) {
       crMeta.engagementId = taskId
       // scope config so the code-review iteration's live (PROBER) hits pass Phase 0.0
       try {
+        // in_scope carries the URL hostnames (PROBER's live runtime hits) PLUS the
+        // source tree path, so Phase 0.0 (which extracts meta.sourceDir for the
+        // code-review squad) matches the source target. matchesScope uses .some(),
+        // so the path entry resolves the source target while hostnames serve PROBER.
         fs.writeFileSync(path.join(INTEL, `scope-${crTaskId}.json`),
-          JSON.stringify({ in_scope: meta.inScope, out_of_scope: meta.outOfScope, infra_dependencies: {} }, null, 2))
+          JSON.stringify({ in_scope: [...(meta.inScope || []), crMeta.sourceDir], out_of_scope: meta.outOfScope, infra_dependencies: {} }, null, 2))
       } catch {}
       iterations.push({ taskId: crTaskId, label: 'White-box (source)', createdAt: new Date().toISOString(), squad: 'code-review', kind: 'whitebox' })
     }
