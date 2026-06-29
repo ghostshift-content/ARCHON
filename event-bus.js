@@ -9550,9 +9550,13 @@ function _processQueueInner() {
           projectId: dispatch.projectId || '',
           source: 'backfill',  // marker so UI knows this was auto-created
         }
-        const allTasks = readJSON(TASKS_FILE) || []
-        allTasks.push(newTask)
-        writeJSON(TASKS_FILE, allTasks)
+        // Lock the read-modify-write: the dashboard/UI is an independent writer
+        // of tasks.json, so an unlocked push can lose a concurrent edit.
+        withFileLock(TASKS_FILE, () => {
+          const allTasks = readJSON(TASKS_FILE) || []
+          allTasks.push(newTask)
+          writeJSON(TASKS_FILE, allTasks)
+        })
         taskById.set(String(dispatch.taskId), newTask) // keep local map in sync
         log(`🔄 Dashboard sync: backfilled tasks.json for dispatch ${dispatch.id} (taskId: ${dispatch.taskId})`)
       } catch (e) {
@@ -9560,7 +9564,14 @@ function _processQueueInner() {
       }
     }
 
-    dispatchToAgent(dispatch)
+    // dispatchToAgent is async + fail-soft internally, but a throw BEFORE its
+    // try-wrapped body (or a rejected promise) would otherwise be an unhandled
+    // rejection. Catch defensively: log loudly and leave the dispatch in-queue
+    // for the stale-recovery sweep rather than crashing the processing loop.
+    dispatchToAgent(dispatch).catch((e) => {
+      try { log(`❌ dispatchToAgent threw for ${dispatch && dispatch.taskId} (non-fatal, left for recovery): ${e && e.message}`) } catch {}
+      try { runningTasks.delete(dispatch && dispatch.taskId) } catch {}
+    })
   }
 }
 
@@ -9914,6 +9925,20 @@ function startWatcher() {
   setInterval(runStuckTaskWatchdog, 5 * 60 * 1000)
   log('👁️  Stuck task watchdog started (5min interval)')
 
+  // Housekeeping sweep — prune in-memory maps so a long-lived daemon doesn't
+  // grow unbounded. _taskMissedSignals is normally deleted per-task, but an
+  // early dispatch error can orphan an entry; drop any whose task isn't running.
+  // calendarLastRun is a best-effort dedup flag — cap it as a cheap backstop.
+  setInterval(() => {
+    try {
+      for (const tid of Object.keys(_taskMissedSignals)) {
+        if (!runningTasks.has(tid) && !runningTasks.has(String(tid))) delete _taskMissedSignals[tid]
+      }
+      const ck = Object.keys(calendarLastRun)
+      if (ck.length > 500) for (const k of ck) delete calendarLastRun[k]
+    } catch {}
+  }, 60 * 60 * 1000)
+
   // ── Task heartbeat (2026-04-20, revised) ─────────────────────────────
   // Writes heartbeat timestamps to a SEPARATE file (/root/intel/task-heartbeats.json)
   // instead of mutating tasks.json. Prevents the race where agent-done status
@@ -10234,4 +10259,28 @@ function startWatcher() {
   log('✅ NEXUS v3 active. Durable orchestrator: atomic writes, single writer, inbox, supervisor, dynamic discovery, per-task logs, task heartbeat. Waiting for tasks...\n')
 }
 
-startWatcher()
+// Only auto-start the daemon when run directly. Importing this module (tests,
+// tooling) must NOT spin up the watcher/intervals or install process handlers.
+if (require.main === module) {
+  // Process-level safety nets — in a long-running daemon a stray rejection or
+  // exception must be logged + checkpointed, never a silent death. We log-and-
+  // continue on unhandledRejection (the pipeline is fail-soft by design) but
+  // exit(1) on uncaughtException (process state is unknown after one).
+  process.on('unhandledRejection', (reason) => {
+    try { log(`❌ UNHANDLED REJECTION: ${reason && reason.stack ? reason.stack : reason}`) } catch {}
+    try { persistCheckpointNow({ crash: 'unhandledRejection' }) } catch {}
+  })
+  process.on('uncaughtException', (err) => {
+    try { log(`❌ UNCAUGHT EXCEPTION: ${err && err.stack ? err.stack : err}`) } catch {}
+    try { persistCheckpointNow({ crash: 'uncaughtException' }) } catch {}
+    process.exit(1)
+  })
+  for (const sig of ['SIGTERM', 'SIGINT']) {
+    process.on(sig, () => {
+      try { log(`🛑 ${sig} received — persisting checkpoint, shutting down`) } catch {}
+      try { persistCheckpointNow({ shutdown: sig }) } catch {}
+      process.exit(0)
+    })
+  }
+  startWatcher()
+}
