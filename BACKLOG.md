@@ -7,6 +7,18 @@ are lower-priority features/ops. Each item: symptom → root cause (file) → fi
 
 ## OPEN
 
+### P2 — Orphaned tool processes survive agent/run cancellation
+- **Symptom:** After cancelling a run, `nmap`/`ffuf`/`curl` subprocesses the agents spawned keep
+  running indefinitely (observed `ppid 1`, one nmap `-p- -T2` running ~2 HOURS, still scanning the
+  old box IP). They leak CPU/RAM and confuse later diagnostics.
+- **Root cause:** `killTaskChildren` / the watchdog SIGTERMs the agent (claude) process, but the agent
+  spawned its tools via its bash tool as grandchildren — they're NOT in the agent's kill path, so they
+  reparent to init and run on. (event-bus.js spawn/kill path — agents not spawned in their own process
+  group; kill targets the process, not the tree.)
+- **Fix:** Spawn agents in their own process group (`detached`/`setsid`) and kill the GROUP
+  (`process.kill(-pgid)`) / whole tree on cancel + watchdog kill, so descendant tools die with the agent.
+  Interim: a sweep that reaps `ppid==1` scan tools whose run is terminal.
+
 ### P3 — Authenticated crawl: TRACER stops at `/login`
 - **Symptom:** `⚠️ TRACER low-coverage: only 1 URL discovered`. The app redirects everything to
   `/login`; the unauthenticated crawl can't get past the auth wall, so endpoint coverage is ~0.
