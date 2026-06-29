@@ -8076,10 +8076,15 @@ const { buildCorrelationMap } = require('./src/pipeline/cross-view-dedup')
 // operator's triage verdicts (triage-<taskId>.json). Fired by a 'generate-report'
 // task-action. Self-contained (derives target from the goal/findings) so it does
 // not depend on the dispatch-time pipeline locals.
+const _reportInFlight = new Set()
 async function generateReportForTask(taskId) {
   const tasks = readJSON(TASKS_FILE) || []
   const task = tasks.find(t => String(t.id) === String(taskId))
   if (!task) { log(`📝 generate-report: task ${taskId} not found`); return }
+  // guard: a duplicate inbox message (or impatient double-click) must not spawn a 2nd SCRIBE
+  if (_reportInFlight.has(String(taskId))) { log(`📝 generate-report: already generating ${taskId} — skipping duplicate`); return }
+  _reportInFlight.add(String(taskId))
+  try {
   const squad = String(task.squad || 'pentest').replace(/-squad$/, '')
   const projectId = task.projectId || ''
   // Process the findings BEFORE writing the report: promote raw findings to
@@ -8145,6 +8150,7 @@ async function generateReportForTask(taskId) {
     log(`✅ Generate-report: report written for ${taskId}`)
     logActivity('SCRIBE', `✅ Report generated (operator-triaged)`, { type: 'report-done', squad, taskId, projectId })
   } catch (e) { log(`❌ generate-report ${taskId} failed: ${e.message}`) }
+  } finally { _reportInFlight.delete(String(taskId)) }
 }
 
 // ── Amend a run: append instructions to the engagement brief + add in-scope hosts ──

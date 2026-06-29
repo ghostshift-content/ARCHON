@@ -202,6 +202,11 @@ function render(s) {
     const t = (s.tasks || []).find(x => String(x.id) === String(tdTaskId))
     if (t && t.status === 'in-progress') loadFindings()
   }
+  // report tab: while SCRIBE is generating (or once it finishes), keep the tab current
+  if (currentView === 'task' && tdSub === 'report') {
+    const t = (s.tasks || []).find(x => String(x.id) === String(tdTaskId))
+    if (t && (/generating/i.test(t.status || '') || !reportForTask(t))) renderTaskReport()
+  }
 
   const active = s.tasks.filter(t => t.status === 'in-progress').length
   const done = s.tasks.filter(t => ['completed', 'done'].includes(t.status)).length
@@ -322,7 +327,12 @@ function renderTaskOverview() {
 async function renderTaskReport() {
   const t = (lastState ? lastState.tasks : []).find(x => String(x.id) === String(tdTaskId)) || { id: tdTaskId }
   const rel = reportForTask(t)
-  if (!rel) { $('#tdReportBody').innerHTML = `<div class="empty">No report yet.${t.status === 'awaiting-triage' ? ' Triage the findings, then Generate report.' : ''}</div>`; return }
+  // SCRIBE is writing — show a live "generating" state; render() keeps polling until the report lands
+  if (/generating/i.test(t.status || '')) {
+    $('#tdReportBody').innerHTML = `<div class="empty"><div class="spin"></div>Generating report — SCRIBE is writing from the confirmed findings. This takes a few minutes; it'll appear here automatically.</div>`
+    return
+  }
+  if (!rel) { $('#tdReportBody').innerHTML = `<div class="empty">No report yet.${t.status === 'awaiting-triage' ? ' Triage the findings, then click Generate report.' : ' Generate it from the Findings tab.'}</div>`; return }
   $('#tdReportBody').innerHTML = '<div class="skel"></div>'
   await loadReport(rel); $('#tdReportBody').innerHTML = md(reportCache[rel] || '_Could not load report._')
 }
@@ -548,11 +558,14 @@ $('#fdSave').onclick = async () => {
   else toast('Save failed', r && r.error, 'err')
 }
 $('#fnGen').onclick = async () => {
-  const s = await saveTriage(); if (s && s.error) return toast('Save failed', s.error, 'err')
+  const btn = $('#fnGen'); if (btn.disabled) return // guard against double-spawn
+  btn.disabled = true
+  const s = await saveTriage(); if (s && s.error) { btn.disabled = false; return toast('Save failed', s.error, 'err') }
   // target the engagement root → daemon aggregates confirmed findings across all iterations
   const r = await api('POST', '/api/generate-report', { taskId: fnEngagementId || fnTaskId })
-  if (r && !r.error) { toast('Generating report ✓', 'SCRIBE writing from confirmed findings (all iterations)', 'ok'); setTdSub('report') }
+  if (r && !r.error) { toast('Generating report ✓', 'SCRIBE writing from confirmed findings — appears on the Report tab in a few minutes', 'ok'); setTdSub('report') }
   else toast('Generate failed', r && r.error, 'err')
+  setTimeout(() => { btn.disabled = false }, 8000) // re-enable after the request settles
 }
 // ── run another iteration on this engagement ──
 $('#itCancel').onclick = () => { $('#fnIterForm').style.display = 'none' }

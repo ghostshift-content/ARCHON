@@ -341,6 +341,9 @@ ol.fsteps li { font-size: 13px; line-height: 1.5; }
 .act .t { flex-shrink: 0; }
 .act .msg { color: var(--fg-mut); min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 
+.spin { display: inline-block; width: 16px; height: 16px; margin-right: 9px; vertical-align: -3px; border: 2px solid var(--line); border-top-color: var(--accent-2); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Testing-logs tab */
 .reconbox { border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); padding: 12px 14px; margin-bottom: 14px; }
 .reconbox:empty { display: none; }
