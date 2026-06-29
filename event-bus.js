@@ -1645,6 +1645,9 @@ function writePostTaskMemory(agentName, taskId, taskTitle, squad, grade, cost, g
   const agentLower = agentName.toLowerCase()
   const wsDir = agentPaths.personaState(agentLower)
   const memDir = `${wsDir}/memory`
+  // The evicted var/state/agents/<name>/memory/ layout is never pre-created — mkdir before any
+  // write (episodes/grades/lessons) or every post-task memory write ENOENTs (learning loop dies).
+  try { fs.mkdirSync(`${memDir}/episodes`, { recursive: true }) } catch {}
   const dateStr = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
   
   // Extract target name from task title (stock ticker or target)
@@ -3310,76 +3313,25 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
     //      so we trust the time signals. HARD_MAX + NO_MOVEMENT remain the net.
     // Watchdog kill now calls the bridge's duck-typed handle.kill() (→ aborts the
     // in-flight run → bridge maps to code 143), not child.kill.
-    const NO_MOVEMENT_MS = 15 * 60 * 1000 // 15 minutes no stream data = potentially stuck
-    // Recon agents (SCOUT/RANGER) map surface FAST — a tighter 15min cap stops one from sinking
-    // the whole run into deep exploitation (their job is breadth; Phase 2 specialists go deep).
-    const _isReconAgent = ['scout', 'ranger'].includes(agentName.toLowerCase())
-    const HARD_MAX_RUNTIME_MS = (_isReconAgent ? 15 : 45) * 60 * 1000 // recon 15min, others 45min
-    const DONE_GRACE_MS = 8 * 60 * 1000 // 8 min grace after agent reports "done" in activity log
-    // ACTIVITY-STALL (2026-06-08): catches the "streaming/thinking but producing NOTHING" hang
-    // that NO_MOVEMENT misses — lastDataTime keys off the stream, so an agent that keeps
-    // streaming tokens without writing real output (veteran hung 45min while streaming, evading
-    // the 15min NO_MOVEMENT, only the 45min cap caught it) never trips it. Real progress = a NEW
-    // activity-log entry. No new entry for 22min → kill+retry. 22min is generous (slowest healthy
-    // analyst wrote within ~14min; pentest agents log findings far more often).
-    const ACTIVITY_STALL_MS = 22 * 60 * 1000
-    let _lastActivityCount = -1
-    let _lastActivityProgressAt = spawnTime
+    // ── Watchdog: CANCEL-RESPONDER ONLY (2026-06-29 directive: agents must finish their jobs) ──
+    // NO time-based kills. A working agent runs to natural completion and exits on its own; the
+    // ONLY thing that stops it is an explicit user cancel. REMOVED: HARD_MAX (45min), NO_MOVEMENT
+    // (15min), ACTIVITY_STALL (22min), DONE_GRACE (8min), and the recon 15min cap — every one of
+    // them could kill an agent that was still working. killTaskChildren (processCancelSignals) is
+    // the primary cancel path; this interval is belt-and-suspenders so an in-flight cancel still
+    // aborts the run even if the registry missed the handle.
+    // ⚠️ Accepted trade-off (user call): a genuinely-hung agent runs unbounded. Re-add a pure
+    // no-output-at-all net later if runaway cost ever bites.
+    const AGENT_NO_LIMIT_MS = 7 * 24 * 60 * 60 * 1000 // effectively unbounded (safe under setTimeout's ~24.8d ceiling)
     const killViaHandle = (why) => {
-      log(`  ⚠️ ${agentName.toUpperCase()} ${why}. Killing.`)
+      log(`  🛑 ${agentName.toUpperCase()} ${why}. Killing.`)
       clearInterval(movementWatchdog)
       try { if (childHandle) childHandle.kill('SIGTERM') } catch {}
     }
     const movementWatchdog = setInterval(() => {
       if (settled) { clearInterval(movementWatchdog); return }
-      const elapsed = Date.now() - spawnTime
-      const silent = Date.now() - lastDataTime
-
-      // 1. Hard max runtime — unconditional kill.
-      if (elapsed > HARD_MAX_RUNTIME_MS) {
-        killViaHandle(`hit max runtime (${Math.round(elapsed / 60000)}min)`)
-        return
-      }
-
-      // 1b. ACTIVITY-STALL: no NEW activity-log entry (real work output) for 22min → kill.
-      //     Catches the stream-but-no-output hang that NO_MOVEMENT (lastDataTime) cannot see.
-      try {
-        const _agentU = agentName.toUpperCase()
-        const _cnt = readTaskActivity(taskId).filter(e => String(e.agent || '').toUpperCase() === _agentU).length
-        if (_cnt > _lastActivityCount) { _lastActivityCount = _cnt; _lastActivityProgressAt = Date.now() }
-        // progress = a new activity-log entry OR recent tool activity (running a scan/curl).
-        // Only thinking-only streaming with neither trips the stall — the true hang case.
-        const _lastProgress = Math.max(_lastActivityProgressAt, lastToolActivityAt)
-        if (Date.now() - _lastProgress > ACTIVITY_STALL_MS) {
-          killViaHandle(`no activity-log entry or tool activity for ${Math.round((Date.now() - _lastProgress) / 60000)}min (streaming but stuck)`)
-          return
-        }
-      } catch {}
-
-      // 2. DONE_GRACE: agent logged "done/complete" and went silent >8min → kill.
-      //    Pure activity-log read (no pid). Fast path: only this task's entries.
-      if (silent > DONE_GRACE_MS) {
-        try {
-          const agentU = agentName.toUpperCase()
-          const recentActivity = readTaskActivity(taskId)
-            .filter(e => String(e.agent || '').toUpperCase() === agentU)
-            .slice(-3)
-            .map(e => `${e.action || ''} ${e.details || ''}`)
-            .join(' ')
-            .toLowerCase()
-          if (/complete|done|finalized|assessment complete|pentest complete|session complete|all findings validated/i.test(recentActivity)) {
-            killViaHandle(`reported done, silent ${Math.round(silent / 60000)}min`)
-            return
-          }
-        } catch {}
-      }
-
-      // 3. NO_MOVEMENT: no progress for 15min → kill. (No CPU probe possible
-      //    without a pid; the time signal is authoritative now.)
-      if (silent > NO_MOVEMENT_MS) {
-        killViaHandle(`stuck — no progress for ${Math.round(silent / 60000)}min`)
-      }
-    }, 60000) // Check every 60s
+      if (_isTaskCancelled(taskId)) { killViaHandle('task cancelled'); return }
+    }, 30000) // check ONLY for cancellation, every 30s
 
     // ── The single bridged spawn. bridgeSpawnAgent NEVER throws. onChildHandle
     // fires SYNCHRONOUSLY (before the await) with the duck-typed kill handle —
@@ -3393,8 +3345,8 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
     try {
       const res = await bridgeSpawnAgent({
         ...ctx,
-        // adapter ceiling = HARD_MAX; watchdog (15min no-movement) fires first for stuck agents
-        timeoutMs: HARD_MAX_RUNTIME_MS,
+        // no time limit — agents run to natural completion (only user-cancel stops them)
+        timeoutMs: AGENT_NO_LIMIT_MS,
         onChildHandle: (handle) => {
           childHandle = handle
           registerTaskChild(taskId, handle)
@@ -3745,14 +3697,9 @@ proceed normally — assumptions stay implicit.
     }
   } catch {}
 
-  // Recon agents (SCOUT/RANGER) map surface + flag exploitable vulns FAST — they must NOT
-  // sink the whole run budget into deep exploitation (that's the Phase 2 specialists' job).
-  const _reconBlock = PENTEST_RECON.includes(agentLower)
-    ? `\n## RECON SCOPE + TIME BOUNDARY (you are a recon agent)\nYour job: map the attack surface and FLAG exploitable vulns with a QUICK proof (one request that demonstrates it), then emit-finding it immediately. Do NOT spend the run deep-exploiting / mass-dumping — the Phase 2 specialists do that from your flagged findings. Target ~10-12 min: breadth over depth. When you've mapped the surface and flagged the obvious vulns, STOP and return so the pipeline advances to the specialists.\n`
-    : ''
   return PENTEST_COVERAGE + `\nYou are ${agentUpper}, pentest specialist in ${squad}. Target: ${targetUrl}. Task: ${taskTitle}. TaskID: ${taskId}. WAF: ${wafStatus || 'unknown'}.
 ${goalLine}${techLine}${profileFragment}${MUST_GATES}${feedbackCtx}${liveFindings}${graphCtx}
-${_reconBlock}${canonBlock}${nmapBlock}${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
+${canonBlock}${nmapBlock}${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
 Read your skill: cat ${agentPaths.skillsDir(agentLower)}/*/SKILL.md
 Read bypass refs: cat ${agentPaths.skillsDir(agentLower)}/*/references/*.md 2>/dev/null
 Read canonical target (Phase 0.45 — vhost + --resolve mapping): cat ${agentPaths.INTEL_ROOT}/canonical-target-${taskId}.json 2>/dev/null
@@ -3764,29 +3711,22 @@ Read attack plan (Phase 1.9): cat ${agentPaths.INTEL_ROOT}/attack-plan-${taskId}
 Read WAF bypass reference (use when a WAF vendor is named): cat ${agentPaths.AGENTS_ROOT}/agents/refs/waf-bypass.md 2>/dev/null
 Read memory: cat ${agentPaths.lessonsPath(agentLower)} 2>/dev/null
 
-## RECORDING FINDINGS — MANDATORY: a finding ONLY counts if emitted via the tool below
-A finding you describe in your reply or echo to a log is INVISIBLE to the pipeline — it will NOT
-reach the operator, the validator, or the report. The ONLY way a finding is counted is this command.
-Run it the INSTANT you confirm (or strongly suspect) something — do NOT batch them to the end.
-node ${agentPaths.AGENTS_ROOT}/tools/emit-finding.js --task ${taskId} --agent ${agentUpper} --type confirmed|suspected|surface --severity critical|high|medium|low|info --confidence high|medium|low --url "URL" --relation backend-of|redirect-to|api-for|subdomain-of|same-app --parent "${targetUrl}" --auth none|cookie|bearer|saml|azure-ad|custom --details "WHAT_YOU_FOUND" --impact "WHAT_AN_ATTACKER_GAINS_concretely" --tested "what,you,tested" --not-tested "what,remains" --reproduction-file /tmp/repro-${agentUpper}.txt --payloads-file /tmp/payloads-${agentUpper}.txt
-Multi-line evidence goes in the temp files first, e.g.: the exact request/response or command output → /tmp/repro-${agentUpper}.txt; each payload (incl WAF-bypass mutations + which landed), one per line → /tmp/payloads-${agentUpper}.txt. Short single-line fields can use --reproduction "curl ..." instead of the file flag.
-Worked example:
-  printf '%s\\n' 'GET /download/0 HTTP/1.1' 'Host: 10.0.0.1' '' '→ 200, leaks creds nathan:hunter2' > /tmp/repro-${agentUpper}.txt
-  node ${agentPaths.AGENTS_ROOT}/tools/emit-finding.js --task ${taskId} --agent ${agentUpper} --type confirmed --severity critical --confidence high --url "http://10.0.0.1/download/0" --details "Unauthenticated IDOR exposes PCAP files with cleartext FTP creds" --impact "Any unauthenticated user downloads every capture + recovers FTP credentials" --reproduction-file /tmp/repro-${agentUpper}.txt
-This helper guarantees your finding is recorded without corruption even when reproduction contains newlines, quotes, or backslashes (USER\\|PASS). Run it once per finding.
-On every CONFIRMED finding you MUST fill --impact with the concrete attacker gain (e.g. "read any user's invoices via IDOR", "execute OS commands as www-data"), not just the severity word.
-EVIDENCE CONTRACT: only set type=confirmed if you CAPTURED replayable evidence (the exact request/response, command output, or DOM proof) and put it in "reproduction". No captured evidence → type=suspected. A confirmed claim without evidence is demoted automatically — it does not help you to over-claim.
-Always populate \`tested\` + \`not_tested\` so other agents know the gaps.
+## RECORDING FINDINGS — log EVERY finding the moment you confirm (or strongly suspect) it
+Record findings as you go (do NOT batch to the end). Two ways — use whichever you like; either reaches
+the validator + report:
+1) ACTIVITY-LOG (always available) — one line per finding:
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"${agentUpper}","action":"CONFIRMED Finding: TITLE","details":"EVIDENCE — exact request/response or command output","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}","type":"finding","severity":"critical|high|medium|low|info","status":"confirmed|suspected"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
+2) emit-finding helper (cleaner, structured — recommended for multi-line evidence; never corrupts):
+node ${agentPaths.AGENTS_ROOT}/tools/emit-finding.js --task ${taskId} --agent ${agentUpper} --type confirmed|suspected|surface --severity critical|high|medium|low|info --confidence high|medium|low --url "URL" --parent "${targetUrl}" --details "WHAT_YOU_FOUND" --impact "WHAT_AN_ATTACKER_GAINS" --reproduction-file /tmp/repro-${agentUpper}.txt
+On every CONFIRMED finding fill impact with the concrete attacker gain (e.g. "read any user's invoices via IDOR", "OS commands as www-data"), not just the severity word.
+EVIDENCE CONTRACT: only mark confirmed if you CAPTURED replayable evidence (request/response, command output, DOM proof). No captured evidence → suspected. A confirmed claim without evidence is auto-demoted.
 
 ## CREATIVE ATTACK PHASE — after your skill's standard checks
 1. What did you find that's ALMOST a vuln? Can you chain it with another finding?
 2. What assumptions does this app make that you can break?
 (Skill files cover the standard payload library — focus this phase on the chains and broken-assumption ideas your skill doesn't enumerate.)
 
-## PROGRESS LOG (status only — NOT findings; findings go through emit-finding.js above)
-Use the activity log ONLY for human-readable progress notes (what you're testing now). It does NOT
-record findings — never put a finding here instead of emitting it.
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"${agentUpper}","action":"PROGRESS: what you are testing now","details":"context","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}","type":"progress"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
+Finish your job — complete your full assessment, then return. There is no time limit.
 Execute now.${missedSignalsBlock}`
 }
 
@@ -4945,11 +4885,9 @@ async function dispatchPentestParallel(dispatch) {
     })
     updateProgress(10, 'Phase 1: Recon running (SCOUT + RANGER)')
 
-    // maxRetries=0 for recon: recon is time-boxed (15min watchdog cap). A cap-kill must NOT
-    // re-spawn the agent for another 15min — that defeats the cap and lets recon run ~30min.
     const reconResults = await Promise.all(PENTEST_RECON.map(agent => {
       const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId])
-      return spawnWithRetry(agent, prompt, undefined, 0)
+      return spawnWithRetry(agent, prompt, undefined)
     }))
     trackCosts(reconResults)
 
@@ -10655,6 +10593,78 @@ function startWatcher() {
     fs.watch(CANCEL_DIR, () => setTimeout(processCancelSignals, 200))
   } catch {}
   log('🛑 Cancel-signal watcher started')
+
+  // ── Orphan-reaper janitor ──
+  // When an agent is killed (cancel), the scan tools it spawned (nmap/ffuf/…) reparent to init
+  // (ppid 1) because the default SDK adapter doesn't group-kill — they'd run forever (saw an
+  // nmap -p- alive ~2h). The daemon NEVER spawns these scan tools directly with ppid 1, so any
+  // ppid==1 match is unambiguously a leaked agent tool. Sweep + SIGKILL them every 60s.
+  // ponytail: ppid==1 + tool-name match. A human-launched detached scan would also match — fine
+  // on a pentest daemon box. Upgrade path: tag agent tools + match the tag instead.
+  function reapOrphanScanTools() {
+    try {
+      const { execSync } = require('child_process')
+      const out = execSync('ps -eo pid=,ppid=,args= 2>/dev/null', { timeout: 5000, maxBuffer: 4 * 1024 * 1024 }).toString()
+      let reaped = 0
+      for (const line of out.split('\n')) {
+        const m = line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/)
+        if (!m || m[2] !== '1') continue // ppid must be 1 (orphaned/reparented)
+        if (!/\b(nmap|ffuf|katana|nuclei|gobuster|sqlmap|wfuzz|nikto|gospider|feroxbuster|dirb|whatweb)\b/i.test(m[3])) continue
+        try { process.kill(+m[1], 'SIGKILL'); reaped++ } catch {}
+      }
+      if (reaped) log(`🧹 Orphan-reaper: killed ${reaped} leaked scan-tool process(es) (ppid=1)`)
+    } catch {}
+  }
+  setInterval(reapOrphanScanTools, 60000) // sweep every 60s
+  log('🧹 Orphan-reaper started (60s sweep)')
+
+  // ── Activity→live-findings ingester ──
+  // Agents log findings to ACTIVITY-LOG (the path the AUDITOR reads). To ALSO surface them in the
+  // Findings tab live — without depending on the agent calling emit-finding — promote new
+  // finding-shaped activity entries for in-progress tasks into live-findings-<task>.jsonl
+  // (idempotent, deduped by url+title), via the finding-schema normalizer.
+  const _FINDING_AGENTS = new Set(['SCOUT', 'RANGER', 'RELAY', 'VIPER', 'DRILL', 'WARDEN', 'LEDGER', 'FORGE', 'SPECTRE', 'DECOY', 'VAULT', 'GATEWAY', 'SENTRY', 'AUDITOR'])
+  function _looksLikeFinding(e) {
+    if (!e || !_FINDING_AGENTS.has(String(e.agent || '').toUpperCase())) return false
+    if (e.type === 'finding') return true
+    const a = String(e.action || '')
+    return /^(CONFIRMED|SUSPECTED)\s+Finding:/i.test(a) || /^(critical|high|medium|low)\b\s*[:\-]/i.test(a)
+  }
+  function ingestActivityFindings() {
+    try {
+      const tasks = (readJSON(TASKS_FILE) || []).filter(t => t && t.status === 'in-progress')
+      if (!tasks.length) return
+      const { normalizeFinding } = require('./agents/finding-schema')
+      const ID = agentPaths.INTEL_ROOT
+      let lines = []
+      try { lines = fs.readFileSync(`${ID}/ACTIVITY-LOG.jsonl`, 'utf8').trim().split('\n').slice(-1500) } catch {}
+      const acts = []
+      for (const l of lines) { try { acts.push(JSON.parse(l)) } catch {} }
+      for (const task of tasks) {
+        const taskId = String(task.id)
+        const lf = `${ID}/live-findings-${taskId}.jsonl`
+        const seen = new Set()
+        try { for (const l of fs.readFileSync(lf, 'utf8').split('\n')) { if (!l.trim()) continue; try { const o = JSON.parse(l); seen.add(`${String(o.url || '').toLowerCase()}|${String(o.details || o.title || '').slice(0, 40)}`) } catch {} } } catch {}
+        let added = 0
+        for (const e of acts) {
+          if (String(e.taskId) !== taskId || !_looksLikeFinding(e)) continue
+          const a = String(e.action || '')
+          const title = a.replace(/^(confirmed|suspected)\s+finding:\s*/i, '').slice(0, 120)
+          const url = (a + ' ' + (e.details || '')).match(/https?:\/\/[^\s"')]+/)?.[0] || ''
+          const key = `${url.toLowerCase()}|${(e.details || title).slice(0, 40)}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          const sev = e.severity || (a.match(/^(critical|high|medium|low|info)/i) || [])[1] || 'medium'
+          const type = e.status || (/^(confirmed|critical|high)/i.test(a) ? 'confirmed' : 'suspected')
+          const rec = normalizeFinding({ agent: e.agent, type, severity: sev, url, details: title, reproduction: e.details || '', taskId, source: 'activity-ingest' })
+          try { fs.appendFileSync(lf, JSON.stringify(rec) + '\n'); added++ } catch {}
+        }
+        if (added) log(`📥 Ingested ${added} activity finding(s) → live-findings for ${taskId}`)
+      }
+    } catch {}
+  }
+  setInterval(ingestActivityFindings, 15000) // every 15s during in-progress runs
+  log('📥 Activity→findings ingester started (15s)')
 
   // ── Sprint C.2 Task 7: A2A handoff inbox watcher ──
   // Cross-squad expert-to-expert handoffs land in /root/intel/handoffs/inbox/.

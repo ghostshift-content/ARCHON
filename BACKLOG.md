@@ -7,36 +7,13 @@ are lower-priority features/ops. Each item: symptom → root cause (file) → fi
 
 ## OPEN
 
-### P2 — Orphaned tool processes survive agent/run cancellation
-- **Symptom:** After cancelling a run, `nmap`/`ffuf`/`curl` subprocesses the agents spawned keep
-  running indefinitely (observed `ppid 1`, one nmap `-p- -T2` running ~2 HOURS, still scanning the
-  old box IP). They leak CPU/RAM and confuse later diagnostics.
-- **Root cause:** `killTaskChildren` / the watchdog SIGTERMs the agent (claude) process, but the agent
-  spawned its tools via its bash tool as grandchildren — they're NOT in the agent's kill path, so they
-  reparent to init and run on. (event-bus.js spawn/kill path — agents not spawned in their own process
-  group; kill targets the process, not the tree.)
-- **Fix:** Spawn agents in their own process group (`detached`/`setsid`) and kill the GROUP
-  (`process.kill(-pgid)`) / whole tree on cancel + watchdog kill, so descendant tools die with the agent.
-  Interim: a sweep that reaps `ppid==1` scan tools whose run is terminal.
-
-### P2 — Agent memory write fails (ENOENT) — learning loop is dead
-- **Symptom:** `⚠️ Memory write failed: ENOENT … var/state/agents/auditor/memory/episodes/<file>.md`.
-  Verified NO agent (auditor/scout/ranger/scribe/atlas) has a `memory/episodes/` dir, so every
-  post-task memory/episode write fails — the reflexion/learning loop never persists.
-- **Root cause:** The memory writer opens the episode file without `mkdir -p` on the parent dir
-  (event-bus.js `writePostTaskMemory` / the episode emitter). The evicted `var/state/agents/<name>/...`
-  layout dirs are never created.
-- **Fix:** `fs.mkdirSync(dir, {recursive:true})` before every memory/episode write (or at agent-state
-  init via paths.js). One line at the write site; back-fill the dirs for existing agents.
-
-### P2 — `emit-finding` compliance is prompt-only (no deterministic fallback)
-- **Symptom:** Agents may still log findings to the activity log instead of calling `emit-finding`
-  (prompt-level fix isn't guaranteed — they ignored the old instruction). If they do, the live
-  amber→green lifecycle is empty until Phase 3.
-- **Root cause:** No deterministic backstop turning activity-log findings into structured findings.
-- **Fix:** A daemon-side ingester that, during a run, promotes activity-log entries shaped like findings
-  (`CONFIRMED/CRITICAL/...`) into `live-findings-<task>.jsonl` via the same normalizer — so the tab +
-  lifecycle work even if an agent skips the tool. (Belt to the mandatory-prompt suspenders.)
+### P3 — SDK adapter doesn't group-kill (deeper orphan fix)
+- **Symptom:** The interim orphan-reaper (FIXED below) sweeps leaked `ppid==1` scan tools every 60s,
+  but the root cause remains: the default SDK adapter spawns the `claude` subprocess WITHOUT
+  `detached`, and its kill = `abortController.abort()` only (no `process.kill(-pid)`).
+- **Fix:** Make the SDK-adapter kill path group-kill (agents/runner/adapters/sdk.js), or run tool-heavy
+  agents under `ADAPTER=cli` (agents/runner/adapters/cli.js already does `detached:true` + group-kill).
+  Lower priority now that the reaper covers it + the watchdog no longer auto-kills.
 
 ### P3 — Zero-finding alert only warns, never acts
 - **Symptom:** `⚠️ Zero-finding alert: 25min … 0 live findings` fired twice but nothing changed — recon
@@ -81,6 +58,17 @@ are lower-priority features/ops. Each item: symptom → root cause (file) → fi
 ---
 
 ## FIXED (2026-06-29 session)
+
+- ✅ **Time caps killed working agents** — removed ALL time-based watchdog kills (HARD_MAX, NO_MOVEMENT,
+  ACTIVITY_STALL, DONE_GRACE, recon cap); watchdog is now a cancel-responder only. Agents run to
+  natural completion; only a user-cancel stops them. (event-bus.js spawnAgent watchdog)
+- ✅ **Recon boundary prompt** (forced early stop) removed; activity-log finding logging restored so
+  findings flow via AUDITOR like before (emit-finding kept as optional clean path).
+- ✅ **Memory write ENOENT** — `writePostTaskMemory` now `mkdir -p`s `memDir/episodes` before writing;
+  learning loop persists again.
+- ✅ **Orphaned tool processes** — daemon orphan-reaper sweeps `ppid==1` scan tools every 60s.
+- ✅ **emit-finding compliance** — activity→live-findings ingester promotes activity findings into the
+  structured tab live (15s), so findings show regardless of which path the agent used.
 
 - ✅ **Agents didn't use `emit-finding`** (findings invisible until Phase 3) — emission is now MANDATORY
   in the prompt (a finding only counts if emitted via the tool); the activity-log echo is demoted to
