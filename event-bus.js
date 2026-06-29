@@ -3215,6 +3215,12 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
 
     const spawnTime = Date.now()
     let lastDataTime = Date.now()
+    // Tool activity (running nmap/ffuf/curl = REAL work) is distinct from thinking-only
+    // tokens. Recon agents (SCOUT/RANGER) run long tool chains and log NO activity-log
+    // entry for >22min while genuinely scanning — they were being false-killed by the
+    // ACTIVITY-STALL watchdog. Tracking tool events lets real work reset the stall timer
+    // while the thinking-only hang (no tool calls, no output) the watchdog targets still dies.
+    let lastToolActivityAt = Date.now()
 
     // ── onProgress: the bridge/adapter liveness callback. Replaces the old
     // child.stdout/stderr 'data' handlers. It (1) updates lastDataTime so the
@@ -3239,6 +3245,9 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
         chunk = String(msg == null ? '' : msg)
       }
       if (!chunk) return
+      // a tool_use/tool_result event = the agent is actively running a tool (real progress),
+      // not just emitting thinking tokens — reset the activity-stall timer.
+      if (chunk.includes('<tool_use>') || chunk.includes('<tool_result>')) lastToolActivityAt = Date.now()
       streamBuffer += chunk
       if (!streamFlushTimer) {
         streamFlushTimer = setTimeout(() => { flushStream(); streamFlushTimer = null }, 300)
@@ -3295,8 +3304,11 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
         const _agentU = agentName.toUpperCase()
         const _cnt = readTaskActivity(taskId).filter(e => String(e.agent || '').toUpperCase() === _agentU).length
         if (_cnt > _lastActivityCount) { _lastActivityCount = _cnt; _lastActivityProgressAt = Date.now() }
-        else if (Date.now() - _lastActivityProgressAt > ACTIVITY_STALL_MS) {
-          killViaHandle(`no activity-log progress for ${Math.round((Date.now() - _lastActivityProgressAt) / 60000)}min (streaming but stuck)`)
+        // progress = a new activity-log entry OR recent tool activity (running a scan/curl).
+        // Only thinking-only streaming with neither trips the stall — the true hang case.
+        const _lastProgress = Math.max(_lastActivityProgressAt, lastToolActivityAt)
+        if (Date.now() - _lastProgress > ACTIVITY_STALL_MS) {
+          killViaHandle(`no activity-log entry or tool activity for ${Math.round((Date.now() - _lastProgress) / 60000)}min (streaming but stuck)`)
           return
         }
       } catch {}
