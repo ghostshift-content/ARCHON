@@ -56,12 +56,12 @@ function normalizeFinding(finding) {
 
   f.severity = normalizeSeverity(f.severity)
 
-  // id: prefer existing, else map findingId
+  // id: map findingId first (so the title fallback below can reference it)
   if (!f.id && f.findingId) {
     f.id = f.findingId
   }
 
-  // title: prefer existing, then synthesize
+  // title: prefer existing, then synthesize from id/type (uses the ORIGINAL id state)
   if (!f.title || (typeof f.title === 'string' && !f.title.trim())) {
     if (f.id) {
       f.title = `Finding ${f.id}`
@@ -70,6 +70,13 @@ function normalizeFinding(finding) {
     } else {
       f.title = 'Untitled finding'
     }
+  }
+
+  // id (last resort): synthesize AFTER the title fallback so a record with neither id nor
+  // findingId still ends up with an id — downstream dedup/judge/report key off it, and a
+  // missing id silently drops the finding.
+  if (!f.id) {
+    f.id = _autoId()
   }
 
   // Autonomy fields (optional, pass through via the spread above):

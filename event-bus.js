@@ -2388,9 +2388,14 @@ async function _runtracerAgentInner(target, taskId) {
     // Full depth crawl with memory-safe timeout — no missing endpoints.
     // Reuse a persistent Chrome on CDP 18800 IF one is up (saves ~2GB RAM); otherwise let
     // crawl4ai self-spawn its own playwright browser so the crawl works out of the box.
-    let _cdpPrefix = ''
-    try { require('child_process').execSync('curl -sf -o /dev/null --max-time 2 http://localhost:18800/json/version', { timeout: 3000 }); _cdpPrefix = 'CRAWL4AI_CDP_URL=http://localhost:18800 ' }
-    catch { _cdpPrefix = '' } // no CDP Chrome → self-spawn
+    // Non-blocking net probe (NOT execSync — Phase A3 must never block the event loop).
+    const _cdpUp = await new Promise(res => {
+      const sock = require('net').connect(18800, '127.0.0.1')
+      const done = v => { try { sock.destroy() } catch {}; res(v) }
+      sock.setTimeout(1500)
+      sock.once('connect', () => done(true)).once('timeout', () => done(false)).once('error', () => done(false))
+    })
+    const _cdpPrefix = _cdpUp ? 'CRAWL4AI_CDP_URL=http://localhost:18800 ' : '' // else self-spawn
     const crawlCmd = `${_cdpPrefix}timeout 300 python3 ${agentPaths.skillsDir('tracer')}/web-crawling/scripts/crawl4ai_crawler.py -u "${sTarget}" -d 4 --max-pages 200 -o "${outDir}" 2>&1`
     log(`   Phase A3: crawl4ai browser crawl (depth 4, max 200, CDP reuse, 5min timeout, heartbeat 30s)...`)
     const crawlResult = await runWithHeartbeat(crawlCmd, {
@@ -3045,6 +3050,18 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
   // outside resolve/reject would otherwise crash the daemon. We always resolve.
   return new Promise(async (resolve, reject) => {
    try {
+    // ── Cooperative-cancellation chokepoint ──
+    // EVERY agent routes through spawnAgent, so this single file-based guard is what
+    // makes cancel reliable: once a task is marked cancelled in tasks.json, no new agent
+    // ever spawns for it. This does NOT depend on the in-memory _taskChildren registry
+    // (which legitimately holds 0 entries during daemon-run phases like nmap, the exact
+    // window where the old kill-registered-children path reported "0 children killed" and
+    // the pipeline kept spawning). killTaskChildren still kills the in-flight agent; this
+    // stops every subsequent one.
+    if (_isTaskCancelled(taskId)) {
+      log(`🛑 ${agentName.toUpperCase()} not spawned — task ${taskId} is cancelled`)
+      return resolve({ agentName, code: 143, output: '', cost: { totalCost: 0, model: '', tokens: { total: 0 } } })
+    }
     const agentId = agentName.toLowerCase()
     const complexityScore = typeof opts.complexityScore === 'number'
       ? opts.complexityScore
@@ -4893,6 +4910,7 @@ async function dispatchPentestParallel(dispatch) {
       })
       updateProgress(15, 'Recon skipped — direct to specialists')
     } else {
+    if (_isTaskCancelled(taskId)) { log(`🛑 Task ${taskId} cancelled — halting before Phase 1 recon`); killTaskChildren(taskId, 'cancelled'); return }
     log(`🔄 Phase 1: Dispatching recon agents (${PENTEST_RECON.map(a => a.toUpperCase()).join(', ')})`)
     logActivity('NEXUS', `🔄 Phase 1: Recon — ${PENTEST_RECON.map(a => a.toUpperCase()).join(', ')}`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
@@ -5267,6 +5285,7 @@ async function dispatchPentestParallel(dispatch) {
     // Reflexion critique generated from wave 1 findings.
     // Wave 2 (batches 3+4 merged): second-half specialists run in parallel WITH critique.
     // Old: 4 sequential awaits = ~65min wall. New: 2 parallel waves = ~35min wall.
+    if (_isTaskCancelled(taskId)) { log(`🛑 Task ${taskId} cancelled — halting before Phase 2 specialists`); killTaskChildren(taskId, 'cancelled'); return }
     const wave1Agents = [...PENTEST_VULN_BATCH1_dyn, ...PENTEST_VULN_BATCH2_dyn]
     const wave2Agents = [...PENTEST_VULN_BATCH3_dyn, ...PENTEST_VULN_BATCH4_dyn]
 
