@@ -4589,11 +4589,25 @@ async function dispatchPentestParallel(dispatch) {
     }
 
     // ── Phase 0.4: nmap service scan — the HEART TRUTH. Deterministic, daemon-run,
-    // BEFORE the recon agents. Discovers every open port/service on the host (all 65535
-    // ports) so the whole pipeline keys off ground truth, not just the single URL the
+    // BEFORE the recon agents + crawl. Discovers every open port/service on the host (all
+    // 65535 ports) so the whole pipeline keys off ground truth, not just the single URL the
     // operator typed. Writes nmap-<taskId>.json that buildPentestSpecialistPrompt injects
-    // into every recon + specialist prompt. Fail-soft. ──
-    if (phaseEnabled('0.4', squad)) {
+    // into every recon + specialist prompt. Fail-soft.
+    //
+    // ONLY for a FULL scan. An abuse/focused scan (focus classes, custom abuse-driven
+    // cases, feature-driven, or "skip initial recon") targets the given web app's logic —
+    // we deliberately do NOT port-scan the host there. ──
+    const _m = dispatch.meta || {}
+    const _isFullScan = _m.testType !== 'feature' && !_m.skipRecon && !_m.customFocus && !_m.featureFocus &&
+      !(Array.isArray(_m.focusClasses) && _m.focusClasses.length)
+    if (phaseEnabled('0.4', squad) && !_isFullScan) {
+      log(`⏭️ Phase 0.4 nmap skipped — abuse/focused scan (no host port discovery, testing the app directly)`)
+      logActivity('NEXUS', `⏭️ Phase 0.4: nmap skipped (abuse/focused scan)`, {
+        type: 'nmap-scan', squad, taskId, projectId: projectId || '',
+        details: `Abuse/focused scan — port/service discovery is skipped by design; testing the given app surface directly.`,
+      })
+    }
+    if (phaseEnabled('0.4', squad) && _isFullScan) {
       try {
         const { runNmapScan, nmapSummary } = require('./src/pipeline/nmap-scan')
         log(`🛰️ Phase 0.4: nmap -sV -p- full service scan (heart truth) on ${targetUrl}`)
