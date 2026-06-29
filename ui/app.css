@@ -179,6 +179,9 @@ a { color: var(--accent-2); text-decoration: none; } a:hover { text-decoration: 
 .finding.rejected { opacity: .5; }
 .finding .fmain { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .finding .fcvss { font-family: var(--mono); font-size: 11.5px; color: var(--fg-mut); }
+.finding .fstatus { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: .02em; white-space: nowrap; }
+.finding .fstatus.ok { color: #34d399; background: rgba(52,211,153,.13); border: 1px solid rgba(52,211,153,.4); }
+.finding .fstatus.warn { color: #fbbf24; background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.38); }
 .finding .ftitle { font-weight: 600; font-size: 14px; }
 .finding .fmeta { color: var(--fg-mut); font-size: 12px; margin-top: 6px; }
 .finding .fmono { font-family: var(--mono); }

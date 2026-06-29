@@ -414,23 +414,43 @@ function synthRawRequest(method, url, curl) {
     return req + (body ? `\r\n${body}` : '')
   } catch { return '' }
 }
-// findings for a single task (one iteration) — tagged with srcTask + a unique key.
+const _normUrl = u => String(u || '').toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '')
+// A live finding is CONFIRMED if the agent marked it confirmed AND it carries
+// replayable evidence (reproduction); otherwise it's UNCONFIRMED (still shown).
+function _liveStatus(f) {
+  const evidenced = !!String(f.reproduction || f.details || '').trim()
+  return (String(f.type || '').toLowerCase() === 'confirmed' && evidenced) ? 'CONFIRMED' : 'UNCONFIRMED'
+}
+function _liveTitle(f) {
+  const d = String(f.details || '').trim()
+  if (d) return d.split(/[:.\n]/)[0].slice(0, 90)
+  return f.cwe || f.owasp || `${(f.agent || 'AGENT')} finding`
+}
+// findings for a single task (one iteration). Surfaces BOTH AUDITOR-validated
+// findings (Confirmed, green) AND the raw agent findings from live-findings — so
+// nothing the pentest found is ever invisible just because AUDITOR didn't run.
 function findingsForSingleTask(id, label) {
   id = String(id)
   const validated = readJsonl(path.join(INTEL, `VALIDATED-FINDINGS-${id}.jsonl`))
   const judged = readJsonl(path.join(INTEL, `JUDGED-FINDINGS-${id}.jsonl`))
+  const live = readJsonl(path.join(INTEL, `live-findings-${id}.jsonl`))
   const judgeBy = {}; for (const j of judged) if (j.id) judgeBy[j.id] = j
   let triage = {}; try { triage = JSON.parse(fs.readFileSync(path.join(INTEL, `triage-${id}.json`), 'utf8')).verdicts || {} } catch {}
   let detail = {}; try { detail = JSON.parse(fs.readFileSync(path.join(INTEL, `findings-detail-${id}.json`), 'utf8')) || {} } catch {}
-  return validated.filter(f => !f.taskId || String(f.taskId) === id).map(f => {
+
+  const out = []
+  const seenUrls = new Set()
+  // 1) AUDITOR-validated findings (the trusted set).
+  for (const f of validated.filter(f => !f.taskId || String(f.taskId) === id)) {
     const d = detail[f.id] || {}
     const poc = d.poc || f.reproduction_method || f.reproduction || ''
-    return {
+    if (f.url) seenUrls.add(_normUrl(f.url))
+    out.push({
       key: id + '::' + f.id, srcTask: id, iteration: label || '',
       id: f.id, severity: titleSev(f.severity), title: f.title || f.id,
       cvss: typeof f.cvss_score === 'number' ? f.cvss_score : (f.cvss || null),
       cvssVector: f.cvss_vector || d.cvss_vector || '',
-      agent: f.original_agent || f.agent || '', status: f.validation_status || '',
+      agent: f.original_agent || f.agent || '', status: f.validation_status || 'CONFIRMED',
       url: f.url || '', method: f.method || '',
       description: d.description || f.description || f.summary || '',
       poc, validation: f.reproduction_result || d.validation || '',
@@ -438,10 +458,29 @@ function findingsForSingleTask(id, label) {
       remediation: d.remediation || f.remediation || f.fix || f.recommendation || '',
       rawRequest: d.raw_request || f.raw_request || f.http_request || synthRawRequest(f.method, f.url, poc),
       judge: (judgeBy[f.id] && (judgeBy[f.id].verdict || judgeBy[f.id].judgement)) || '',
-      enriched: !!detail[f.id],
-      triage: triage[f.id] || null,
-    }
-  })
+      enriched: !!detail[f.id], triage: triage[f.id] || null, source: 'validated',
+    })
+  }
+  // 2) Raw agent findings (live-findings) not already covered by a validated entry.
+  let n = 0
+  for (const f of live) {
+    const u = _normUrl(f.url)
+    if (u && seenUrls.has(u)) continue
+    n++
+    const fid = `LF-${n}`
+    out.push({
+      key: id + '::' + fid, srcTask: id, iteration: label || '',
+      id: fid, severity: titleSev(f.severity), title: _liveTitle(f),
+      cvss: null, cvssVector: '',
+      agent: f.agent || '', status: _liveStatus(f),
+      url: f.url || '', method: '',
+      description: f.details || '', poc: f.reproduction || '', validation: '',
+      impact: f.impact || '', remediation: '',
+      rawRequest: synthRawRequest('GET', f.url, f.reproduction),
+      judge: '', enriched: false, triage: triage[fid] || null, source: 'live',
+    })
+  }
+  return out
 }
 // Aggregate findings across ALL iterations of the engagement the task belongs to.
 // Standalone (non-engagement) tasks resolve to a single iteration → identical to before.

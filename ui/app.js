@@ -364,6 +364,7 @@ function renderFindings() {
       <div class="fmain">
         <span class="badge fbadge sev-${sevNow.toLowerCase()}">${esc(sevNow)}</span>
         ${cvssNow != null ? `<span class="fcvss">CVSS ${cvssNow}</span>` : ''}
+        ${f.status ? `<span class="fstatus ${/confirm/i.test(f.status) ? 'ok' : 'warn'}">${/confirm/i.test(f.status) ? '✓ Confirmed' : (f.status === 'NEEDS-LIVE' ? 'Needs-live' : 'Unconfirmed')}</span>` : ''}
         <span class="ftitle">${esc(f.title)}</span>
         ${f.iteration ? `<span class="iter-tag">${esc(f.iteration)}</span>` : ''}
         <div class="seg fverdict" data-noopen><button data-fv="confirmed" class="${v.verdict !== 'rejected' ? 'on' : ''}" type="button" title="Confirm">✓</button><button data-fv="rejected" class="${v.verdict === 'rejected' ? 'on' : ''}" type="button" title="Reject">✕</button></div>
