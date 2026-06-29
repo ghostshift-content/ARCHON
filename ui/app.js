@@ -193,8 +193,9 @@ function render(s) {
   $('#footMeta').innerHTML = `intel ▸<br>${esc(s.intel.replace(/^.*?(var\/intel.*)$/, '…/$1'))}`
   $('#cTasks').textContent = s.tasks.length
   $('#cReports').textContent = s.reports.length
-  // if the detail page is open, keep its overview live
+  // if the detail page is open, keep its overview / live logs current
   if (currentView === 'task' && tdSub === 'overview') renderTaskOverview()
+  if (currentView === 'task' && tdSub === 'log') renderTaskLogs()
 
   const active = s.tasks.filter(t => t.status === 'in-progress').length
   const done = s.tasks.filter(t => ['completed', 'done'].includes(t.status)).length
@@ -254,29 +255,32 @@ const SEV = ['Critical', 'High', 'Medium', 'Low', 'Info']
 
 /* ── CVSS 3.1 base-score calculator — defined in cvss.js (loaded before app.js) ── */
 let fnTaskId = '', fnFindings = [], fnVerdicts = {}
-let tdTaskId = '', tdBackTo = 'tasks', tdSub = 'overview'
+let tdTaskId = '', tdBackTo = 'tasks', tdSub = 'overview', tdLogLoaded = false
 
 /* ── per-run detail page (Overview / Findings / Report) ── */
 async function openTaskPage(taskId) {
   // resolve to the engagement root so iterations all open the same aggregated page
   try { const ir = await api('GET', '/api/iterations?taskId=' + encodeURIComponent(taskId)); if (ir && ir.engagementId) taskId = ir.engagementId } catch {}
   tdBackTo = currentView === 'task' ? tdBackTo : currentView
-  tdTaskId = taskId; fnTaskId = taskId
+  tdTaskId = taskId; fnTaskId = taskId; tdLogLoaded = false
   const t = (lastState ? lastState.tasks : []).find(x => String(x.id) === String(taskId)) || { id: taskId }
   $('#tdTitle').textContent = t.title || taskId
   $('#tdId').textContent = taskId
   $('#tdStatus').textContent = t.status || ''
   $('#tdStatus').className = 'badge ' + statusClass(t.status)
-  const sub = t.status === 'awaiting-triage' ? 'findings' : (reportForTask(t) ? 'report' : 'overview')
+  const sub = t.status === 'in-progress' ? 'log'
+    : t.status === 'awaiting-triage' ? 'findings'
+    : (reportForTask(t) ? 'report' : 'overview')
   show('task'); setTdSub(sub)
   if (sub !== 'findings') loadFindings() // populate the Findings count + summary even when landing elsewhere
 }
 function setTdSub(sub) {
   tdSub = sub
   $$('#tdTabs button').forEach(b => b.classList.toggle('on', b.dataset.td === sub))
-  ;['overview', 'findings', 'report'].forEach(s => { const el = $('#td-' + s); if (el) el.style.display = s === sub ? '' : 'none' })
+  ;['overview', 'findings', 'log', 'report'].forEach(s => { const el = $('#td-' + s); if (el) el.style.display = s === sub ? '' : 'none' })
   if (sub === 'overview') renderTaskOverview()
   else if (sub === 'findings') loadFindings()
+  else if (sub === 'log') renderTaskLogs()
   else if (sub === 'report') renderTaskReport()
 }
 $$('#tdTabs button').forEach(b => b.onclick = () => setTdSub(b.dataset.td))
@@ -315,6 +319,41 @@ async function renderTaskReport() {
   if (!rel) { $('#tdReportBody').innerHTML = `<div class="empty">No report yet.${t.status === 'awaiting-triage' ? ' Triage the findings, then Generate report.' : ''}</div>`; return }
   $('#tdReportBody').innerHTML = '<div class="skel"></div>'
   await loadReport(rel); $('#tdReportBody').innerHTML = md(reportCache[rel] || '_Could not load report._')
+}
+// friendly label for a raw artifact filename
+function artLabel(name) {
+  const m = name.replace(/-t-\d+-[a-f0-9]+/i, '').replace(/\.(json|jsonl|md)$/i, '').replace(/^pentest-/, '')
+  return { 'brief': 'Engagement brief', 'env-fingerprint': 'Environment fingerprint', 'tech-stack': 'Tech stack', 'target-profile': 'Target profile', 'scope': 'Scope', 'endpoints': 'Discovered endpoints', 'live-findings': 'Raw findings (live)', 'engagement': 'Engagement', 'triage': 'Triage verdicts' }[m] || m.replace(/[-_]/g, ' ')
+}
+async function renderTaskLogs() {
+  const tid = tdTaskId
+  const stream = $('#tdLogStream'), arts = $('#tdLogArtifacts')
+  if (!stream) return
+  if (!tdLogLoaded) stream.innerHTML = '<div class="skel"></div>'
+  const r = await api('GET', '/api/logs?taskId=' + encodeURIComponent(tid))
+  if (tid !== tdTaskId) return // navigated away while fetching
+  tdLogLoaded = true
+  const acts = (r && r.activity) || []
+  const artifacts = (r && r.artifacts) || []
+  arts.innerHTML = artifacts.length
+    ? `<div class="art-lbl">Raw results — download</div>` + artifacts.map(a =>
+        `<a class="art" href="/api/report?f=${encodeURIComponent(a.rel)}" download="${esc(a.name)}" title="${esc(a.name)} · ${(a.size / 1024).toFixed(1)} KB">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+          <span>${esc(artLabel(a.name))}</span><span class="art-sz">${(a.size / 1024).toFixed(1)} KB</span></a>`).join('')
+    : ''
+  stream.innerHTML = acts.length ? acts.map(a => {
+    const det = String(a.details || '').trim()
+    const act = String(a.action || a.raw || '').trim()
+    const isPhase = /phase\s*[\d.]/i.test(act)
+    return `<div class="logrow${isPhase ? ' phase' : ''}">
+      <span class="lt">${a.ts ? fmtTime(a.ts) : ''}</span>
+      <span class="la">${esc(a.agent || '·')}</span>
+      <div class="lc"><div class="lact">${esc(act)}</div>${det && det !== act ? `<pre class="ldet">${esc(det)}</pre>` : ''}</div>
+    </div>`
+  }).join('') : '<div class="empty">No activity logged for this run yet.</div>'
+  // keep scrolled to the latest line while a run is live
+  const t = (lastState ? lastState.tasks : []).find(x => String(x.id) === String(tid))
+  if (t && t.status === 'in-progress') stream.scrollTop = stream.scrollHeight
 }
 
 let fnEngagementId = '', fnIterations = [], fnFilter = ''

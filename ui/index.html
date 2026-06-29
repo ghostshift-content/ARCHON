@@ -199,10 +199,19 @@
         <div class="subtabs" id="tdTabs">
           <button data-td="overview" class="on">Overview</button>
           <button data-td="findings">Findings <span class="count" id="tdFnCount">0</span></button>
+          <button data-td="log">Testing logs</button>
           <button data-td="report">Report</button>
         </div>
 
         <div class="td-panel" id="td-overview"></div>
+
+        <div class="td-panel" id="td-log" style="display:none">
+          <div class="card">
+            <div class="loghead"><h3>Testing logs</h3><span class="sub" id="tdLogSub">commands executed &amp; phase activity · live</span></div>
+            <div id="tdLogArtifacts" class="artifacts"></div>
+            <div id="tdLogStream" class="logstream"></div>
+          </div>
+        </div>
 
         <div class="td-panel" id="td-findings" style="display:none">
           <!-- engagement iterations: filter findings by iteration + launch a new one -->

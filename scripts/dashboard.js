@@ -506,6 +506,31 @@ function iterationsForTask(taskId) {
   const eng = E ? readEngagement(E) : null
   return { engagementId: E || String(taskId), iterations: (eng && eng.iterations) || [] }
 }
+// Testing-logs feed for a task: full activity entries (commands + recon output) scoped
+// to the engagement's iterations + the raw per-task artifact files for download.
+function logsForTask(taskId) {
+  const id = String(taskId)
+  const E = resolveEngagementId(id)
+  const eng = E ? readEngagement(E) : null
+  const ids = new Set([id, E].filter(Boolean))
+  for (const it of (eng && eng.iterations) || []) if (it.taskId) ids.add(it.taskId)
+  // last ~3000 activity lines, kept if the entry belongs to one of our taskIds
+  const all = readLines('ACTIVITY-LOG.jsonl', 3000)
+  const activity = all.filter(a => a && ids.has(String(a.taskId))).slice(-500)
+  // raw artifacts: top-level INTEL files whose name carries any of our taskIds
+  const artifacts = []
+  try {
+    for (const f of fs.readdirSync(INTEL)) {
+      if (![...ids].some(t => f.includes(t))) continue
+      const full = path.join(INTEL, f)
+      let st; try { st = fs.statSync(full) } catch { continue }
+      if (!st.isFile()) continue
+      artifacts.push({ name: f, rel: f, size: st.size, mtime: st.mtimeMs })
+    }
+  } catch {}
+  artifacts.sort((a, b) => a.name.localeCompare(b.name))
+  return { taskId: id, engagementId: E || id, activity, artifacts }
+}
 function enrichFindings(body) {
   const taskId = String(body.taskId || '').trim()
   if (!taskId) throw new Error('taskId is required')
@@ -623,6 +648,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && p === '/api/iterations') {
       return json(res, 200, iterationsForTask(url.searchParams.get('taskId') || ''))
+    }
+    if (req.method === 'GET' && p === '/api/logs') {
+      return json(res, 200, logsForTask(url.searchParams.get('taskId') || ''))
     }
     if (req.method === 'POST' && p === '/api/iterate') {
       try { return json(res, 200, iterateDispatch(await readBody(req))) } catch (e) { return json(res, 400, { error: e.message }) }

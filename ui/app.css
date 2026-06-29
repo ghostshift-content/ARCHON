@@ -337,8 +337,30 @@ ol.fsteps li { font-size: 13px; line-height: 1.5; }
 .act { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; align-items: baseline; }
 .act:last-child { border: 0; }
 .act .t { color: var(--fg-dim); font-family: var(--mono); font-size: 11px; min-width: 60px; }
-.act .ag { color: var(--accent-2); font-family: var(--mono); min-width: 86px; font-size: 11.5px; font-weight: 600; }
-.act .msg { color: var(--fg-mut); }
+.act .ag { color: var(--accent-2); font-family: var(--mono); min-width: 86px; flex-shrink: 0; font-size: 11.5px; font-weight: 600; }
+.act .t { flex-shrink: 0; }
+.act .msg { color: var(--fg-mut); min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+
+/* Testing-logs tab */
+.loghead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.loghead h3 { margin: 0; }
+.artifacts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.artifacts:empty { display: none; }
+.art-lbl { width: 100%; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--fg-dim); margin-bottom: 2px; }
+.art { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-2); color: var(--fg); font-size: 12px; text-decoration: none; transition: border-color .12s, background .12s; }
+.art:hover { border-color: var(--accent-2); background: var(--bg-3, var(--bg-2)); }
+.art svg { width: 14px; height: 14px; color: var(--accent-2); flex-shrink: 0; }
+.art-sz { color: var(--fg-dim); font-family: var(--mono); font-size: 10.5px; }
+.logstream { max-height: 62vh; overflow-y: auto; display: flex; flex-direction: column; }
+.logrow { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; align-items: baseline; }
+.logrow:last-child { border: 0; }
+.logrow.phase { background: rgba(99,102,241,.06); margin: 0 -8px; padding: 7px 8px; border-radius: 6px; }
+.logrow .lt { color: var(--fg-dim); font-family: var(--mono); font-size: 11px; min-width: 60px; flex-shrink: 0; }
+.logrow .la { color: var(--accent-2); font-family: var(--mono); min-width: 86px; flex-shrink: 0; font-size: 11.5px; font-weight: 600; }
+.logrow .lc { min-width: 0; flex: 1; }
+.logrow .lact { color: var(--fg); overflow-wrap: anywhere; word-break: break-word; }
+.logrow.phase .lact { font-weight: 600; }
+.logrow .ldet { margin: 5px 0 0; padding: 8px 10px; background: var(--bg-2); border-radius: 6px; font-family: var(--mono); font-size: 11px; line-height: 1.5; color: var(--fg-mut); white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-height: 260px; overflow-y: auto; }
 
 /* ── reports ── */
 .replist .r { display: flex; align-items: center; gap: 13px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-sm); margin-bottom: 8px; cursor: pointer; transition: .12s; background: var(--panel); }
