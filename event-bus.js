@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 /**
- * NEXUS — THE ALL-SEEING DISPATCHER — Real-time agent dispatcher
- * 
- * v2: Memory System + Parallel Execution for Stocks Squad
- * 
- * Architecture:
- *   - Stocks tasks → Phase 1 (6 analysts parallel) → Phase 2 (CHANAKYA synthesize)
- *                   → Phase 3 (3 challengers parallel) → Phase 4 (CHANAKYA final)
- *   - Pentest tasks → Sequential (ATLAS leads)
- *   - Post-task: Memory writing (episodes, grades, lessons, squad memory)
- *   - Pre-task: Agents read lessons + episodes + squad memory
+ * NEXUS — the ARCHON dispatcher daemon.
+ *
+ * Reads tasks from an inbox/dispatch-queue and runs each through a phased,
+ * fail-soft pipeline:
+ *   - Pentest (black-box)     → ATLAS leads: recon → fingerprint → strategist →
+ *                               adaptive specialists → AUDITOR → ARBITER → SCRIBE
+ *   - Code-review (white-box) → CURATOR leads: src/dispatch/code-review-dispatcher.js
+ * Single writer of core state (tasks.json / dispatch-queue.json / ACTIVITY-LOG).
+ * Pre-task: agents read lessons + memory. Post-task: lessons/memory writeback.
  */
 
 const fs = require('fs')
@@ -160,7 +159,6 @@ const AGENT_MODEL_OVERRIDES_FILE = INTEL_DIR + '/agent-model-overrides.json'
 const TASKS_FILE = INTEL_DIR + '/tasks.json'
 const ACTIVITY_LOG = INTEL_DIR + '/ACTIVITY-LOG.jsonl'
 const AGENT_STATUS_FILE = INTEL_DIR + '/agent-status.json'
-const SQUAD_MEMORY_STOCKS = INTEL_DIR + '/squad-memory-stocks.json'
 const SQUAD_MEMORY_PENTEST = INTEL_DIR + '/squad-memory-pentest.json'
 const STOCK_DOSSIER_TEMPLATE_VERSION = 'v3.0-golden'
 const STREAMS_DIR = INTEL_DIR + '/streams'
@@ -9784,8 +9782,8 @@ function checkCalendar() {
 
     if (shouldRun) {
       calendarLastRun[runKey] = true
-      const agent = ev.agent || 'CHANAKYA'
-      const squad = ev.squad || 'stocks-squad'
+      const agent = ev.agent || 'ATLAS'
+      const squad = ev.squad || 'pentest-squad'
       const label = ev.label || 'Scheduled task'
 
       log(`📅 CALENDAR TRIGGER: "${label}" → ${agent}`)
