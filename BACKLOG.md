@@ -19,6 +19,38 @@ are lower-priority features/ops. Each item: symptom → root cause (file) → fi
   (`process.kill(-pgid)`) / whole tree on cancel + watchdog kill, so descendant tools die with the agent.
   Interim: a sweep that reaps `ppid==1` scan tools whose run is terminal.
 
+### P2 — Agent memory write fails (ENOENT) — learning loop is dead
+- **Symptom:** `⚠️ Memory write failed: ENOENT … var/state/agents/auditor/memory/episodes/<file>.md`.
+  Verified NO agent (auditor/scout/ranger/scribe/atlas) has a `memory/episodes/` dir, so every
+  post-task memory/episode write fails — the reflexion/learning loop never persists.
+- **Root cause:** The memory writer opens the episode file without `mkdir -p` on the parent dir
+  (event-bus.js `writePostTaskMemory` / the episode emitter). The evicted `var/state/agents/<name>/...`
+  layout dirs are never created.
+- **Fix:** `fs.mkdirSync(dir, {recursive:true})` before every memory/episode write (or at agent-state
+  init via paths.js). One line at the write site; back-fill the dirs for existing agents.
+
+### P2 — `emit-finding` compliance is prompt-only (no deterministic fallback)
+- **Symptom:** Agents may still log findings to the activity log instead of calling `emit-finding`
+  (prompt-level fix isn't guaranteed — they ignored the old instruction). If they do, the live
+  amber→green lifecycle is empty until Phase 3.
+- **Root cause:** No deterministic backstop turning activity-log findings into structured findings.
+- **Fix:** A daemon-side ingester that, during a run, promotes activity-log entries shaped like findings
+  (`CONFIRMED/CRITICAL/...`) into `live-findings-<task>.jsonl` via the same normalizer — so the tab +
+  lifecycle work even if an agent skips the tool. (Belt to the mandatory-prompt suspenders.)
+
+### P3 — Zero-finding alert only warns, never acts
+- **Symptom:** `⚠️ Zero-finding alert: 25min … 0 live findings` fired twice but nothing changed — recon
+  kept running to the cap.
+- **Root cause:** The alert is informational only (event-bus.js zero-finding watchdog).
+- **Fix:** Make it act — e.g. nudge/cut recon, or escalate to Phase 2 — when 0 findings persist past N
+  min. (Partially mitigated by the new 15-min recon cap.)
+
+### P3 — No concurrency cap on in-progress engagements
+- **Symptom:** Earlier, 4 runs executed at once (from cancel-not-working) and competed for CPU.
+- **Root cause:** No max-concurrent-engagements guard; nothing stops N dispatches all spawning fleets.
+- **Fix:** A configurable concurrency cap (queue beyond N in-progress). Lower priority now that cancel
+  works, but defensive for a public build. (event-bus.js processQueue)
+
 ### P3 — Authenticated crawl: TRACER stops at `/login`
 - **Symptom:** `⚠️ TRACER low-coverage: only 1 URL discovered`. The app redirects everything to
   `/login`; the unauthenticated crawl can't get past the auth wall, so endpoint coverage is ~0.
