@@ -3683,6 +3683,8 @@ proceed normally — assumptions stay implicit.
   vendor's block signature, then MUTATE with vendor-specific bypasses (encoding, casing, comments,
   chunking, header tricks) and refire — iterate until it lands or you've genuinely exhausted it. Record
   EVERY attempt and the working payload in your reproduction.
+- Tag each attempt in "payloads_tried" with its OUTCOME: success | sanitized | blocked | rate-limited |
+  error | inconclusive. A blocked/sanitized result is signal (adapt), not a dead end.
 `
 
   return PENTEST_COVERAGE + `\nYou are ${agentUpper}, pentest specialist in ${squad}. Target: ${targetUrl}. Task: ${taskTitle}. TaskID: ${taskId}. WAF: ${wafStatus || 'unknown'}.
