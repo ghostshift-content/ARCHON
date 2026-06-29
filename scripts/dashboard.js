@@ -712,6 +712,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/logs') {
       return json(res, 200, logsForTask(url.searchParams.get('taskId') || ''))
     }
+    if (req.method === 'GET' && p === '/api/health') {
+      return json(res, 200, readJSON('health.json', { ok: null, checks: [], note: 'supervisor has not run yet' }))
+    }
     if (req.method === 'POST' && p === '/api/iterate') {
       try { return json(res, 200, iterateDispatch(await readBody(req))) } catch (e) { return json(res, 400, { error: e.message }) }
     }

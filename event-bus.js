@@ -2898,9 +2898,11 @@ async function runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerpri
     try { if (fs.existsSync(endpointFile)) endpointData = fs.readFileSync(endpointFile, 'utf-8').slice(0, 4000) } catch {}
 
     const prompt = planner.buildAttackPlanPrompt({ targetUrl, fingerprint, reconDump, endpointData })
+    // ATLAS = pentest orchestrator → Opus (was modelRouter.resolve, a non-existent method → errored)
+    const _atlasRoute = modelRouter.getModelForAgent('atlas', { squad })
     const { text } = await runAgent({
-      agentName: 'ATLAS', taskId, model: modelRouter.resolve('atlas'),
-      effort: 'high', userPrompt: prompt, timeoutMs: 90000,
+      agentName: 'ATLAS', taskId, model: _atlasRoute.model,
+      effort: _atlasRoute.effort || 'high', userPrompt: prompt, timeoutMs: 90000,
     })
     const plan = planner.normalizePlan(text)
     fs.writeFileSync(outPath, JSON.stringify(plan, null, 2))
@@ -2943,8 +2945,9 @@ ${findingsDump || '(none)'}
 
 Output ONE JSON array, same shape as the attack plan: {"endpoint","params","vuln_class","hypothesis","why",
 "priority"(1-5),"suggested_specialist","cve"}. 0-10 entries, ranked. If nothing is left, output [].`
+    const _atlasRoute = modelRouter.getModelForAgent('atlas', { squad }) // orchestrator → Opus (was broken resolve())
     const { text } = await runAgent({
-      agentName: 'ATLAS', taskId, model: modelRouter.resolve('atlas'), effort: 'high', userPrompt: prompt, timeoutMs: 90000,
+      agentName: 'ATLAS', taskId, model: _atlasRoute.model, effort: _atlasRoute.effort || 'high', userPrompt: prompt, timeoutMs: 90000,
     })
     const followup = planner.normalizePlan(text)
     fs.writeFileSync(`${agentPaths.INTEL_ROOT}/followup-plan-${taskId}.json`, JSON.stringify(followup, null, 2))
@@ -10575,6 +10578,15 @@ function startWatcher() {
               writeJSON(TASKS_FILE, tasks)
             }
           } catch (e) { log(`⚠️ cancel: task update failed: ${e.message}`) }
+          // GAP FIX: mark the dispatch-queue entry cancelled too (was left 'processing' → looked stuck).
+          try {
+            withFileLock(DISPATCH_FILE, () => {
+              const q = readJSON(DISPATCH_FILE) || []
+              let changed = false
+              for (const d of q) { if (String(d.taskId) === taskId && d.status !== 'cancelled') { d.status = 'cancelled'; d.cancelledAt = new Date().toISOString(); changed = true } }
+              if (changed) writeJSON(DISPATCH_FILE, q)
+            })
+          } catch (e) { log(`⚠️ cancel: queue update failed: ${e.message}`) }
           logActivity('NEXUS', `🛑 Task ${taskId} cancelled (${killed} children killed)`, {
             type: 'task-cancelled', taskId, details: `Reason: ${signal.reason || 'user-cancel'}`
           })
@@ -10665,6 +10677,49 @@ function startWatcher() {
   }
   setInterval(ingestActivityFindings, 15000) // every 15s during in-progress runs
   log('📥 Activity→findings ingester started (15s)')
+
+  // ── Operational Supervisor — aggregated health pass (10s): verifies cancel/dispatch/queue/
+  // heartbeat invariants, auto-heals the zombie-cancel gap, writes var/intel/health.json, and
+  // escalates unknown/recurring anomalies to a one-shot Opus SENTINEL diagnostic. ──
+  const { runHealthPass } = require('./src/ops/supervisor')
+  const _supStart = Date.now()
+  const _escalateState = {}
+  const _writeCancelSignal = (taskId) => {
+    try {
+      const name = `${Date.now()}-${require('crypto').randomBytes(4).toString('hex')}.json`
+      const tmp = path.join(CANCEL_DIR, name + '.tmp')
+      fs.writeFileSync(tmp, JSON.stringify({ taskId, reason: 'supervisor: cancelled task still had live agents' }))
+      fs.renameSync(tmp, path.join(CANCEL_DIR, name))
+    } catch {}
+  }
+  let _sentinelInFlight = false
+  const _spawnSentinel = async (snapshot) => {
+    if (_sentinelInFlight) return
+    _sentinelInFlight = true
+    try {
+      const route = modelRouter.getModelForAgent('atlas', { squad: 'pentest' }) // → Opus
+      let recent = ''
+      try { recent = fs.readFileSync(ACTIVITY_LOG, 'utf8').trim().split('\n').slice(-40).join('\n') } catch {}
+      const prompt = `You are SENTINEL, ARCHON's operational diagnostician. The deterministic health supervisor flagged anomalies it could NOT auto-resolve. Diagnose the ROOT CAUSE concisely and name the single best fix.\n\nHEALTH SNAPSHOT:\n${JSON.stringify(snapshot, null, 2)}\n\nRECENT ACTIVITY (last 40):\n${recent}\n\nOutput ONLY JSON: {"diagnosis":"2-4 sentences","fix":"the one best action"}`
+      const { text } = await runAgent({ agentName: 'SENTINEL', taskId: 'health', model: route.model, effort: route.effort || 'high', userPrompt: prompt, timeoutMs: 60000 })
+      let diag = { diagnosis: String(text || '').slice(0, 600), fix: '' }
+      try { const m = String(text).match(/\{[\s\S]*\}/); if (m) diag = JSON.parse(m[0]) } catch {}
+      try { const h = JSON.parse(fs.readFileSync(`${agentPaths.INTEL_ROOT}/health.json`, 'utf8')); h.sentinel = { at: new Date().toISOString(), ...diag }; fs.writeFileSync(`${agentPaths.INTEL_ROOT}/health.json`, JSON.stringify(h, null, 2)) } catch {}
+      logActivity('SENTINEL', `🩺 Health diagnosis: ${String(diag.diagnosis || '').slice(0, 100)}`, { type: 'health-diagnosis', details: `${diag.diagnosis || ''}\nFix: ${diag.fix || ''}` })
+    } catch (e) { log(`⚠️ SENTINEL diagnostic failed: ${e.message}`) }
+    finally { _sentinelInFlight = false }
+  }
+  function _healthPass() {
+    try {
+      runHealthPass({
+        intel: agentPaths.INTEL_ROOT, daemonStartMs: _supStart, escalateState: _escalateState,
+        writeCancelSignal: _writeCancelSignal, spawnDiagnostic: _spawnSentinel,
+      })
+    } catch (e) { log(`⚠️ health pass failed (non-fatal): ${e.message}`) }
+  }
+  setInterval(_healthPass, 10000) // every 10s
+  setTimeout(_healthPass, 3000)   // first pass shortly after boot
+  log('🩺 Operational Supervisor started (10s health pass)')
 
   // ── Sprint C.2 Task 7: A2A handoff inbox watcher ──
   // Cross-squad expert-to-expert handoffs land in /root/intel/handoffs/inbox/.

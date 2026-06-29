@@ -432,3 +432,24 @@ ol.fsteps li { font-size: 13px; line-height: 1.5; }
   .grid.cols-2 { grid-template-columns: 1fr; }
   .row2 { grid-template-columns: 1fr; }
 }
+
+/* System Health card */
+#healthCard .loghead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+#healthCard .loghead h3 { margin: 0; }
+.sub.warn { color: #fbbf24; }
+.hbanner { padding: 8px 12px; border-radius: 8px; font-weight: 700; font-size: 13px; margin-bottom: 12px; }
+.hbanner.ok { color: #34d399; background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.3); }
+.hbanner.warn { color: #fbbf24; background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.35); }
+.hrow { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.hrow:last-of-type { border: 0; }
+.hstat { flex-shrink: 0; font-weight: 800; width: 16px; text-align: center; }
+.hstat.ok { color: #34d399; }
+.hstat.warn { color: #fbbf24; }
+.hk { min-width: 150px; flex-shrink: 0; color: var(--fg); text-transform: capitalize; }
+.hv { color: var(--fg-mut); min-width: 0; overflow-wrap: anywhere; }
+.hv.dim { color: var(--fg-dim); }
+.hfix { color: #34d399; font-size: 10.5px; font-weight: 700; }
+.warn { color: #fbbf24; }
+.hmeta { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 11px; color: var(--fg-dim); }
+.hfixes { margin-top: 6px; font-size: 11.5px; color: var(--accent-2); }
+.hsent { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: rgba(99,102,241,.08); font-size: 12px; color: var(--fg-mut); }

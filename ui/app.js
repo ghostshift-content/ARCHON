@@ -773,7 +773,22 @@ async function api(method, url, body) {
   try { return await (await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })).json() }
   catch (e) { return { error: String(e.message || e) } }
 }
-async function tick() { const s = await api('GET', '/api/state'); if (s && !s.error) render(s) }
+async function tick() { const s = await api('GET', '/api/state'); if (s && !s.error) render(s); if (currentView === 'overview') renderHealth() }
+// System Health card — the Operational Supervisor's latest snapshot
+async function renderHealth() {
+  const el = $('#ovHealth'); if (!el) return
+  const h = await api('GET', '/api/health'); if (!h || h.error) { el.innerHTML = '<div class="empty">health unavailable</div>'; return }
+  if (h.ok === null) { el.innerHTML = `<div class="empty">${esc(h.note || 'supervisor starting…')}</div>`; return }
+  const pill = (ok) => `<span class="hstat ${ok ? 'ok' : 'warn'}">${ok ? '✓' : '⚠'}</span>`
+  const rows = (h.checks || []).map(c => `<div class="hrow">${pill(c.ok)}<span class="hk">${esc(c.name.replace(/_/g, ' '))}</span><span class="hv ${c.ok ? '' : 'dim'}">${esc(c.detail || '')}${c.autoFixed ? ' <span class="hfix">auto-fixed</span>' : ''}</span></div>`).join('')
+  const q = h.queue || {}, t = h.tasks || {}
+  const meta = `<div class="hmeta">queue ${q.pending || 0} pending · ${q.processing || 0} processing${q.stuckProcessing ? ` · <span class="warn">${q.stuckProcessing} stuck</span>` : ''} &nbsp;|&nbsp; ${t.inProgress || 0} in-progress · ${t.liveAgents || 0} live agents${t.zombie ? ` · <span class="warn">${t.zombie} zombie</span>` : ''} &nbsp;|&nbsp; uptime ${h.daemonUptimeS != null ? Math.round(h.daemonUptimeS / 60) + 'm' : '—'}</div>`
+  const fixes = (h.recentFixes || []).length ? `<div class="hfixes">recent: ${h.recentFixes.map(f => esc(f)).join(' · ')}</div>` : ''
+  const sent = h.sentinel ? `<div class="hsent">🩺 SENTINEL: ${esc(h.sentinel.diagnosis || '')}${h.sentinel.fix ? ` — fix: ${esc(h.sentinel.fix)}` : ''}</div>` : ''
+  $('#healthSub').textContent = h.ok ? 'all systems healthy · every 10s' : 'anomaly detected · every 10s'
+  $('#healthSub').className = 'sub ' + (h.ok ? '' : 'warn')
+  el.innerHTML = `<div class="hbanner ${h.ok ? 'ok' : 'warn'}">${h.ok ? '✓ All operational invariants healthy' : '⚠ Anomaly — see below'}</div>${rows}${meta}${fixes}${sent}`
+}
 async function boot() {
   const r = await api('GET', '/api/squads')
   SQUADS = (r && r.squads) || []
