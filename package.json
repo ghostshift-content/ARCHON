@@ -33,8 +33,9 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.162",
-    "@anthropic-ai/sdk": "^0.88.0",
-    "acorn": "^8.16.0",
+    "acorn": "^8.16.0"
+  },
+  "optionalDependencies": {
     "playwright": "^1.59.1"
   }
 }

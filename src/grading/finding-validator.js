@@ -21,7 +21,9 @@ const fs = require('fs')
 const anthropicKey = require('../integrations/anthropic-key')
 const tracer = (() => { try { return require('../integrations/tracer') } catch { return { span: () => ({ end: () => {} }), event: () => {} } } })()
 
-// Lazy SDK load + client cache — same pattern as grader.js. Keep raw-fetch-free.
+// ponytail: optional BYO-key path (see grader.js). @anthropic-ai/sdk is not a
+// declared dep — absent → loadAnthropicSDK()=null → validateFinding is a no-op
+// (the subscription-OAuth default). Install the SDK + set a key to enable it.
 let _sdk = null
 function loadAnthropicSDK() {
   if (_sdk !== null) return _sdk

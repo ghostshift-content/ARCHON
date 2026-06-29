@@ -35,8 +35,10 @@ const { runAgent } = require('../../agents/runner/agent-runner')
 const targetClassifier = (() => { try { return require('../routing/target-classifier') } catch { return null } })()
 const tracer = (() => { try { return require('../integrations/tracer') } catch { return { span: () => ({ end: () => {} }), event: () => {} } } })()
 
-// Anthropic SDK — only loaded lazily; callers can still use this module in environments
-// without node_modules (test runners). If SDK is missing, LLM refinement degrades to noop.
+// ponytail: optional bring-your-own-API-key path. @anthropic-ai/sdk is NOT a
+// declared dependency (ARCHON runs on subscription OAuth). If it's absent, this
+// require fails → _sdk=false → refineOne falls back to the OAuth/CLI path. Install
+// @anthropic-ai/sdk + set a key only if you want the direct-API grading path.
 let _sdk = null
 function loadAnthropicSDK() {
   if (_sdk !== null) return _sdk
