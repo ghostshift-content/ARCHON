@@ -7,7 +7,14 @@ const SEVERITY_MAP = Object.freeze({
 })
 
 function extractTarget(dispatch) {
-  return (dispatch && (dispatch.sourceDir || dispatch.target)) || null
+  if (!dispatch) return null
+  // The dashboard/UI and the code-review dispatcher carry the source tree under
+  // dispatch.meta.sourceDir (see scripts/dashboard.js + code-review-dispatcher.js
+  // runCodeReview, which reads meta.sourceDir). Older/test dispatches may put it
+  // at the top level. Check both so Phase 0.0 evaluates the real target instead
+  // of failing "no target extractable" and hard-blocking every white-box run.
+  const meta = (dispatch.meta && typeof dispatch.meta === 'object') ? dispatch.meta : {}
+  return dispatch.sourceDir || dispatch.target || meta.sourceDir || meta.target || null
 }
 
 function matchesScope(targetPath, scope) {
