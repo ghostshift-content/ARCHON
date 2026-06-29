@@ -5908,7 +5908,7 @@ Be brief and specific. This is an adversarial check.`
       // ── PHASE 3.08: Active PoC probes (off by default, env+permission gated) ──
       // 2026-05-12: enables safe-exploitation probes when the dispatch task has
       // engagement_mode='active-poc' + a valid active_poc_permission token AND
-      // the daemon has archon_ACTIVE_POC=enabled env var. See:
+      // the daemon has ARCHON_ACTIVE_POC=enabled env var. See:
       // agents/active-poc-policy.js for full safety contract.
       try {
         const __aPocPolicy = require('./agents/active-poc-policy')

@@ -2,7 +2,7 @@
 //
 // End-to-end validation of the active-poc dispatch path. Active-PoC
 // requires THREE conditions to fire (defense-in-depth):
-//   1. archon_ACTIVE_POC=enabled env var
+//   1. ARCHON_ACTIVE_POC=enabled env var
 //   2. taskConfig.engagement_mode === 'active-poc'
 //   3. Valid active_poc_permission token (id + issuer + unexpired
 //      valid_until + scope_domains + capabilities + caps)
@@ -61,7 +61,7 @@ function buildMockRegistry(capturedRun) {
 }
 
 test('end-to-end: env+permission+confirmed-finding → probe FIRES + audit written', async () => {
-  process.env.archon_ACTIVE_POC = 'enabled'
+  process.env.ARCHON_ACTIVE_POC = 'enabled'
   const auditDir = mkTmpDir()
   const captured = []
   const findings = [{
@@ -87,12 +87,12 @@ test('end-to-end: env+permission+confirmed-finding → probe FIRES + audit writt
   assert.ok(auditContent.length > 0, 'audit file should have content')
   assert.match(auditContent, /F-VPN-001/, 'audit should reference finding ID')
 
-  delete process.env.archon_ACTIVE_POC
+  delete process.env.ARCHON_ACTIVE_POC
   fs.rmSync(auditDir, { recursive: true, force: true })
 })
 
-test('env-gate: archon_ACTIVE_POC unset → entire run silent', async () => {
-  delete process.env.archon_ACTIVE_POC
+test('env-gate: ARCHON_ACTIVE_POC unset → entire run silent', async () => {
+  delete process.env.ARCHON_ACTIVE_POC
   const auditDir = mkTmpDir()
   const captured = []
   const findings = [{
@@ -117,7 +117,7 @@ test('env-gate: archon_ACTIVE_POC unset → entire run silent', async () => {
 })
 
 test('scope-gate: target out of scope → probe skipped, audit notes reason', async () => {
-  process.env.archon_ACTIVE_POC = 'enabled'
+  process.env.ARCHON_ACTIVE_POC = 'enabled'
   const auditDir = mkTmpDir()
   const captured = []
   const findings = [{
@@ -138,7 +138,7 @@ test('scope-gate: target out of scope → probe skipped, audit notes reason', as
   assert.ok(result.skipped_reasons.some(s => /scope/i.test(s.reason)),
     `expected scope-skip reason, got ${JSON.stringify(result.skipped_reasons)}`)
 
-  delete process.env.archon_ACTIVE_POC
+  delete process.env.ARCHON_ACTIVE_POC
   fs.rmSync(auditDir, { recursive: true, force: true })
 })
 
@@ -159,7 +159,7 @@ test('permission-validity: expired permission → validatePermission rejects', (
 })
 
 test('non-confirmed finding skipped (validation_status check)', async () => {
-  process.env.archon_ACTIVE_POC = 'enabled'
+  process.env.ARCHON_ACTIVE_POC = 'enabled'
   const auditDir = mkTmpDir()
   const captured = []
   const findings = [{
@@ -179,6 +179,6 @@ test('non-confirmed finding skipped (validation_status check)', async () => {
   assert.strictEqual(captured.length, 0,
     'SUSPECTED findings must not trigger probes — only CONFIRMED')
 
-  delete process.env.archon_ACTIVE_POC
+  delete process.env.ARCHON_ACTIVE_POC
   fs.rmSync(auditDir, { recursive: true, force: true })
 })
