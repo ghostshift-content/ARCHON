@@ -79,12 +79,14 @@ const ok = (label, cond, extra = '') => cond ? (console.log(`  ✓ ${label}`), p
     const stillDispatch = await p.$eval('#view-dispatch', el => el.classList.contains('active'))
     ok('empty-URL submit blocked (stays on dispatch, no crash)', stillDispatch && errs.length === beforeV, errsAt().slice(beforeV).join(' | '))
 
-    // ── test-type mode selector reshapes the pentest form (black/white/both) ──
+    // ── test-type mode selector reshapes the pentest form (black-box / static / white-box) ──
     await p.selectOption('#fSquad', 'pentest'); await p.waitForTimeout(250)
     ok('default black-box: source group hidden', await p.$eval('#ptSourceGroup', el => el.style.display === 'none'))
+    await p.$eval('#ptMode button[data-v="static"]', el => el.click()); await p.waitForTimeout(150)
+    ok('static-analysis mode: source group shown', await p.$eval('#ptSourceGroup', el => el.style.display !== 'none'))
+    ok('static-analysis mode: black group hidden', await p.$eval('#ptBlackGroup', el => el.style.display === 'none'))
     await p.$eval('#ptMode button[data-v="whitebox"]', el => el.click()); await p.waitForTimeout(150)
-    ok('white-box mode: source group shown', await p.$eval('#ptSourceGroup', el => el.style.display !== 'none'))
-    ok('white-box mode: black group hidden', await p.$eval('#ptBlackGroup', el => el.style.display === 'none'))
+    ok('white-box mode: source AND black both shown', await p.$eval('#ptSourceGroup', el => el.style.display !== 'none') && await p.$eval('#ptBlackGroup', el => el.style.display !== 'none'))
     await p.$eval('#ptMode button[data-v="blackbox"]', el => el.click()); await p.waitForTimeout(150)
     ok('back to black-box: source group hidden again', await p.$eval('#ptSourceGroup', el => el.style.display === 'none'))
 

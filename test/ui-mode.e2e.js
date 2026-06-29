@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Browser e2e: the pentest Test-type selector (Black-box / White-box / White+Black).
+// Browser e2e: the pentest Test-type selector (Black-box / Static Analysis / White-box).
 // Asserts the form reshapes per mode AND each mode routes the dispatch correctly:
-//   black-box → pentest (no source) · white-box → code-review · both → combined engagement.
+//   black-box → pentest (no source) · static → code-review (source only) · white-box → combined engagement (source review + live pentest).
 // Run with the daemon STOPPED (don't consume the queued dispatches).
 const fs = require('fs')
 const path = require('path')
@@ -40,28 +40,28 @@ function cleanup() {
     ok('default black-box: source hidden, black shown', !(await vis('#ptSourceGroup')) && (await vis('#ptBlackGroup')))
     ok('default black-box: URL required marker shown', await vis('#ptUrlReq'))
 
-    // white-box reshapes
-    await setMode('whitebox')
-    ok('white-box: source group shown', await vis('#ptSourceGroup'))
-    ok('white-box: black group hidden', !(await vis('#ptBlackGroup')))
-    ok('white-box: scan-strategy hidden', !(await vis('#ptStrategyField')))
-    ok('white-box: URL required marker hidden', !(await vis('#ptUrlReq')))
-    ok('white-box: URL relabeled "Deployed URL"', /Deployed URL/.test(await p.$eval('#ptUrlLabel', el => el.textContent)))
+    // static-analysis reshapes (source only)
+    await setMode('static')
+    ok('static: source group shown', await vis('#ptSourceGroup'))
+    ok('static: black group hidden', !(await vis('#ptBlackGroup')))
+    ok('static: scan-strategy hidden', !(await vis('#ptStrategyField')))
+    ok('static: URL required marker hidden', !(await vis('#ptUrlReq')))
+    ok('static: URL relabeled "Deployed URL"', /Deployed URL/.test(await p.$eval('#ptUrlLabel', el => el.textContent)))
 
-    // both reshapes
-    await setMode('both')
-    ok('both: source + black both shown', (await vis('#ptSourceGroup')) && (await vis('#ptBlackGroup')))
-
-    // ── routing: WHITE-BOX → code-review dispatch ──
+    // white-box reshapes (source review + live pentest)
     await setMode('whitebox')
+    ok('white-box: source + black both shown', (await vis('#ptSourceGroup')) && (await vis('#ptBlackGroup')))
+
+    // ── routing: STATIC ANALYSIS → code-review dispatch (source only) ──
+    await setMode('static')
     await p.fill('#ptSourceDir', SRC)
     await p.fill('#ptUrl', 'https://wbonly.test')
     await p.$eval('#fSubmit', el => el.click()); await p.waitForTimeout(800)
     let d = freshDispatches()
     const wb = d.find(j => j.squad === 'code-review-squad')
-    ok('white-box → code-review dispatch', !!wb && wb.meta.sourceDir === SRC)
-    ok('white-box → deployUrl bridged from URL', wb && wb.meta.deployUrl === 'https://wbonly.test')
-    ok('white-box → NOT a pentest dispatch', !d.some(j => j.squad === 'pentest-squad'))
+    ok('static → code-review dispatch', !!wb && wb.meta.sourceDir === SRC)
+    ok('static → deployUrl bridged from URL', wb && wb.meta.deployUrl === 'https://wbonly.test')
+    ok('static → NOT a pentest dispatch', !d.some(j => j.squad === 'pentest-squad'))
 
     // reset form state (success resets to black-box). Re-open dispatch.
     await p.click('button[data-view="dispatch"]'); await p.waitForTimeout(300)
@@ -75,19 +75,19 @@ function cleanup() {
     ok('black-box → pentest dispatch', !!bb)
     ok('black-box → no sourceDir in meta', bb && !bb.meta.sourceDir)
 
-    // ── routing: BOTH → combined engagement (pentest + code-review iterations) ──
+    // ── routing: WHITE-BOX → combined engagement (pentest + code-review iterations) ──
     await p.click('button[data-view="dispatch"]'); await p.waitForTimeout(300)
-    await setMode('both')
+    await setMode('whitebox')
     await p.fill('#ptUrl', 'https://bothx.test'); await p.fill('#ptSourceDir', SRC); await p.fill('#ptInScope', 'bothx.test')
     await p.$eval('#fSubmit', el => el.click()); await p.waitForTimeout(800)
     d = freshDispatches()
     const root = d.find(j => j.squad === 'pentest-squad' && j.meta.targetUrl === 'https://bothx.test')
     const child = d.find(j => j.squad === 'code-review-squad' && j.meta.deployUrl === 'https://bothx.test')
-    ok('both → pentest (black-box) dispatch on the live URL', !!root && root.meta.engagementId === root.taskId)
-    ok('both → paired code-review (white-box) dispatch with source', !!child && child.meta.sourceDir === SRC)
+    ok('white-box → pentest (live) dispatch on the URL', !!root && root.meta.engagementId === root.taskId)
+    ok('white-box → paired code-review (source) dispatch with source', !!child && child.meta.sourceDir === SRC)
     // the engagement sidecar ties them together as one combined run
     const engFile = fs.existsSync(path.join(INTEL, `engagement-${root && root.taskId}.json`))
-    ok('both → engagement sidecar links the two iterations', engFile)
+    ok('white-box → engagement sidecar links the two iterations', engFile)
 
     ok('no page errors', errs.length === 0, errs.join(' | '))
   } catch (e) {

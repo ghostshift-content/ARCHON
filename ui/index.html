@@ -109,8 +109,8 @@
             <!-- pentest-specific fields (shown only when squad = pentest) -->
             <div id="ptFields" style="display:none">
               <div class="field"><label>Test type</label>
-                <div class="seg" id="ptMode"><button data-v="blackbox" class="on">Black-box</button><button data-v="whitebox">White-box</button><button data-v="both">White + Black</button></div>
-                <div class="hint" id="ptModeHint">Black-box: live target only. White-box: source code review. White + Black: both, merged into one de-duplicated report.</div></div>
+                <div class="seg" id="ptMode"><button data-v="blackbox" class="on">Black-box</button><button data-v="static">Static Analysis</button><button data-v="whitebox">White-box</button></div>
+                <div class="hint" id="ptModeHint">Black-box: live target only. Static Analysis: source code review (no live testing). White-box: source review + live pentest together, merged into one de-duplicated report.</div></div>
               <div class="field" id="ptUrlField"><label id="ptUrlLabel">Web application URL <span class="req" id="ptUrlReq">*</span></label>
                 <input class="input" id="ptUrl" placeholder="https://app.example.com">
                 <div class="hint" id="ptUrlHint">The primary live target. Its host is auto-added to in-scope.</div></div>

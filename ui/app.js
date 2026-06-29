@@ -593,15 +593,18 @@ $$('#ptFocusClasses button').forEach(b => b.onclick = () => {
   b.classList.toggle('on')
   if (b.dataset.custom) { $('#ptCustomFocusWrap').style.display = b.classList.contains('on') ? 'block' : 'none'; if (b.classList.contains('on')) $('#ptCustomFocus').focus() }
 })
-// ── test-type mode: Black-box / White-box / White+Black → reshape the form ──
+// ── test-type mode: Black-box / Static Analysis / White-box → reshape the form ──
+//   black-box      = live target only
+//   static (analysis) = source code review only (no live testing; URL optional)
+//   white-box      = source review + live pentest together (URL required + source)
 function applyPtMode(mode) {
-  const wb = mode === 'whitebox', both = mode === 'both', bb = mode === 'blackbox'
-  $('#ptSourceGroup').style.display = (wb || both) ? 'block' : 'none'
-  $('#ptBlackGroup').style.display = (bb || both) ? 'block' : 'none'
-  $('#ptStrategyField').style.display = (bb || both) ? 'block' : 'none'
-  $('#ptUrlReq').style.display = wb ? 'none' : 'inline'        // URL optional in white-box (runtime validation)
-  $('#ptUrlLabel').firstChild.nodeValue = wb ? 'Deployed URL ' : 'Web application URL '
-  $('#ptUrlHint').textContent = wb
+  const stat = mode === 'static', wb = mode === 'whitebox', bb = mode === 'blackbox'
+  $('#ptSourceGroup').style.display = (stat || wb) ? 'block' : 'none'   // source needed for static + white-box
+  $('#ptBlackGroup').style.display = (bb || wb) ? 'block' : 'none'      // live scope for black-box + white-box
+  $('#ptStrategyField').style.display = (bb || wb) ? 'block' : 'none'
+  $('#ptUrlReq').style.display = stat ? 'none' : 'inline'              // URL optional only in Static Analysis
+  $('#ptUrlLabel').firstChild.nodeValue = stat ? 'Deployed URL ' : 'Web application URL '
+  $('#ptUrlHint').textContent = stat
     ? 'Optional — if the source is deployed, agents runtime-validate the source findings against this live URL.'
     : 'The primary live target. Its host is auto-added to in-scope.'
 }
@@ -634,15 +637,15 @@ $('#fSubmit').onclick = async () => {
       username: r.querySelector('.cu').value.trim(), password: r.querySelector('.cp').value, role: r.querySelector('.cr').value,
     })).filter(c => c.username)
 
-    if (mode === 'whitebox') {
-      // white-box only → code-review squad; URL (if given) becomes the runtime-validation target
+    if (mode === 'static') {
+      // Static Analysis → source-only code-review squad; URL (if given) becomes the runtime-validation target
       if (!sourceDir) { toast('Source directory required', 'Absolute path to the source tree', 'err'); $('#ptSourceDir').focus(); return }
       const meta = { sourceDir }   // preset auto-detected by the code-review engine
       if (targetUrl) meta.deployUrl = targetUrl
       if (credentials.length) meta.testAccounts = { attacker: credentials[0], ...(credentials[1] ? { victim: credentials[1] } : {}) }
       body = { squad: 'code-review', taskTitle: title, priority: prio, meta }
     } else {
-      // black-box OR both → live pentest (both also runs a white-box iteration)
+      // black-box OR white-box → live pentest (white-box also runs a source-review iteration)
       if (!targetUrl) { toast('Target URL required', 'e.g. https://app.example.com', 'err'); $('#ptUrl').focus(); return }
       const testType = ($('#ptType button.on') || {}).dataset?.v || 'full'
       const featureFocus = $('#ptFocus').value.trim()
@@ -652,8 +655,8 @@ $('#fSubmit').onclick = async () => {
       if (testType === 'feature') meta.featureFocus = featureFocus
       const customFocus = $('#ptCustomChip').classList.contains('on') ? $('#ptCustomFocus').value.trim() : ''
       if (customFocus) meta.customFocus = customFocus
-      if (mode === 'both') {
-        if (!sourceDir) { toast('Source directory required', 'White + Black needs a URL and a source directory', 'err'); $('#ptSourceDir').focus(); return }
+      if (mode === 'whitebox') {
+        if (!sourceDir) { toast('Source directory required', 'White-box needs a live URL and a source directory', 'err'); $('#ptSourceDir').focus(); return }
         meta.sourceDir = sourceDir   // preset auto-detected
       }
       body = { squad: 'pentest', taskTitle: title, priority: prio, meta }
