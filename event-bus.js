@@ -2824,6 +2824,48 @@ Do not analyze. Do not pad. Just list misses. If nothing missed, output "NONE".`
   }
 }
 
+// ── Stage 0.6 — Deep environment fingerprint ──────────────────────────────────
+// Identify the EXACT product/stack + WAF vendor so specialists can craft
+// stack-specific payloads (AEM → AEM payloads) and vendor-specific WAF bypasses.
+// Writes env-fingerprint-<taskId>.json. Fail-soft → returns the normalized empty
+// shape (downstream then runs generically, exactly as before).
+async function runEnvFingerprint({ taskId, targetUrl, squad, projectId, wafStatus, techContext, endpointFile }) {
+  const efp = require('./src/pipeline/env-fingerprint')
+  const outPath = `${agentPaths.INTEL_ROOT}/env-fingerprint-${taskId}.json`
+  try {
+    let reconDump = ''
+    try {
+      reconDump = readTaskActivity(taskId)
+        .filter(e => /^(SCOUT|RANGER|TRACER)$/i.test(String(e.agent || '')))
+        .slice(-50).map(e => JSON.stringify(e)).join('\n').slice(0, 6000)
+    } catch {}
+    let endpointData = ''
+    try { if (fs.existsSync(endpointFile)) endpointData = fs.readFileSync(endpointFile, 'utf-8').slice(0, 4000) } catch {}
+    let jsBundleData = ''
+    try {
+      const jf = `${agentPaths.INTEL_ROOT}/js-bundle-analysis-${taskId}.json`
+      if (fs.existsSync(jf)) jsBundleData = fs.readFileSync(jf, 'utf-8').slice(0, 3000)
+    } catch {}
+
+    const prompt = efp.buildFingerprintPrompt({ targetUrl, wafStatus, techStack: techContext, reconDump, endpointData, jsBundleData })
+    const { text } = await runAgent({
+      agentName: 'FINGERPRINT', taskId, model: modelRouter.resolveFamily('balanced'),
+      effort: 'medium', userPrompt: prompt, timeoutMs: 60000,
+    })
+    const fp = efp.normalizeFingerprint(text)
+    fs.writeFileSync(outPath, JSON.stringify(fp, null, 2))
+    log(`🔬 Phase 0.6: Env fingerprint — ${efp.fingerprintSummary(fp) || '(stack not identified)'}`)
+    logActivity('NEXUS', `🔬 Phase 0.6: env fingerprint`, {
+      type: 'env-fingerprint', squad, taskId, projectId: projectId || '',
+      details: efp.fingerprintSummary(fp) || 'no specific product identified',
+    })
+    return fp
+  } catch (e) {
+    log(`⚠️ Phase 0.6 env-fingerprint failed (non-fatal): ${e.message}`)
+    return efp.normalizeFingerprint(null)
+  }
+}
+
 // (2026-06-04) Compact one-line summary of an SDK stream message for the agent
 // stream file. The sdk adapter's onProgress fires with raw SDK message OBJECTS
 // (system/init, assistant, user, result, stream_event, ...). Dumping the raw
@@ -4880,6 +4922,14 @@ async function dispatchPentestParallel(dispatch) {
     } catch (epAnalyzerErr) {
       log(`⚠️ Phase 1.8 endpoint-analyzer error (non-fatal): ${epAnalyzerErr.message}`)
     }
+
+    // ── PHASE 0.6 — Deep environment fingerprint (runs here: recon signals ready) ──
+    // Identify the exact product + WAF vendor so Phase 2 specialists craft
+    // stack-specific payloads + vendor-specific WAF bypasses. Fail-soft.
+    let envFingerprint = null
+    try {
+      envFingerprint = await runEnvFingerprint({ taskId, targetUrl, squad, projectId, wafStatus, techContext, endpointFile })
+    } catch (fpErr) { log(`⚠️ Phase 0.6 wrapper error (non-fatal): ${fpErr.message}`) }
 
     // ── PHASE 2: Vulnerability specialists — 2-wave adaptive parallel ──────
     // Wave 1 (batches 1+2 merged): all first-half specialists run in true parallel.
