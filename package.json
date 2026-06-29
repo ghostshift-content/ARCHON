@@ -5,7 +5,11 @@
   "main": "event-bus.js",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "git+https://github.com/ghostshift-content/ARCHON.git"
+  },
+  "homepage": "https://github.com/ghostshift-content/ARCHON#readme",
+  "bugs": {
+    "url": "https://github.com/ghostshift-content/ARCHON/issues"
   },
   "engines": {
     "node": ">=18"
