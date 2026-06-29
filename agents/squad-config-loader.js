@@ -20,7 +20,7 @@ const path = require('path')
 // Constants
 // ---------------------------------------------------------------------------
 
-const PRODUCTION_SQUADS = ['pentest', 'stocks', 'cloud-security', 'network-pentest', 'code-review']
+const PRODUCTION_SQUADS = ['pentest', 'code-review']
 
 const SQUADS_DIR = path.join(__dirname, 'squads')
 

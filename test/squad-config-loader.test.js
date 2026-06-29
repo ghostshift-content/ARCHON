@@ -1,11 +1,12 @@
 // test/squad-config-loader.test.js
 // Unit tests for agents/squad-config-loader.js
-// Run: bun test test/squad-config-loader.test.js
+// Run: node --test test/squad-config-loader.test.js  (or via npm test)
 
 'use strict'
 const __roots = require('../paths') // portable roots (KURU_*_ROOT) — see paths.js
 
-
+const fs = require('node:fs')
+const path = require('node:path')
 const { test, describe, beforeEach } = require('node:test')
 const assert = require('node:assert/strict')
 
@@ -23,10 +24,10 @@ describe('loadSquadConfig', () => {
     assert.equal(cfg.squad, 'pentest')
   })
 
-  test('returns correct leader for stocks squad (CHANAKYA)', () => {
-    const cfg = loader.loadSquadConfig('stocks')
-    assert.equal(cfg.leader, 'CHANAKYA', `expected CHANAKYA, got ${cfg.leader}`)
-    assert.equal(cfg.squad, 'stocks')
+  test('returns correct leader for code-review squad (CURATOR)', () => {
+    const cfg = loader.loadSquadConfig('code-review')
+    assert.equal(cfg.leader, 'CURATOR', `expected CURATOR, got ${cfg.leader}`)
+    assert.equal(cfg.squad, 'code-review')
   })
 
   test('throws on unknown squad', () => {
@@ -50,7 +51,7 @@ describe('loadSquadConfig', () => {
     )
   })
 
-  test('modelTier values are valid (fast|balanced|powerful) for all 5 squads', () => {
+  test('modelTier values are valid (fast|balanced|powerful) for every production squad', () => {
     const validTiers = new Set(['fast', 'balanced', 'powerful'])
     for (const squad of loader.PRODUCTION_SQUADS) {
       const cfg = loader.loadSquadConfig(squad)
@@ -61,7 +62,7 @@ describe('loadSquadConfig', () => {
     }
   })
 
-  test('effort values are valid for all 5 squads', () => {
+  test('effort values are valid for every production squad', () => {
     const validEfforts = new Set(['low', 'medium', 'high', 'xhigh', 'max'])
     for (const squad of loader.PRODUCTION_SQUADS) {
       const cfg = loader.loadSquadConfig(squad)
@@ -85,19 +86,19 @@ describe('loadSquadConfig', () => {
 })
 
 describe('getAllSquadConfigs', () => {
-  test('returns 5 entries with no nulls', () => {
+  test('returns one entry per production squad, with no nulls', () => {
     const all = loader.getAllSquadConfigs()
     const keys = Object.keys(all)
-    assert.equal(keys.length, 5, `expected 5 squads, got ${keys.length}: ${keys.join(', ')}`)
+    assert.equal(keys.length, loader.PRODUCTION_SQUADS.length,
+      `expected ${loader.PRODUCTION_SQUADS.length} squads, got ${keys.length}: ${keys.join(', ')}`)
     for (const [squad, cfg] of Object.entries(all)) {
       assert.notEqual(cfg, null, `squad "${squad}" config is null — file missing or invalid`)
     }
   })
 
-  test('returns all 5 production squad names', () => {
+  test('returns exactly the production squad names', () => {
     const all = loader.getAllSquadConfigs()
-    const expected = ['pentest', 'stocks', 'cloud-security', 'network-pentest', 'code-review']
-    for (const squad of expected) {
+    for (const squad of loader.PRODUCTION_SQUADS) {
       assert.ok(squad in all, `missing squad "${squad}" from getAllSquadConfigs result`)
     }
   })
@@ -117,7 +118,7 @@ describe('clearCache + reload', () => {
     assert.equal(second.modelTier, first.modelTier)
   })
 
-  test('clearCache + getAllSquadConfigs still returns 5 valid entries', () => {
+  test('clearCache + getAllSquadConfigs still returns valid entries (no nulls)', () => {
     // Prime the cache first
     loader.getAllSquadConfigs()
 
@@ -130,17 +131,27 @@ describe('clearCache + reload', () => {
 })
 
 describe('PRODUCTION_SQUADS constant', () => {
-  test('is an array of 5 elements', () => {
+  test('is a non-empty array', () => {
     assert.ok(Array.isArray(loader.PRODUCTION_SQUADS), 'PRODUCTION_SQUADS should be an array')
-    assert.equal(loader.PRODUCTION_SQUADS.length, 5)
+    assert.ok(loader.PRODUCTION_SQUADS.length > 0, 'PRODUCTION_SQUADS should be non-empty')
   })
 
-  test('matches quality-tracker PRODUCTION_SQUADS', () => {
-    const qt = require((__roots.AGENTS_ROOT + '/agents/quality-tracker'))
+  // Drift guard: the constant must match the squads that actually have a
+  // squad.json on disk. Pins PRODUCTION_SQUADS so getAllSquadConfigs can never
+  // silently return nulls, and forces the list to be updated when a squad is
+  // added or removed. (Replaces the old assertion against the purged
+  // agents/quality-tracker module.)
+  test('matches the squads that actually have a squad.json on disk', () => {
+    const squadsDir = path.join(__roots.AGENTS_ROOT, 'agents', 'squads')
+    const onDisk = fs.readdirSync(squadsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => d.name)
+      .filter(name => fs.existsSync(path.join(squadsDir, name, 'squad.json')))
+      .sort()
     assert.deepEqual(
       [...loader.PRODUCTION_SQUADS].sort(),
-      [...qt.PRODUCTION_SQUADS].sort(),
-      'squad-config-loader and quality-tracker PRODUCTION_SQUADS must match'
+      onDisk,
+      'PRODUCTION_SQUADS must match the squad dirs that contain a squad.json'
     )
   })
 })

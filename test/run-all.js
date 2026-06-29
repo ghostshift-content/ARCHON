@@ -26,7 +26,6 @@ const BUN_FILES = new Set([
   'grader.test.js',
   'phase-envelope.test.js',
   'suppression-ledger.test.js',
-  'squad-config-loader.test.js',
   'goal-evaluator.test.js',
 ])
 
