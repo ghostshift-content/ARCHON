@@ -2866,6 +2866,41 @@ async function runEnvFingerprint({ taskId, targetUrl, squad, projectId, wafStatu
   }
 }
 
+// ── Stage 1 — The Strategist (attack planning) ────────────────────────────────
+// ATLAS reads recon + the env fingerprint → a ranked, stack-aware attack plan
+// (attack-plan-<taskId>.json) that the specialists attack first. Fail-soft.
+async function runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerprint, endpointFile }) {
+  const planner = require('./src/pipeline/attack-planner')
+  const outPath = `${agentPaths.INTEL_ROOT}/attack-plan-${taskId}.json`
+  try {
+    let reconDump = ''
+    try {
+      const lf = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
+      if (fs.existsSync(lf)) reconDump = fs.readFileSync(lf, 'utf-8').slice(-6000)
+      if (!reconDump) reconDump = readTaskActivity(taskId).filter(e => /^(SCOUT|RANGER|TRACER)$/i.test(String(e.agent || ''))).slice(-40).map(e => JSON.stringify(e)).join('\n').slice(0, 6000)
+    } catch {}
+    let endpointData = ''
+    try { if (fs.existsSync(endpointFile)) endpointData = fs.readFileSync(endpointFile, 'utf-8').slice(0, 4000) } catch {}
+
+    const prompt = planner.buildAttackPlanPrompt({ targetUrl, fingerprint, reconDump, endpointData })
+    const { text } = await runAgent({
+      agentName: 'ATLAS', taskId, model: modelRouter.resolve('atlas'),
+      effort: 'high', userPrompt: prompt, timeoutMs: 90000,
+    })
+    const plan = planner.normalizePlan(text)
+    fs.writeFileSync(outPath, JSON.stringify(plan, null, 2))
+    log(`🧠 Phase 1.9: Attack plan — ${planner.planSummary(plan) || '(no hypotheses)'}`)
+    logActivity('ATLAS', `🧠 Phase 1.9: attack plan (${plan.length} hypotheses)`, {
+      type: 'attack-plan', squad, taskId, projectId: projectId || '',
+      details: planner.planSummary(plan) || 'no ranked hypotheses produced',
+    })
+    return plan
+  } catch (e) {
+    log(`⚠️ Phase 1.9 attack-planner failed (non-fatal): ${e.message}`)
+    return []
+  }
+}
+
 // (2026-06-04) Compact one-line summary of an SDK stream message for the agent
 // stream file. The sdk adapter's onProgress fires with raw SDK message OBJECTS
 // (system/init, assistant, user, result, stream_event, ...). Dumping the raw
@@ -3538,13 +3573,30 @@ analyzer extracted facts; YOUR job is to break them. If the file is absent,
 proceed normally — assumptions stay implicit.
 `
 
+  // Environment-adaptive attack block (Phase 0.6 fingerprint + Phase 1.9 plan).
+  // Drives STACK-SPECIFIC payload generation + WAF-vendor-aware bypass adaptation.
+  const envAdaptiveBlock = `
+## ENVIRONMENT-ADAPTIVE ATTACK (Phase 0.6 fingerprint + Phase 1.9 attack plan — read both FIRST)
+- env-fingerprint-${taskId}.json names the EXACT stack. Generate payloads SPECIFIC to the identified
+  product (e.g. Adobe AEM → dispatcher bypass / CRX-Sling / known AEM CVEs; WordPress → WP plugin/REST;
+  Spring → actuator/SpEL), NOT generic ones. If it's empty/low-confidence, fall back to stack-generic.
+- attack-plan-${taskId}.json is ATLAS's ranked plan. Attack the hypotheses whose vuln_class matches YOUR
+  specialty FIRST (highest priority first), then continue your own discovery.
+- If a WAF is named (waf.vendor), assume payloads are filtered: fire, READ the response, identify the
+  vendor's block signature, then MUTATE with vendor-specific bypasses (encoding, casing, comments,
+  chunking, header tricks) and refire — iterate until it lands or you've genuinely exhausted it. Record
+  EVERY attempt and the working payload in your reproduction.
+`
+
   return PENTEST_COVERAGE + `\nYou are ${agentUpper}, pentest specialist in ${squad}. Target: ${targetUrl}. Task: ${taskTitle}. TaskID: ${taskId}. WAF: ${wafStatus || 'unknown'}.
 ${goalLine}${techLine}${profileFragment}${MUST_GATES}${feedbackCtx}${liveFindings}${graphCtx}
-${A2A_HANDOFF_SECTION}${endpointModelBlock}
+${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
 Read your skill: cat ${agentPaths.skillsDir(agentLower)}/*/SKILL.md
 Read bypass refs: cat ${agentPaths.skillsDir(agentLower)}/*/references/*.md 2>/dev/null
 Read endpoints: cat ${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json 2>/dev/null
 Read endpoint-models (Phase 1.8): cat ${agentPaths.INTEL_ROOT}/endpoint-models-${taskId}.jsonl 2>/dev/null
+Read env fingerprint (Phase 0.6): cat ${agentPaths.INTEL_ROOT}/env-fingerprint-${taskId}.json 2>/dev/null
+Read attack plan (Phase 1.9): cat ${agentPaths.INTEL_ROOT}/attack-plan-${taskId}.json 2>/dev/null
 Read memory: cat ${agentPaths.lessonsPath(agentLower)} 2>/dev/null
 
 ## CROSS-COLLABORATION — share findings for other agents to chain off
@@ -4930,6 +4982,11 @@ async function dispatchPentestParallel(dispatch) {
     try {
       envFingerprint = await runEnvFingerprint({ taskId, targetUrl, squad, projectId, wafStatus, techContext, endpointFile })
     } catch (fpErr) { log(`⚠️ Phase 0.6 wrapper error (non-fatal): ${fpErr.message}`) }
+
+    // ── PHASE 1.9 — The Strategist: ATLAS ranks what to attack first ──
+    try {
+      await runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerprint: envFingerprint, endpointFile })
+    } catch (planErr) { log(`⚠️ Phase 1.9 wrapper error (non-fatal): ${planErr.message}`) }
 
     // ── PHASE 2: Vulnerability specialists — 2-wave adaptive parallel ──────
     // Wave 1 (batches 1+2 merged): all first-half specialists run in true parallel.
