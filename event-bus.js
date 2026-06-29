@@ -8082,6 +8082,15 @@ async function generateReportForTask(taskId) {
   if (!task) { log(`📝 generate-report: task ${taskId} not found`); return }
   const squad = String(task.squad || 'pentest').replace(/-squad$/, '')
   const projectId = task.projectId || ''
+  // Process the findings BEFORE writing the report: promote raw findings to
+  // VALIDATED if AUDITOR didn't, then enrich them (CVSS, steps, impact, remediation)
+  // — across every iteration of the engagement — so the report is built on the
+  // actual findings, not an empty VALIDATED file.
+  try {
+    let reportIters = [String(taskId)]
+    try { const engF = `${agentPaths.INTEL_ROOT}/engagement-${taskId}.json`; if (fs.existsSync(engF)) { const e = JSON.parse(fs.readFileSync(engF, 'utf8')); if (Array.isArray(e.iterations) && e.iterations.length) reportIters = e.iterations.map(i => String(i.taskId)) } } catch {}
+    for (const tid of reportIters) { ensureValidatedFindings(tid); await enrichFindingsForTask(tid) }
+  } catch (e) { log(`⚠️ generate-report pre-process (non-fatal): ${e.message}`) }
   const goal = task.goal || ''
   let targetUrl = (goal.match(/https?:\/\/[^\s'"]+/) || [])[0] || ''
   try {
@@ -8154,26 +8163,75 @@ function amendTask(req) {
   logActivity('NEXUS', `✏️ Task ${taskId} amended`, { type: 'amend', taskId, projectId: req.projectId || '', details: String(req.instructions || (req.addScope || []).join(', ')).slice(0, 160) })
 }
 
+// ── Fallback: build VALIDATED-FINDINGS from live-findings when AUDITOR didn't ──
+// The pipeline assumes AUDITOR wrote VALIDATED-FINDINGS-<taskId>.jsonl; when it
+// didn't (e.g. Phase 3 didn't run), every consumer (dashboard, enrichment,
+// report) was empty even though the agents found plenty. This promotes the raw
+// live findings into stable VALIDATED records so nothing downstream is blind.
+// Idempotent: no-op if VALIDATED already has content.
+function ensureValidatedFindings(taskId) {
+  try {
+    const vf = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
+    const have = fs.existsSync(vf) ? fs.readFileSync(vf, 'utf8').trim().split('\n').filter(Boolean).length : 0
+    if (have > 0) return have
+    const lf = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
+    if (!fs.existsSync(lf)) return 0
+    const { enforceContract } = require('./src/pipeline/evidence-contract')
+    const seen = new Set(); const records = []
+    for (const ln of fs.readFileSync(lf, 'utf8').trim().split('\n').filter(Boolean)) {
+      let f; try { f = JSON.parse(ln) } catch { continue }
+      const key = `${(f.url || '').toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '')}|${(f.details || '').slice(0, 40)}`
+      if (seen.has(key)) continue; seen.add(key)
+      const evidenced = !!String(f.reproduction || f.details || '').trim()
+      const status = (String(f.type || '').toLowerCase() === 'confirmed' && evidenced) ? 'CONFIRMED' : 'NEEDS-LIVE'
+      const rec = enforceContract({
+        id: `F-${records.length + 1}`,
+        title: String(f.details || '').split(/[:.\n]/)[0].slice(0, 90) || f.cwe || `${f.agent || 'AGENT'} finding`,
+        severity: f.severity || 'Medium', validation_status: status,
+        original_agent: f.agent || '', url: f.url || '',
+        reproduction_method: f.reproduction || '', reproduction_result: '',
+        details: f.details || '', impact: f.impact || '', cwe: f.cwe || '', owasp: f.owasp || '',
+        taskId: String(taskId), source: 'live-promoted',
+      })
+      records.push(rec)
+    }
+    if (!records.length) return 0
+    fs.writeFileSync(vf, records.map(r => JSON.stringify(r)).join('\n') + '\n')
+    log(`🔁 Promoted ${records.length} live finding(s) → VALIDATED-FINDINGS (AUDITOR produced none)`)
+    return records.length
+  } catch (e) { log(`⚠️ ensureValidatedFindings failed (non-fatal): ${e.message}`); return 0 }
+}
+
 // ── Enrich findings with report-quality structure for the triage view ──
 // Has AUDITOR produce description/impact/remediation/raw_request/poc per finding →
 // findings-detail-<taskId>.json (merged by the dashboard's /api/findings).
 async function enrichFindingsForTask(taskId) {
+  ensureValidatedFindings(taskId)
   const vf = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
   if (!fs.existsSync(vf)) { log(`🔎 enrich-findings: no validated findings for ${taskId}`); return }
   const outFile = `${agentPaths.INTEL_ROOT}/findings-detail-${taskId}.json`
-  const prompt = `You are AUDITOR. Enrich each validated finding with report-quality structure for the operator's triage view.
+  const prompt = `You are AUDITOR acting as a senior pentest report writer. Enrich each validated finding into a
+COMPLETE, professional finding the operator can act on. Re-read the live evidence if needed; do not invent.
 
-Read ${vf} — one JSON finding per line (fields: id, title, severity, cvss_score, cvss_vector, url, method, reproduction_method, reproduction_result). Re-read the live source/evidence if needed; do not invent.
+Read ${vf} — one JSON finding per line (fields: id, title, severity, url, reproduction_method, reproduction_result, details, impact, cwe).
 
-For EVERY finding id, produce:
-- description: 2-4 sentences, ONLY relevant vulnerability description (what it is and why it's a flaw on this target). No filler.
-- impact: the concrete security impact of THIS finding.
+For EVERY finding id, produce ALL of:
+- description: 2-4 sentences — what the vulnerability is and why it's a flaw on THIS target. No filler.
+- cvss_score: the CVSS 3.1 base score (number 0.0-10.0) you assess for THIS finding.
+- cvss_vector: the full CVSS:3.1 vector you scored it with (e.g. "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H").
+- cwe: the most specific CWE id (e.g. "CWE-89").
+- test_steps: a NUMBERED, end-to-end reproduction a non-author can follow — concrete UI/HTTP steps:
+    "Step 1: <go to / send>", "Step 2: <do this>", "Step 3: <observe this>" … include the exact request/payload.
+- validation: what proves it worked (the response/output an operator should see — the proof).
+- impact: the concrete security impact of THIS finding (what an attacker gains).
 - remediation: a specific, actionable fix for THIS finding.
-- raw_request: the raw HTTP request proving it — "METHOD /path HTTP/1.1", Host, headers, Cookie/Authorization if used, a blank line, then body — derived from reproduction_method/url/method.
-- poc: exact validation / PoC steps (the curl or numbered steps) that reproduce it.
+- raw_request: the raw HTTP request proving it — "METHOD /path HTTP/1.1", Host, headers, Cookie/Authorization if used, a blank line, then body.
+- poc: the exact curl/command that reproduces it.
+
+Score CVSS conservatively but realistically for the demonstrated impact (proven RCE/root → Critical/9.x).
 
 Write STRICT JSON to ${outFile}:
-{ "<finding id>": { "description": "", "impact": "", "remediation": "", "raw_request": "", "poc": "" }, ... }
+{ "<finding id>": { "description":"", "cvss_score":0.0, "cvss_vector":"", "cwe":"", "test_steps":["Step 1: …","Step 2: …"], "validation":"", "impact":"", "remediation":"", "raw_request":"", "poc":"" }, ... }
 Write ONLY that file. Then reply one line: enriched N findings.`
   log(`🔎 Enrich-findings: ${taskId} (AUDITOR)`)
   logActivity('NEXUS', `🔎 Enriching findings detail`, { type: 'enrich-findings', taskId, details: 'AUDITOR writing description/impact/remediation/raw-request/poc per finding.' })

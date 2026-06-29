@@ -349,8 +349,10 @@ function renderIterBar() {
 // severity summary reflects the CURRENT triage across the WHOLE engagement (overrides applied, rejected excluded)
 function recountSummary() {
   const counts = {}; for (const s of SEV) counts[s] = 0
-  for (const f of fnFindings) { const v = fnVerdicts[f.key] || {}; if (v.verdict === 'rejected') continue; const sv = v.severity || f.severity; counts[sv] = (counts[sv] || 0) + 1 }
+  let cancelled = 0
+  for (const f of fnFindings) { const v = fnVerdicts[f.key] || {}; if (v.verdict === 'rejected') { cancelled++; continue } const sv = v.severity || f.severity; counts[sv] = (counts[sv] || 0) + 1 }
   $('#fnSummary').innerHTML = SEV.map(s => `<div class="stat"><div class="n" style="color:var(--sev-${s.toLowerCase()})">${counts[s] || 0}</div><div class="l">${s}</div></div>`).join('')
+  const el = $('#tdFnCount'); if (el) el.textContent = cancelled ? `${fnFindings.length - cancelled} (${cancelled} cancelled)` : String(fnFindings.length)
 }
 function renderFindings() {
   recountSummary()
@@ -364,7 +366,7 @@ function renderFindings() {
       <div class="fmain">
         <span class="badge fbadge sev-${sevNow.toLowerCase()}">${esc(sevNow)}</span>
         ${cvssNow != null ? `<span class="fcvss">CVSS ${cvssNow}</span>` : ''}
-        ${f.status ? `<span class="fstatus ${/confirm/i.test(f.status) ? 'ok' : 'warn'}">${/confirm/i.test(f.status) ? '✓ Confirmed' : (f.status === 'NEEDS-LIVE' ? 'Needs-live' : 'Unconfirmed')}</span>` : ''}
+        ${v.verdict === 'rejected' ? '<span class="fcancelled">✕ Cancelled</span>' : (f.status ? `<span class="fstatus ${/confirm/i.test(f.status) ? 'ok' : 'warn'}">${/confirm/i.test(f.status) ? '✓ Confirmed' : (f.status === 'NEEDS-LIVE' ? 'Needs-live' : 'Unconfirmed')}</span>` : '')}
         <span class="ftitle">${esc(f.title)}</span>
         ${f.iteration ? `<span class="iter-tag">${esc(f.iteration)}</span>` : ''}
         <div class="seg fverdict" data-noopen><button data-fv="confirmed" class="${v.verdict !== 'rejected' ? 'on' : ''}" type="button" title="Confirm">✓</button><button data-fv="rejected" class="${v.verdict === 'rejected' ? 'on' : ''}" type="button" title="Reject">✕</button></div>
@@ -379,8 +381,7 @@ function renderFindings() {
     card.querySelectorAll('.fverdict button').forEach(b => b.onclick = (e) => {
       e.stopPropagation()
       fnVerdicts[key].verdict = b.dataset.fv
-      card.querySelectorAll('.fverdict button').forEach(x => x.classList.toggle('on', x === b))
-      card.classList.toggle('rejected', b.dataset.fv === 'rejected'); updateTriageState(); recountSummary()
+      renderFindings() // re-render so the Cancelled tag swaps + count adjusts live
       saveTriage() // persist immediately so opening a finding / navigating never loses the verdict
     })
   })
@@ -417,11 +418,20 @@ function openFindingPage(key) {
   $('#fdTitle').textContent = f.title
   $('#fdSevBadge').textContent = sevNow; $('#fdSevBadge').className = 'badge sev-' + sevNow.toLowerCase()
   const sec = (k, val, mono) => `<div class="fsec"><div class="fk">${k}</div>${val ? (mono ? `<pre class="fv mono">${esc(val)}</pre>` : `<div class="fv">${esc(val)}</div>`) : '<div class="fv dim">— not provided · use “Enrich details”</div>'}</div>`
-  $('#fdInfo').innerHTML = `<h3>${esc(f.id)} · ${esc(f.agent || '')}</h3>
+  const steps = Array.isArray(f.testSteps) && f.testSteps.length
+    ? `<div class="fsec"><div class="fk">Reproduction steps</div><ol class="fsteps">${f.testSteps.map(s => `<li>${esc(String(s).replace(/^step\s*\d+\s*[:.\-]\s*/i, ''))}</li>`).join('')}</ol></div>`
+    : sec('Test steps / PoC', f.poc, true)
+  const tags = [
+    f.cvss != null ? `<span class="fcvss">CVSS ${f.cvss}</span>` : '',
+    f.cwe ? `<span class="fcwe">${esc(f.cwe)}</span>` : '',
+    f.status ? `<span class="fstatus ${/confirm/i.test(f.status) ? 'ok' : 'warn'}">${/confirm/i.test(f.status) ? '✓ Confirmed' : (f.status === 'NEEDS-LIVE' ? 'Needs-live' : 'Unconfirmed')}</span>` : '',
+  ].filter(Boolean).join(' ')
+  $('#fdInfo').innerHTML = `<h3>${esc(f.id)} · ${esc(f.agent || '')} ${tags}</h3>
     ${sec('Description', f.description)}
     ${sec('Vulnerable URL', (f.method ? f.method + ' ' : '') + f.url)}
-    ${sec('Test steps / PoC', f.poc, true)}
+    ${steps}
     ${sec('Validation result', f.validation, true)}
+    ${f.poc && steps !== sec('Test steps / PoC', f.poc, true) ? sec('Command / PoC', f.poc, true) : ''}
     ${sec('HTTP raw request', f.rawRequest, true)}
     ${sec('Impact', f.impact)}
     ${sec('Remediation', f.remediation)}`

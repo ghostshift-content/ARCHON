@@ -182,7 +182,13 @@ a { color: var(--accent-2); text-decoration: none; } a:hover { text-decoration: 
 .finding .fstatus { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: .02em; white-space: nowrap; }
 .finding .fstatus.ok { color: #34d399; background: rgba(52,211,153,.13); border: 1px solid rgba(52,211,153,.4); }
 .finding .fstatus.warn { color: #fbbf24; background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.38); }
+.finding .fcancelled { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: var(--fg-mut); background: rgba(148,163,184,.12); border: 1px solid rgba(148,163,184,.3); white-space: nowrap; }
+.finding.rejected { opacity: .55; }
+.finding.rejected .ftitle { text-decoration: line-through; }
 .finding .ftitle { font-weight: 600; font-size: 14px; }
+ol.fsteps { margin: 4px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+ol.fsteps li { font-size: 13px; line-height: 1.5; }
+.fcwe { font-family: var(--mono); font-size: 11.5px; color: var(--fg-mut); padding: 2px 7px; border-radius: 5px; background: var(--bg-2); }
 .finding .fmeta { color: var(--fg-mut); font-size: 12px; margin-top: 6px; }
 .finding .fmono { font-family: var(--mono); }
 .finding .fresult { color: var(--fg-mut); font-size: 11.5px; margin-top: 8px; background: var(--bg-1); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-family: var(--mono); white-space: pre-wrap; max-height: 90px; overflow: auto; }
