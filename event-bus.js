@@ -144,6 +144,11 @@ function safeTitle(s) {
 const agentPaths = require('./paths') // Phase-1 resolver chokepoint (GATE-121) — ALL persona paths go through paths.js
 const AGENTS_DIR = agentPaths.AGENTS_ROOT
 const INTEL_DIR = agentPaths.INTEL_ROOT // data-layer root (env-overridable via KURU_INTEL_ROOT; see paths.js)
+// Optional mission-control data dir (agents.json / squads.json / calendar.json).
+// The OSS build does NOT ship mission-control: these reads are fail-soft and the
+// dispatch pipeline carries hardcoded role fallbacks (getPentestSpecialists etc.),
+// so an absent dir is fully fine. Set KURU_MISSION_CONTROL_DATA to integrate one.
+const MC_DATA_DIR = process.env.KURU_MISSION_CONTROL_DATA || path.join(INTEL_DIR, 'mission-control')
 const DISPATCH_FILE = INTEL_DIR + '/dispatch-queue.json'
 const AGENT_MODEL_OVERRIDES_FILE = INTEL_DIR + '/agent-model-overrides.json'
 const TASKS_FILE = INTEL_DIR + '/tasks.json'
@@ -345,7 +350,7 @@ class ConfigCache {
   getAgents() {
     if (this._agents && Date.now() - this._agentsTs < this._TTL) return this._agents
     try {
-      this._agents = JSON.parse(fs.readFileSync('/root/mission-control/data/agents.json', 'utf-8'))
+      this._agents = JSON.parse(fs.readFileSync(path.join(MC_DATA_DIR, 'agents.json'), 'utf-8'))
       this._agentsTs = Date.now()
     } catch {
       // Return cached version on error
@@ -358,7 +363,7 @@ class ConfigCache {
   getSquads() {
     if (this._squads && Date.now() - this._squadsTs < this._TTL) return this._squads
     try {
-      this._squads = JSON.parse(fs.readFileSync('/root/mission-control/data/squads.json', 'utf-8'))
+      this._squads = JSON.parse(fs.readFileSync(path.join(MC_DATA_DIR, 'squads.json'), 'utf-8'))
       this._squadsTs = Date.now()
     } catch {
       if (this._squads) return this._squads
@@ -1917,7 +1922,7 @@ function getAgentReplacements() {
   }
   const replacements = { ...CUSTOM_AGENT_TITLES }
   try {
-    const roster = JSON.parse(fs.readFileSync('/root/mission-control/data/agents.json', 'utf-8'))
+    const roster = JSON.parse(fs.readFileSync(path.join(MC_DATA_DIR, 'agents.json'), 'utf-8'))
     for (const agent of roster) {
       const name = String(agent.name || '').toUpperCase()
       if (!name || replacements[name]) continue
@@ -9594,7 +9599,7 @@ function _processQueueInner() {
 }
 
 // ── Calendar Scheduler ──
-const CALENDAR_FILE = '/root/mission-control/data/calendar.json'
+const CALENDAR_FILE = path.join(MC_DATA_DIR, 'calendar.json')
 const calendarLastRun = {}
 
 function readCalendar() {
@@ -9910,7 +9915,24 @@ function startWatcher() {
   log('⚡ Mode: Event-driven dispatch')
   log(`🧠 Memory: Per-agent memory + shared squad memory enabled`)
   log('')
-  
+
+  // Preflight: agents spawn the `claude` CLI (subscription/OAuth auth). If it's
+  // not installed, every dispatch fails with a cryptic ENOENT — warn clearly at
+  // boot instead. Non-fatal: the dashboard + API still serve without it.
+  try {
+    const _bin = process.env.KURU_CLAUDE_BIN
+    const _found = _bin
+      ? fs.existsSync(_bin)
+      : (() => { try { execSync('command -v claude', { stdio: 'ignore' }); return true } catch { return false } })()
+    if (!_found) {
+      log(`⚠️  PREFLIGHT: the 'claude' CLI was not found${_bin ? ` at KURU_CLAUDE_BIN=${_bin}` : ' on PATH'}.`)
+      log(`    Agents cannot run until it is installed + authenticated (Claude subscription OAuth, ~/.claude).`)
+      log(`    Install the Claude CLI, run it once to log in, or set KURU_CLAUDE_BIN to its absolute path.`)
+    } else {
+      log(`✅ Preflight: claude CLI found${_bin ? ` (${_bin})` : ' on PATH'}.`)
+    }
+  } catch {}
+
   if (!fs.existsSync(DISPATCH_FILE)) {
     writeJSON(DISPATCH_FILE, [])
   }
@@ -9933,11 +9955,15 @@ function startWatcher() {
     processQueue()
   }, 30000)
 
-  // Calendar scheduler
-  checkCalendar()
-  setInterval(() => {
+  // Calendar scheduler — a mission-control feature (reads MC_DATA_DIR/calendar.json).
+  // OFF by default in the OSS build; set ARCHON_CALENDAR=1 to enable scheduled runs.
+  if (process.env.ARCHON_CALENDAR === '1') {
     checkCalendar()
-  }, 30000)
+    setInterval(() => {
+      checkCalendar()
+    }, 30000)
+    log('🗓️  Calendar scheduler enabled (ARCHON_CALENDAR=1)')
+  }
 
   // Stuck task watchdog
   setInterval(runStuckTaskWatchdog, 5 * 60 * 1000)

@@ -24,6 +24,7 @@
 
 'use strict'
 
+const os = require('os')
 const anthropicKey = require('../../../src/integrations/anthropic-key')
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -67,8 +68,9 @@ function buildSpawnEnv(opts = {}) {
   const env = {}
 
   // HOME — required so the CLI locates ~/.claude OAuth credentials (subscription auth).
-  // PM2 daemon contexts may lack HOME; OAuth creds live under /root/.claude.
-  env.HOME = process.env.HOME || '/root'
+  // Daemon contexts may lack HOME; fall back to the current user's home (os.homedir())
+  // rather than assuming root, so OAuth resolves for non-root/OSS installs.
+  env.HOME = process.env.HOME || os.homedir()
 
   // PATH — needed to locate sub-executables (node, npx, etc.)
   if (process.env.PATH) env.PATH = process.env.PATH

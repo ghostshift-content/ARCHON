@@ -79,9 +79,29 @@ limits, not metered API billing. Point `KURU_CLAUDE_BIN` at your local `claude` 
 |---|---|
 | `KURU_AGENTS_ROOT` | code root (where `event-bus.js`, `squads/` live) — usually the repo dir |
 | `KURU_INTEL_ROOT`  | data-layer root (runtime state); keep under the gitignored `var/` |
-| `KURU_CLAUDE_BIN`  | path to the `claude` CLI the agents spawn |
+| `KURU_CLAUDE_BIN`  | path to the `claude` CLI the agents spawn (default: resolve `claude` on `PATH`) |
 
 `var/` (all runtime state, reports, findings) is gitignored.
+
+Optional, off by default:
+
+| Var | Effect |
+|---|---|
+| `ARCHON_PORTAL_TOKEN` | require `Authorization: Bearer <token>` on `/api/*` — set it before exposing the portal beyond localhost |
+| `ARCHON_SCOPE_OVERRIDE=1` | allow a dispatch with **no** scope config (Phase 0.0 fails *closed* by default — a missing scope blocks the run) |
+| `ARCHON_CALENDAR=1` | enable the calendar scheduler (a mission-control feature; off in the OSS build) |
+| `KURU_MISSION_CONTROL_DATA` | path to an optional mission-control data dir (`agents.json`/`squads.json`/`calendar.json`); absent is fine — the pipeline has built-in role fallbacks |
+
+### Prerequisites & failure modes
+
+- **Claude CLI required.** Agents spawn `claude` (subscription/OAuth, `~/.claude`). The daemon
+  runs a boot preflight and warns clearly if it's missing — without it every dispatch fails. The
+  dashboard/API still serve so you can configure first.
+- **mission-control is optional.** The OSS build ships without it; the roster falls back to built-in
+  defaults, so an absent `KURU_MISSION_CONTROL_DATA` dir is expected.
+- **Local-operator security.** The portal binds `127.0.0.1` only. The data layer holds operator-entered
+  test credentials (engagement sidecars + briefs are written `0600`; `npm run setup` chmods the root
+  `0700`). Keep `var/` private; it is gitignored by default.
 
 ---
 

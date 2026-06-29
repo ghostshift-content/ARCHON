@@ -22,7 +22,9 @@
 const { spawn: nodeSpawn } = require('node:child_process')
 const { buildSpawnEnv } = require('./common')
 
-const CLAUDE_BIN = process.env.KURU_CLAUDE_BIN || '/root/.local/bin/claude'
+// Resolve via PATH by default ('claude') so non-root/OSS installs work; override
+// with an absolute path via KURU_CLAUDE_BIN.
+const CLAUDE_BIN = process.env.KURU_CLAUDE_BIN || 'claude'
 const DEFAULT_TIMEOUT_MS = 600000 // 10 minutes — matches event-bus seq dispatch
 
 /**
