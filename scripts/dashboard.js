@@ -15,6 +15,7 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const agentPaths = require('../paths')
+const { parseFindingsJsonl } = require('../src/pipeline/loose-jsonl')
 
 const INTEL = agentPaths.INTEL_ROOT
 const AGENTS = agentPaths.AGENTS_ROOT
@@ -391,7 +392,9 @@ function titleSev(s) {
   return 'Info'
 }
 function readJsonl(file) {
-  try { return fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean) }
+  // tolerant: agent findings are echo-written and routinely carry raw newlines /
+  // invalid escapes that break strict per-line JSON.parse — recover those records.
+  try { return parseFindingsJsonl(fs.readFileSync(file, 'utf8')) }
   catch { return [] }
 }
 // Build a raw HTTP request from method+url (and any curl headers/cookie/body).

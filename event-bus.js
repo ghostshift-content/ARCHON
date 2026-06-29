@@ -8177,9 +8177,9 @@ function ensureValidatedFindings(taskId) {
     const lf = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
     if (!fs.existsSync(lf)) return 0
     const { enforceContract } = require('./src/pipeline/evidence-contract')
+    const { parseFindingsJsonl } = require('./src/pipeline/loose-jsonl')
     const seen = new Set(); const records = []
-    for (const ln of fs.readFileSync(lf, 'utf8').trim().split('\n').filter(Boolean)) {
-      let f; try { f = JSON.parse(ln) } catch { continue }
+    for (const f of parseFindingsJsonl(fs.readFileSync(lf, 'utf8'))) {
       const key = `${(f.url || '').toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '')}|${(f.details || '').slice(0, 40)}`
       if (seen.has(key)) continue; seen.add(key)
       const evidenced = !!String(f.reproduction || f.details || '').trim()
