@@ -55,6 +55,18 @@ const now = Date.now()
   ok('snapshot.queue.stuckProcessing = 1', snap.queue.stuckProcessing === 1)
 }
 
+// 3b. terminal-task queue entry left 'processing' → auto-reconciled to completed
+{
+  const tmp = fixture()
+  fs.writeFileSync(path.join(tmp, 'tasks.json'), JSON.stringify([{ id: 't-4-dd', status: 'done' }]))
+  fs.writeFileSync(path.join(tmp, 'dispatch-queue.json'), JSON.stringify([{ id: 'd1', taskId: 't-4-dd', status: 'processing', processedAt: new Date(now - 5000).toISOString() }]))
+  fs.writeFileSync(path.join(tmp, 'task-heartbeats.json'), JSON.stringify({}))
+  const recon = []
+  const snap = runHealthPass({ intel: tmp, now, execSync: () => '', reconcileQueue: u => recon.push(u) })
+  ok('terminal-task queue entry reconciled', recon.length === 1 && recon[0]['t-4-dd'] === 'completed', JSON.stringify(recon))
+  ok('queue_integrity auto-fixed (terminal reconcile)', snap.checks.find(c => c.name === 'queue_integrity').autoFixed === true)
+}
+
 // 4. dispatch without a task → dispatch_integrity not-ok
 {
   const tmp = fixture()

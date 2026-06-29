@@ -10709,11 +10709,21 @@ function startWatcher() {
     } catch (e) { log(`⚠️ SENTINEL diagnostic failed: ${e.message}`) }
     finally { _sentinelInFlight = false }
   }
+  const _reconcileQueue = (updates) => {
+    try {
+      withFileLock(DISPATCH_FILE, () => {
+        const q = readJSON(DISPATCH_FILE) || []
+        let changed = false
+        for (const d of q) { const s = updates[String(d.taskId)]; if (s && d.status !== s) { d.status = s; changed = true } }
+        if (changed) writeJSON(DISPATCH_FILE, q)
+      })
+    } catch {}
+  }
   function _healthPass() {
     try {
       runHealthPass({
         intel: agentPaths.INTEL_ROOT, daemonStartMs: _supStart, escalateState: _escalateState,
-        writeCancelSignal: _writeCancelSignal, spawnDiagnostic: _spawnSentinel,
+        writeCancelSignal: _writeCancelSignal, reconcileQueue: _reconcileQueue, spawnDiagnostic: _spawnSentinel,
       })
     } catch (e) { log(`⚠️ health pass failed (non-fatal): ${e.message}`) }
   }

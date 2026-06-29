@@ -69,13 +69,31 @@ function runHealthPass(ctx = {}) {
   }
   add('cancel_integrity', zombies.length === 0, zombies.length ? `${zombies.length} cancelled task(s) still had live agents — re-cancelled` : 'no zombie cancelled tasks', zombies.length > 0)
 
-  // 2. QUEUE INTEGRITY: dispatch entries stuck 'processing' with no live agent (existing recovery owns the FIX).
+  // 2. QUEUE INTEGRITY.
+  // (a) AUTO-FIX: a queue entry left active ('processing'/'pending') whose TASK is already terminal
+  //     (done/cancelled/failed) — nothing marks the entry done when a task finishes. Reconcile it.
+  const terminal = {} // taskId -> the status to stamp on its queue entry
+  for (const t of tasks) {
+    const s = String(t.status || '')
+    if (s === 'done' || s === 'completed') terminal[String(t.id)] = 'completed'
+    else if (s === 'cancelled') terminal[String(t.id)] = 'cancelled'
+    else if (s === 'failed') terminal[String(t.id)] = 'failed'
+  }
+  const reconcilable = queue.filter(d => (d.status === 'processing' || d.status === 'pending') && terminal[String(d.taskId)])
+  if (reconcilable.length && typeof ctx.reconcileQueue === 'function') {
+    const updates = {}; for (const d of reconcilable) updates[String(d.taskId)] = terminal[String(d.taskId)]
+    try { ctx.reconcileQueue(updates); for (const d of reconcilable) fixes.push(`queue ${d.id} → ${updates[String(d.taskId)]} (task terminal)`) } catch {}
+  }
+  // (b) REPORT: genuinely stuck — 'processing' >15min, task NOT terminal, no live agent (processQueue reclaims).
   const stuckProcessing = queue.filter(d => {
-    if (d.status !== 'processing') return false
+    if (d.status !== 'processing' || terminal[String(d.taskId)]) return false
     const procMs = d.processedAt ? Date.parse(d.processedAt) : 0
     return procMs && (now - procMs) > STUCK_PROCESSING_MS && !(live[String(d.taskId)] > 0)
   })
-  add('queue_integrity', stuckProcessing.length === 0, stuckProcessing.length ? `${stuckProcessing.length} stuck 'processing' entr(ies) >15min — processQueue recovery should reclaim` : 'no stuck queue entries')
+  add('queue_integrity', stuckProcessing.length === 0,
+    stuckProcessing.length ? `${stuckProcessing.length} stuck 'processing' entr(ies) >15min — processQueue recovery should reclaim`
+      : (reconcilable.length ? `reconciled ${reconcilable.length} terminal-task queue entr(ies)` : 'queue consistent'),
+    reconcilable.length > 0)
 
   // 3. DISPATCH INTEGRITY: every active dispatch has a task (processQueue backfills it).
   const taskIds = new Set(tasks.map(t => String(t.id)))
