@@ -4945,9 +4945,11 @@ async function dispatchPentestParallel(dispatch) {
     })
     updateProgress(10, 'Phase 1: Recon running (SCOUT + RANGER)')
 
+    // maxRetries=0 for recon: recon is time-boxed (15min watchdog cap). A cap-kill must NOT
+    // re-spawn the agent for another 15min — that defeats the cap and lets recon run ~30min.
     const reconResults = await Promise.all(PENTEST_RECON.map(agent => {
       const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId])
-      return spawnWithRetry(agent, prompt, undefined)
+      return spawnWithRetry(agent, prompt, undefined, 0)
     }))
     trackCosts(reconResults)
 
