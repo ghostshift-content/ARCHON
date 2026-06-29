@@ -63,6 +63,9 @@ Open **http://localhost:4000 → New dispatch**, enter a target URL (and optiona
 directory), and dispatch. Watch progress under **Tasks**; triage under the run's **Findings** tab;
 read the **Report** tab when generated.
 
+For the full operator workflow — authorization checklist, field-by-field dispatch guide, and
+troubleshooting — see **[OPERATOR-RUNBOOK.md](./OPERATOR-RUNBOOK.md)**.
+
 ### Authentication — subscription, not API key
 
 Agents run the `claude` CLI, which authenticates with your **Claude subscription via OAuth**

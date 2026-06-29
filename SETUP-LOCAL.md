@@ -12,7 +12,7 @@ paths automatically.
 ## One-time setup
 
 ```bash
-npm install                       # deps: claude-agent-sdk, sdk, acorn, playwright
+npm install                       # deps: claude-agent-sdk, acorn (+ optional playwright)
 cp .env.local.example .env.local  # then edit the three paths inside
 npm run setup                     # scaffold + seed the local data layer (var/intel)
 ```
