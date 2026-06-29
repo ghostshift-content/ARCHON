@@ -153,6 +153,13 @@ function verifyChain(chain, opts = {}) {
         }
       }
 
+      // Capture the observed HTTP status (injected HTTP/STATUS marker, or the
+      // legacy status line for -i/-v steps) so chain evidence can report it.
+      // Reads the already-augmented stdout (post CORS-recheck replacement).
+      const _statusMatch = stdout.match(/HTTP\/STATUS\/(\d{3})/)
+        || stdout.match(/HTTP\/(?:1\.[01]|2|3)\s+(\d{3})/)
+      if (_statusMatch) stepRecord.http_status = Number(_statusMatch[1])
+
       // Match expected_result
       if (step.match_mode === 'semantic') {
         // 2026-05-12 (D1): keywords + status_code_range. Tolerant of variable
@@ -244,6 +251,10 @@ function verifyChains(chains, opts = {}) {
       severity: chain.severity || 'Unknown',
       mitre_technique: chain.mitre_technique || '',
       narrative: chain.narrative || '',
+      // Thread the Constructor's finding_ids through verification (r =
+      // {verified,stepResults,reason} has none) so the orphan guard can match
+      // chains against VALIDATED-FINDINGS instead of dropping every one.
+      finding_ids: Array.isArray(chain.finding_ids) ? chain.finding_ids.filter(Boolean) : [],
       ...r,
     })
   }

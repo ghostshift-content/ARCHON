@@ -230,5 +230,28 @@ test('stderr captured in stepRecord when present', () => {
   assert.ok(r.stepResults[0].stderr || r.stepResults[0].response, 'should capture something useful')
 })
 
+// Regression: verifyChains must PROPAGATE finding_ids onto each result so the
+// SCRIBE orphan guard can cross-check chains against VALIDATED-FINDINGS. Before
+// this fix the projection spread only {verified,stepResults,reason} and dropped
+// finding_ids, so the guard treated EVERY verified chain as an orphan and
+// discarded it (the entire chain-reporting path was dead).
+test('verifyChains propagates finding_ids onto each result (orphan-guard backing survives)', () => {
+  const result = cv.verifyChains([
+    { id: 'c1', name: 'c1', severity: 'High', finding_ids: ['F-1', 'F-2'], steps: [] },
+    { id: 'c2', name: 'c2', severity: 'Low', steps: [] }, // no finding_ids → []
+  ])
+  assert.deepStrictEqual(result.results[0].finding_ids, ['F-1', 'F-2'],
+    'finding_ids must survive verification')
+  assert.deepStrictEqual(result.results[1].finding_ids, [],
+    'missing finding_ids must normalize to []')
+})
+
+test('verifyChains filters falsy finding_ids', () => {
+  const result = cv.verifyChains([
+    { id: 'c3', name: 'c3', severity: 'High', finding_ids: ['F-1', '', null, 'F-3'], steps: [] },
+  ])
+  assert.deepStrictEqual(result.results[0].finding_ids, ['F-1', 'F-3'])
+})
+
 console.log(`\n${passed} passed, ${failures} failed`)
 process.exit(failures > 0 ? 1 : 0)

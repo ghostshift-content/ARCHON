@@ -6181,6 +6181,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
             impact: r.reason || '',
             verified: r.verified,
             mitre_technique: r.mitre_technique || '',
+            finding_ids: Array.isArray(r.finding_ids) ? r.finding_ids : [],
             stepResults: r.stepResults || [],
           }))
 
@@ -6216,7 +6217,7 @@ The output MUST validate against the schema. You cannot emit prose — only the 
               for (const chain of chainResults) {
                 const ids = chain.finding_ids || []
                 const evidence = chain.stepResults
-                  ? chain.stepResults.map(s => `${s.step_id}: ${s.matched ? 'matched' : 'no-match'} (${(s.http_status || '')}`).join('; ')
+                  ? chain.stepResults.map(s => `${s.step_id}: ${s.matched ? 'matched' : 'no-match'} (${s.http_status || '?'})`).join('; ')
                   : ''
                 for (const fid of ids) {
                   chainByFinding[fid] = { verified: chain.verified, evidence }
