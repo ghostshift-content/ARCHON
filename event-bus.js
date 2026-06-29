@@ -48,13 +48,18 @@ const { extractTargetUrl } = require('./src/utils/url-extractor')
 const { shouldEarlyExit, decisions: EARLY_EXIT_DECISIONS } = require('./src/pipeline/early-exit-decision')
 const { evaluateConvergence } = require('./agents/goal-evaluator')
 
-// (2026-06-04) AgentRunner port — chokepoint that replaces raw `claude --print`
-// spawn sites with runAgent(spec) → { text, usage, model, raw } (or throws).
-// Adapter selected by process.env.ADAPTER (default 'cli'). See agents/runner/.
+// ── Agent-run layering (intentional — these are TWO contracts, not redundant indirection) ──
+//   spawnAgent (orchestrator: model routing, watchdogs, retry, logging)
+//     ├─ legacy retry path  → bridgeSpawnAgent → runAgent → adapter (sdk|cli)
+//     └─ SDK-native sites    → runAgent directly → adapter
+// runAgent returns { text, usage, model, raw } (or throws) — the clean chokepoint
+// consumed directly by grader / goal-evaluator / verify+challenge sites.
+// bridgeSpawnAgent re-shapes that into the legacy { code, output, cost, model } and
+// NEVER throws, because spawnWithRetry keys its rate-limit/killed/return decisions off
+// `code` and scans the `output` envelope string (calculateCost + trajectory hooks).
+// Folding the two would break one set of consumers, so the seam stays. Default
+// adapter is 'sdk' (subscription OAuth, no API key); ADAPTER=cli is the rollback floor.
 const { runAgent, resolvedAdapterName } = require('./agents/runner/agent-runner')
-// (2026-06-04) Bridge — legacy { code, output, cost, model } shape over the port,
-// NEVER throws. Used by fire-and-forget call sites whose close-handler bodies key
-// off exit code + raw envelope string (sequential dispatch). See agents/runner/.
 const { bridgeSpawnAgent } = require('./agents/runner/run-agent-bridge')
 
 // (2026-05-09) Sprint C.1 trajectory observer — TrajAD-inspired specialist
