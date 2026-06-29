@@ -2901,6 +2901,49 @@ async function runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerpri
   }
 }
 
+// ── Stage 2b — gated Exploit-Prover (Phase 3.085) ────────────────────────────
+// For CONFIRMED exploitable findings, generate + fire a BENIGN env-specific
+// payload that PROVES impact (RCE → echo a nonce) → proof_of_execution. Fires
+// ONLY behind the active-poc 3-gate perimeter (engagement_mode + permission token
+// + ARCHON_ACTIVE_POC). Default = nothing fires.
+async function runExploitProver({ taskId, squad, projectId, taskConfig, fingerprint }) {
+  const prover = require('./src/pipeline/exploit-prover')
+  const policy = require('./agents/active-poc-policy')
+  const gate = prover.evaluateGate(taskConfig, { policy, phaseEnabled: (id) => phaseEnabled(id, squad) })
+  if (!gate.ok) {
+    log(`🎯 Phase 3.085 exploit-prover: no fire (impact proof gated off) — ${gate.reason}`)
+    return { proved: 0, skipped: gate.reason }
+  }
+  const vf = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
+  let findings = []
+  try { if (fs.existsSync(vf)) findings = fs.readFileSync(vf, 'utf8').trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean) } catch {}
+  const cap = Number(gate.permission && gate.permission.max_total_probes) || 5
+  const targets = findings.filter(f => prover.isExploitable(f)).slice(0, cap)
+  if (!targets.length) { log(`🎯 Phase 3.085: no exploitable confirmed findings to prove`); return { proved: 0 } }
+  const { randomBytes } = require('node:crypto')
+  let proved = 0; const proofs = []
+  for (const f of targets) {
+    try {
+      const nonce = 'ARCHONPOC-' + randomBytes(6).toString('hex')
+      const { text } = await runAgent({
+        agentName: 'EXPLOIT-PROVER', taskId, model: modelRouter.resolveFamily('balanced'),
+        effort: 'high', userPrompt: prover.buildProofPrompt(f, fingerprint, nonce), timeoutMs: 120000,
+      })
+      const proof = prover.parseProof(text, nonce)
+      f.proof_of_execution = proof
+      if (proof.confirmed) proved++
+      proofs.push({ id: f.id, confirmed: proof.confirmed, type: proof.type })
+      logActivity('EXPLOIT-PROVER', `🎯 Impact ${proof.confirmed ? 'PROVEN' : 'not proven'} for ${f.id} (${proof.type})`, {
+        type: 'exploit-proof', squad, taskId, projectId: projectId || '', details: String(proof.command).slice(0, 300),
+      })
+    } catch (e) { log(`⚠️ exploit-prover error on ${f.id} (non-fatal): ${e.message}`) }
+  }
+  try { fs.writeFileSync(`${agentPaths.INTEL_ROOT}/proof-of-execution-${taskId}.jsonl`, proofs.map(p => JSON.stringify(p)).join('\n') + (proofs.length ? '\n' : '')) } catch {}
+  try { fs.writeFileSync(vf, findings.map(x => JSON.stringify(x)).join('\n') + (findings.length ? '\n' : '')) } catch {} // back-annotate proof_of_execution
+  log(`🎯 Phase 3.085: exploit-prover — ${proved}/${targets.length} impact(s) PROVEN with a live benign payload`)
+  return { proved, attempted: targets.length }
+}
+
 // (2026-06-04) Compact one-line summary of an SDK stream message for the agent
 // stream file. The sdk adapter's onProgress fires with raw SDK message OBJECTS
 // (system/init, assistant, user, result, stream_event, ...). Dumping the raw
@@ -3767,6 +3810,7 @@ A verified chain of 2 mediums = 1 Critical in the report.
 ## CRITICAL LENGTH REQUIREMENT (Opus 4.7 reminder)
 Opus 4.7 defaults to shorter responses than prior models. This report is an EXCEPTION — it must be comprehensive and detailed.
 Required output: 40KB+ markdown, all 8 sections fully populated, complete reproduction curl commands per finding, full CVSS:3.1 vectors (AV:N/AC:L/...), OWASP category mapping, defensive config snippets.
+Per finding, ALWAYS include the concrete IMPACT (the finding's "impact" field — what an attacker actually gains). If a finding has a "proof_of_execution" (from the gated Exploit-Prover), show it as a PROOF OF IMPACT block: the exact benign payload/command fired and the response proving execution (nonce). Mark such findings "Impact PROVEN (live PoC)" — these are the strongest evidence in the report.
 Do NOT abbreviate. Do NOT summarize findings. Do NOT skip sections. The reader is a senior security engineer who needs every detail to fix the issues.
 
 ${goalSection}${MUST_GATES}
@@ -5683,6 +5727,12 @@ Be brief and specific. This is an adversarial check.`
     } catch (auditorBuilderErr) {
       log(`⚠️ Phase 3.05 auditor-validated-builder error (non-fatal): ${auditorBuilderErr.message}`)
     }
+
+    // ── PHASE 3.085 — Exploit-Prover: demonstrate impact with a benign env-specific
+    // payload (gated behind the active-poc perimeter; default fires nothing) ──
+    try {
+      await runExploitProver({ taskId, squad, projectId, taskConfig: (typeof taskConfig === 'object' && taskConfig) || {}, fingerprint: envFingerprint })
+    } catch (proverErr) { log(`⚠️ Phase 3.085 wrapper error (non-fatal): ${proverErr.message}`) }
 
     // ── PHASE 3.4: Build Attack Graph + Validate with AUDITOR results (Level 3) ──
     let graphContext = ''
