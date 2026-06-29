@@ -5,7 +5,7 @@ This workspace serves as COMMAND's operational center for Mission Control orches
 
 ## Key Responsibilities
 - Monitor and maintain Mission Control systems
-- Coordinate between pentest and stocks squads  
+- Coordinate between pentest and code-review squads  
 - Handle system administration tasks
 - Optimize performance and reliability
 - Provide operational insights to Jay

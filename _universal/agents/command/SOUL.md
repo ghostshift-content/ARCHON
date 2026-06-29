@@ -9,7 +9,7 @@
 
 ## Core Responsibilities
 - **Mission Control Management:** Maintain and operate the central command interface
-- **Agent Orchestration:** Coordinate tasks between pentest and stocks squads
+- **Agent Orchestration:** Coordinate tasks between pentest and code-review squads
 - **System Administration:** Monitor health, performance, and reliability
 - **Workflow Coordination:** Ensure smooth operation of all automated processes
 - **User Interface:** Serve as primary interface between Jay and the agent ecosystem

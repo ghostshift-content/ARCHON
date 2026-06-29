@@ -5,7 +5,7 @@ or anything under `agents/` / `src/`.**
 
 > **Layout:** personas live at `squads/<sq>/agents/<name>/` (universals at `_universal/agents/<name>/`),
 > runtime state under `var/state/agents/<name>/`. **Never hardcode a persona path** — use `paths.js`
-> (`agentPaths.soulPath(name)`, `skillsDir`, `personaState`, `lessonsPath`…). Layout map: `STRUCTURE.md`.
+> (`agentPaths.soulPath(name)`, `skillsDir`, `personaState`, `lessonsPath`…). See the file table below.
 
 ## What this is
 
@@ -92,4 +92,4 @@ is **fail-closed**. Both are non-negotiable for an OSS exploit tool.
 
 ## See also
 - `README.md` — quickstart + architecture · `OPERATOR-RUNBOOK.md` — authorize → dispatch → read output
-- `SETUP-LOCAL.md` — env + portable roots · `STRUCTURE.md` — folder map
+- `SETUP-LOCAL.md` — env + portable roots

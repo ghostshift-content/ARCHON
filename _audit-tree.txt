@@ -1,0 +1,353 @@
+.
+├── agents
+│   ├── active-poc-library
+│   │   ├── cloud-security
+│   │   ├── network-pentest
+│   │   └── pentest
+│   ├── active-poc-policy.js
+│   ├── active-poc-runner.js
+│   ├── auditor-validated-builder.js
+│   ├── browser-evaluate-ast.js
+│   ├── browser-recipe-validator.js
+│   ├── browser-verifier.js
+│   ├── dossier-selector.js
+│   ├── endpoint-analyzer.js
+│   ├── finding-schema.js
+│   ├── goal-evaluator.js
+│   ├── handoff-end-to-end-monitor.js
+│   ├── handoff-marker-parser.js
+│   ├── handoff-protocol.js
+│   ├── handoff-resolver.js
+│   ├── isa-grader.js
+│   ├── js-bundle-analyzer-ast.js
+│   ├── js-bundle-analyzer.js
+│   ├── judge-verifier.js
+│   ├── llm-model-resolver.js
+│   ├── long-running-spawn.js
+│   ├── model-config.js
+│   ├── pentest-browser-recipe-constructor.js
+│   ├── phase-envelope.js
+│   ├── poc-evidence-capture.js
+│   ├── prod-endpoint-validator.js
+│   ├── redirect-aware-curl.js
+│   ├── review-queue.js
+│   ├── rule-based-handoff-generator.js
+│   ├── runner
+│   │   ├── adapters
+│   │   ├── agent-runner.js
+│   │   └── run-agent-bridge.js
+│   ├── scope-prevalidator.js
+│   ├── scope-validator.js
+│   ├── scribe-chain-orphan-guard.js
+│   ├── severity-profile.js
+│   ├── squad-config-loader.js
+│   ├── squad-policy
+│   │   ├── code-review.js
+│   │   └── pentest.js
+│   ├── squads
+│   │   ├── code-review
+│   │   └── pentest
+│   ├── suppression-ledger.js
+│   ├── tech-affinity.js
+│   ├── trajectory-observer.js
+│   └── url-extractor.js
+├── _audit-tree.txt
+├── CLAUDE.md
+├── common
+│   ├── captcha
+│   │   ├── captcha_handler.py
+│   │   ├── captcha_methodology.md
+│   │   ├── __init__.py
+│   │   ├── README.md
+│   │   └── session_store.py
+│   ├── config
+│   │   ├── authorization_checklist.md
+│   │   └── scope_template.yaml
+│   ├── payloads
+│   │   ├── command_injection.txt
+│   │   ├── command_injection.yaml
+│   │   ├── cors_misconfig.txt
+│   │   ├── cors_misconfig.yaml
+│   │   ├── crlf_injection.txt
+│   │   ├── crlf_injection.yaml
+│   │   ├── deserialization.txt
+│   │   ├── deserialization.yaml
+│   │   ├── graphql.txt
+│   │   ├── graphql.yaml
+│   │   ├── http_smuggling.txt
+│   │   ├── http_smuggling.yaml
+│   │   ├── jwt_attacks.txt
+│   │   ├── jwt_attacks.yaml
+│   │   ├── ldap_injection.txt
+│   │   ├── ldap_injection.yaml
+│   │   ├── nosql_injection.txt
+│   │   ├── nosql_injection.yaml
+│   │   ├── ognl_injection.txt
+│   │   ├── ognl_injection.yaml
+│   │   ├── path_traversal.txt
+│   │   ├── path_traversal.yaml
+│   │   ├── prototype_pollution.txt
+│   │   ├── prototype_pollution.yaml
+│   │   ├── sqli.txt
+│   │   ├── sqli.yaml
+│   │   ├── ssrf.txt
+│   │   ├── ssrf.yaml
+│   │   ├── ssti.txt
+│   │   ├── ssti.yaml
+│   │   ├── websocket.txt
+│   │   ├── websocket.yaml
+│   │   ├── xss.txt
+│   │   ├── xss.yaml
+│   │   ├── xxe.txt
+│   │   └── xxe.yaml
+│   ├── remediation
+│   │   ├── api_remediation.yaml
+│   │   ├── auth_remediation.yaml
+│   │   ├── config_remediation.yaml
+│   │   ├── injection_remediation.yaml
+│   │   ├── ssrf_remediation.yaml
+│   │   └── xss_remediation.yaml
+│   ├── reporting
+│   │   ├── finding_schema.json
+│   │   ├── report_generator.py
+│   │   └── reporting_guide.md
+│   └── taxonomy
+│       ├── cwe_top100.yaml
+│       ├── owasp_api_2023.yaml
+│       ├── owasp_llm_2025.yaml
+│       ├── owasp_mobile_2024.yaml
+│       └── owasp_web_2021.yaml
+├── eval
+│   └── recall-fixtures.jsonl
+├── event-bus.js
+├── layout.config.json
+├── LICENSE
+├── ownership.json
+├── package.json
+├── package-lock.json
+├── paths.js
+├── pre-commit-check.sh
+├── PROGRESS.md
+├── prompts
+│   ├── chain-analysis
+│   │   └── v1.md
+│   └── specialist
+│       └── v1.md
+├── README.md
+├── scripts
+│   ├── auto-dispatch-stocks.sh
+│   ├── backup-agent-state.sh
+│   ├── build-ds-export.js
+│   ├── changelog-watch-cron.sh
+│   ├── check-missions.sh
+│   ├── dashboard.js
+│   ├── e2e.sh
+│   ├── g4-metrics.js
+│   ├── g4-report.js
+│   ├── generate-dossiers.sh
+│   ├── kurukshetra-verify-loop.sh
+│   ├── midcap-monitor.sh
+│   ├── nifty-runner.sh
+│   ├── notify-completion.sh
+│   ├── phase38-retro-validate.sh
+│   ├── phase38-runtime-smoke.sh
+│   ├── process-handoff.js
+│   ├── recall-probe.js
+│   ├── run-judge-verifier.js
+│   ├── sequential-dispatch.sh
+│   ├── setup-local.js
+│   ├── smoke-handoff.js
+│   └── telegram-doctor.sh
+├── SETUP-LOCAL.md
+├── squads
+│   ├── code-review
+│   │   ├── agents
+│   │   └── methodology
+│   └── pentest
+│       ├── agents
+│       ├── capabilities.json
+│       └── methodology
+├── src
+│   ├── core
+│   │   └── squad-framework.js
+│   ├── dispatch
+│   │   └── code-review-dispatcher.js
+│   ├── grading
+│   │   ├── finding-validator.js
+│   │   ├── gold-set.js
+│   │   └── grader.js
+│   ├── integrations
+│   │   ├── anthropic-key.js
+│   │   ├── langfuse-tracer.js
+│   │   ├── notifier.js
+│   │   ├── quota-manager.js
+│   │   └── tracer.js
+│   ├── learning
+│   │   ├── feedback-loop.js
+│   │   ├── memory-ranker.js
+│   │   └── versioned-memory.js
+│   ├── pipeline
+│   │   ├── attack-graph.js
+│   │   ├── chain-verifier.js
+│   │   ├── cross-view-dedup.js
+│   │   ├── early-exit-decision.js
+│   │   ├── evidence-completeness.js
+│   │   └── pentest-phases.js
+│   ├── rendering
+│   │   └── prompt-renderer.js
+│   ├── routing
+│   │   ├── model-router.js
+│   │   └── target-classifier.js
+│   ├── safety
+│   │   ├── offensive-vaccine.js
+│   │   ├── scrub-baseline.js
+│   │   ├── scrub-goal-paths.js
+│   │   └── thrash-quarantine.js
+│   └── utils
+│       ├── task-log.js
+│       └── url-extractor.js
+├── STRUCTURE.md
+├── test
+│   ├── active-poc-csrf-bypass.test.js
+│   ├── active-poc-e2e.test.js
+│   ├── active-poc-log-injection.test.js
+│   ├── active-poc-pii-snapshot.test.js
+│   ├── active-poc-policy.test.js
+│   ├── active-poc-port-confirm.test.js
+│   ├── active-poc-runner.test.js
+│   ├── active-poc-s3-public-read.test.js
+│   ├── active-poc-vpn-no-lockout.test.js
+│   ├── agent-runner.test.js
+│   ├── anthropic-key.test.js
+│   ├── arbiter-verify-prompt.test.js
+│   ├── archon-api.test.js
+│   ├── auditor-validated-builder-new-format.test.js
+│   ├── auditor-validated-builder.test.js
+│   ├── browser-cors-recipe.test.js
+│   ├── browser-evaluate-ast.test.js
+│   ├── browser-recipe-validator.test.js
+│   ├── browser-verifier.test.js
+│   ├── chain-verifier-semantic-match.test.js
+│   ├── chain-verifier.test.js
+│   ├── code-review-dispatcher-integration.test.js
+│   ├── context-inventory.test.js
+│   ├── cross-view-dedup.test.js
+│   ├── cvss.test.js
+│   ├── early-exit-decision.test.js
+│   ├── endpoint-analyzer.test.js
+│   ├── engagement.test.js
+│   ├── event-bus-g3-inline-heartbeat.test.js
+│   ├── event-bus-handoff-marker-wiring.test.js
+│   ├── event-bus-phase38-wiring.test.js
+│   ├── event-bus-phase-3-9-path-fix.test.js
+│   ├── event-bus-phase-3-9-wiring.test.js
+│   ├── event-bus-phase-a3-async.test.js
+│   ├── event-bus-task-actions-dedup.test.js
+│   ├── event-bus-tracer-verifying.test.js
+│   ├── event-bus-trajectory-wiring.test.js
+│   ├── evidence-completeness.test.js
+│   ├── extract-target-priority.test.js
+│   ├── finding-schema.test.js
+│   ├── finding-validator.test.js
+│   ├── fixtures
+│   │   └── browser-validator
+│   ├── fresh-eyes.test.js
+│   ├── g4-end-to-end.test.js
+│   ├── g4-metrics.test.js
+│   ├── g4-report.test.js
+│   ├── gate-80-severity-profile.test.js
+│   ├── gate-81-scope-prevalidator.test.js
+│   ├── gate-86-canonical-url.test.js
+│   ├── gate-87-scope-validator-fallback.test.js
+│   ├── gate-88-program-type-resolver.test.js
+│   ├── gate-89-redirect-aware-chain.test.js
+│   ├── gate-90-browser-cors-recipe.test.js
+│   ├── gate-91-scribe-chain-orphan-guard.test.js
+│   ├── gate-92-chain-schema-finding-ids.test.js
+│   ├── gitlab-bfla-regression.test.js
+│   ├── gitlab-fp-v2-regression.test.js
+│   ├── goal-evaluator.test.js
+│   ├── grader.test.js
+│   ├── handoff-cost-caps.test.js
+│   ├── handoff-end-to-end-monitor.test.js
+│   ├── handoff-marker-parser.test.js
+│   ├── handoff-protocol.test.js
+│   ├── handoff-resolver.test.js
+│   ├── handoff-watcher.test.js
+│   ├── js-bundle-analyzer-ast.test.js
+│   ├── js-bundle-analyzer.test.js
+│   ├── judge-verifier-promotion.test.js
+│   ├── judge-verifier.test.js
+│   ├── llm-model-resolver.test.js
+│   ├── long-running-spawn.test.js
+│   ├── model-config.test.js
+│   ├── model-router-profile-override.test.js
+│   ├── no-hardcoded-model-strings.test.js
+│   ├── pentest-browser-recipe-constructor-parser.test.js
+│   ├── pentest-browser-recipe-constructor.test.js
+│   ├── pentest-phases.test.js
+│   ├── pentest-scope.test.js
+│   ├── phase-envelope.test.js
+│   ├── pipeline-completeness-provider.test.js
+│   ├── poc-evidence-capture.test.js
+│   ├── process-handoff-create.test.js
+│   ├── prod-endpoint-validator.test.js
+│   ├── prompt-renderer.test.js
+│   ├── publication-banner.test.js
+│   ├── publication-blocking-gate.test.js
+│   ├── quarantine-thrash.test.js
+│   ├── redirect-aware-curl.test.js
+│   ├── retry-cancel-guard.test.js
+│   ├── rule-based-handoff-e2e.test.js
+│   ├── rule-based-handoff-generator.test.js
+│   ├── run-agent-bridge.test.js
+│   ├── run-all.js
+│   ├── run-judge-verifier.test.js
+│   ├── savereport-taskid-match.test.js
+│   ├── scope-fail-closed.test.js
+│   ├── scope-validator.test.js
+│   ├── scribe-chain-orphan-guard.test.js
+│   ├── scribe-prompt-browser-aware.test.js
+│   ├── scribe-prompt-handoff-aware.test.js
+│   ├── scribe-prompt-judge-aware.test.js
+│   ├── scribe-trajectory-aware.test.js
+│   ├── scrub-baseline.test.js
+│   ├── scrub-goal-paths.test.js
+│   ├── sdk-no-api-key.test.js
+│   ├── severity-profile.test.js
+│   ├── specialist-prompt-handoff.test.js
+│   ├── squad-config-loader.test.js
+│   ├── suppression-ledger.test.js
+│   ├── target-classifier.test.js
+│   ├── task-log.test.js
+│   ├── tech-affinity.test.js
+│   ├── tech-detection.test.js
+│   ├── threat-model-provider.test.js
+│   ├── threat-model.test.js
+│   ├── trajectory-observer-concurrency.test.js
+│   ├── trajectory-observer.test.js
+│   ├── ui-engagement.e2e.js
+│   ├── ui-findings.e2e.js
+│   ├── ui-flows.e2e.js
+│   ├── ui-mode.e2e.js
+│   ├── ui-smoke.e2e.js
+│   ├── ui-whitebox.e2e.js
+│   ├── url-extractor-shared.test.js
+│   └── url-extractor.test.js
+├── tools
+│   ├── _codemod-roots.js
+│   ├── test-clean-report.js
+│   └── test-phase35-replay.js
+├── ui
+│   ├── app.css
+│   ├── app.js
+│   ├── cvss.js
+│   └── index.html
+└── _universal
+    └── agents
+        ├── arbiter
+        ├── auditor
+        ├── command
+        └── scribe
+
+53 directories, 298 files
