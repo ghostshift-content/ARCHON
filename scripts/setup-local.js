@@ -79,11 +79,11 @@ const CONFIGS = {
     // 'vuln_specialist' (balanced/high) — a safe default.
     agent_roles: {
       scout: 'recon', ranger: 'recon', tracer: 'recon',
-      atlas: 'chain_analysis', chanakya: 'stock_leader',
+      atlas: 'chain_analysis', curator: 'chain_analysis',
       auditor: 'verification', arbiter: 'validation', scribe: 'report',
     },
     complexity_scoring: { signals: [], tiers: [] },
-    deny_family_downgrade_for: ['auditor', 'atlas', 'chanakya', 'scribe', 'arbiter'],
+    deny_family_downgrade_for: ['auditor', 'atlas', 'curator', 'scribe', 'arbiter'],
   },
   'grader-config.json': {
     enabled: true,

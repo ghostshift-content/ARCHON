@@ -1901,20 +1901,6 @@ const CUSTOM_AGENT_TITLES = {
   'FORGE': 'SSTI Specialist',
   'DECOY': 'CSRF Specialist',
   'SPECTRE': 'XXE Specialist',
-  // Network pentest
-  'SHALYA': 'Network Pentest Lead',
-  'GHATOTKACHA': 'Network Service Analyst',
-  // Red team
-  'PARASHURAMA': 'Red Team Lead',
-  'INDRA': 'Active Directory Specialist',
-  // Cloud security
-  'VARUNA': 'Cloud Security Lead',
-  'AGNI': 'AWS Specialist',
-  'KUBERA': 'Container Security Specialist',
-  'MITRA': 'GCP Specialist',
-  'SOMA': 'Azure Specialist',
-  // AI security
-  'MAYA': 'AI Security Specialist',
 }
 
 let _agentReplacementsCache = null
