@@ -4910,7 +4910,7 @@ async function dispatchPentestParallel(dispatch) {
       })
       updateProgress(15, 'Recon skipped — direct to specialists')
     } else {
-    if (_isTaskCancelled(taskId)) { log(`🛑 Task ${taskId} cancelled — halting before Phase 1 recon`); killTaskChildren(taskId, 'cancelled'); return }
+    if (_isTaskCancelled(taskId)) { log(`🛑 Task ${taskId} cancelled — halting before Phase 1 recon`); killTaskChildren(taskId, 'cancelled'); return { totalCost, allCosts } }
     log(`🔄 Phase 1: Dispatching recon agents (${PENTEST_RECON.map(a => a.toUpperCase()).join(', ')})`)
     logActivity('NEXUS', `🔄 Phase 1: Recon — ${PENTEST_RECON.map(a => a.toUpperCase()).join(', ')}`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
@@ -5285,7 +5285,7 @@ async function dispatchPentestParallel(dispatch) {
     // Reflexion critique generated from wave 1 findings.
     // Wave 2 (batches 3+4 merged): second-half specialists run in parallel WITH critique.
     // Old: 4 sequential awaits = ~65min wall. New: 2 parallel waves = ~35min wall.
-    if (_isTaskCancelled(taskId)) { log(`🛑 Task ${taskId} cancelled — halting before Phase 2 specialists`); killTaskChildren(taskId, 'cancelled'); return }
+    if (_isTaskCancelled(taskId)) { log(`🛑 Task ${taskId} cancelled — halting before Phase 2 specialists`); killTaskChildren(taskId, 'cancelled'); return { totalCost, allCosts } }
     const wave1Agents = [...PENTEST_VULN_BATCH1_dyn, ...PENTEST_VULN_BATCH2_dyn]
     const wave2Agents = [...PENTEST_VULN_BATCH3_dyn, ...PENTEST_VULN_BATCH4_dyn]
 
@@ -8720,6 +8720,14 @@ async function dispatchToAgent(dispatch) {
     // PARALLEL EXECUTION for security-testing squads (pentest, red-team, cloud-security, etc.)
     try {
       const { totalCost, allCosts } = await dispatchPentestParallel(dispatch)
+
+      // Cancelled mid-flight → stop here: keep status 'cancelled', no grading/report/'done'.
+      if (_isTaskCancelled(taskId)) {
+        log(`🛑 ${taskId} was cancelled — skipping grading + report`)
+        try { runningTasks.delete(taskId) } catch {}
+        setTimeout(() => processQueue(), 1500)
+        return
+      }
 
       // Triage gate: if the pipeline stopped before the report (awaiting operator
       // triage), do NOT grade or mark done — the report doesn't exist yet. The
