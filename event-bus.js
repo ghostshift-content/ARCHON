@@ -3597,10 +3597,12 @@ Read endpoints: cat ${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json 2>
 Read endpoint-models (Phase 1.8): cat ${agentPaths.INTEL_ROOT}/endpoint-models-${taskId}.jsonl 2>/dev/null
 Read env fingerprint (Phase 0.6): cat ${agentPaths.INTEL_ROOT}/env-fingerprint-${taskId}.json 2>/dev/null
 Read attack plan (Phase 1.9): cat ${agentPaths.INTEL_ROOT}/attack-plan-${taskId}.json 2>/dev/null
+Read WAF bypass reference (use when a WAF vendor is named): cat ${agentPaths.AGENTS_ROOT}/agents/refs/waf-bypass.md 2>/dev/null
 Read memory: cat ${agentPaths.lessonsPath(agentLower)} 2>/dev/null
 
 ## CROSS-COLLABORATION — share findings for other agents to chain off
-echo '{"agent":"${agentUpper}","type":"confirmed|suspected|surface","url":"URL","relation":"backend-of|redirect-to|api-for|subdomain-of|same-app","parent":"${targetUrl}","auth":"none|cookie|bearer|saml|azure-ad|custom","tested":["what-you-tested"],"not_tested":["what-remains"],"details":"WHAT_YOU_FOUND","severity":"critical|high|medium|low|info","confidence":"high|medium|low","reproduction":"EXACT_CURL_COMMAND_OR_STEPS"}' >> ${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl
+echo '{"agent":"${agentUpper}","type":"confirmed|suspected|surface","url":"URL","relation":"backend-of|redirect-to|api-for|subdomain-of|same-app","parent":"${targetUrl}","auth":"none|cookie|bearer|saml|azure-ad|custom","tested":["what-you-tested"],"not_tested":["what-remains"],"details":"WHAT_YOU_FOUND","severity":"critical|high|medium|low|info","confidence":"high|medium|low","impact":"WHAT_AN_ATTACKER_GAINS_concretely","reproduction":"EXACT_CURL_COMMAND_OR_STEPS","payloads_tried":["each payload incl WAF-bypass mutations + which landed"]}' >> ${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl
+On every CONFIRMED finding you MUST fill "impact" with the concrete attacker gain (e.g. "read any user's invoices via IDOR", "execute OS commands as www-data"), not just the severity word.
 Always populate \`tested\` + \`not_tested\` so other agents know the gaps.
 
 ## CREATIVE ATTACK PHASE — after your skill's standard checks

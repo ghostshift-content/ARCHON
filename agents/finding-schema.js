@@ -72,6 +72,18 @@ function normalizeFinding(finding) {
     }
   }
 
+  // Autonomy fields (optional, pass through via the spread above):
+  //   impact            — concrete attacker gain (always set on CONFIRMED findings)
+  //   proof_of_execution — { type, command, output, nonce, confirmed:bool } from the gated exploit-prover
+  //   payloads_tried    — every payload incl WAF-bypass mutations + which landed
+  // Coerce their types defensively so downstream consumers can trust them.
+  if (f.proof_of_execution != null && typeof f.proof_of_execution === 'object') {
+    f.proof_of_execution.confirmed = f.proof_of_execution.confirmed === true
+  }
+  if (f.payloads_tried != null && !Array.isArray(f.payloads_tried)) {
+    f.payloads_tried = [String(f.payloads_tried)]
+  }
+
   return f
 }
 
