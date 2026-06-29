@@ -60,11 +60,10 @@ function correlate(findings) {
 }
 
 // Load findings across iterations, group, write correlation-<taskId>.json.
-// deps: { intelRoot, log?, now? } — now() injectable for deterministic tests.
+// deps: { intelRoot, log? }
 function buildCorrelationMap(taskId, iters, deps = {}) {
   const intelRoot = deps.intelRoot
   const log = deps.log || (() => {})
-  const now = deps.now || (() => new Date().toISOString())
   const all = []
   for (const it of iters || []) {
     const vf = `${intelRoot}/VALIDATED-FINDINGS-${it.taskId}.jsonl`
@@ -79,7 +78,7 @@ function buildCorrelationMap(taskId, iters, deps = {}) {
     }
   }
   const { exact_duplicate_groups, cross_view_candidates } = correlate(all)
-  const map = { taskId, generatedAt: now(), raw_count: all.length, exact_duplicate_groups, cross_view_candidates }
+  const map = { taskId, generatedAt: new Date().toISOString(), raw_count: all.length, exact_duplicate_groups, cross_view_candidates }
   try { fs.writeFileSync(`${intelRoot}/correlation-${taskId}.json`, JSON.stringify(map, null, 2)) } catch {}
   log(`🔗 Correlation: ${all.length} findings → ${exact_duplicate_groups.length} exact-dup group(s), ${cross_view_candidates.length} cross-view class candidate(s)`)
   return map

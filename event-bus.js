@@ -7861,10 +7861,7 @@ EVERY line MUST include "taskId":"${taskId}" and "validation_status":"CONFIRMED"
 // Deterministic cross-view de-dup (combined white-box + black-box) — see
 // src/pipeline/cross-view-dedup.js. Writes correlation-<taskId>.json so SCRIBE
 // merges within scripted groupings instead of guessing.
-const { buildCorrelationMap: _buildCorrelationMap } = require('./src/pipeline/cross-view-dedup')
-function buildCorrelationMap(taskId, iters) {
-  return _buildCorrelationMap(taskId, iters, { intelRoot: agentPaths.INTEL_ROOT, log })
-}
+const { buildCorrelationMap } = require('./src/pipeline/cross-view-dedup')
 
 // ── Triage gate: generate the report on operator command (2026-06-17) ──
 // Runs SCRIBE standalone on the already-produced findings, filtered by the
@@ -7909,7 +7906,7 @@ async function generateReportForTask(taskId) {
       // Deterministic pre-pass: write correlation-<taskId>.json and make SCRIBE
       // merge ONLY within those scripted groupings (no free-form correlation).
       let _corr = null
-      try { _corr = buildCorrelationMap(taskId, iters) } catch (e) { log(`⚠️ correlation map failed (non-fatal): ${e.message}`) }
+      try { _corr = buildCorrelationMap(taskId, iters, { intelRoot: agentPaths.INTEL_ROOT, log }) } catch (e) { log(`⚠️ correlation map failed (non-fatal): ${e.message}`) }
       prompt += `\n\n## CROSS-VIEW CORRELATION + DE-DUPLICATION (AUTHORITATIVE)\nThis engagement tested ONE system two ways — WHITE-BOX (source, file:line evidence) and BLACK-BOX (live, HTTP/URL evidence). Many findings are the SAME vulnerability from both sides. Correlate by root cause (same code path / endpoint / parameter / vuln class):\n- A vulnerability reported white-box AND black-box is ONE finding, NOT two — merge into a single entry carrying BOTH evidences (source file:line + fix from white-box, raw HTTP/curl/PROBER repro from black-box), label it "Confirmed white-box + black-box", and use the WORSE severity/CVSS.\n- White-box-only → label "Source-confirmed (white-box)". Black-box-only → label "Runtime-confirmed (black-box)".\n- Emit a CORRELATION TABLE (finding | white-box evidence | black-box evidence | merged severity) BEFORE the detailed findings.\n- All executive summary counts MUST reflect the DE-DUPLICATED finding set, not the raw per-iteration totals.`
       if (_corr) {
         prompt += `\n\n## DETERMINISTIC CORRELATION SPINE (read FIRST — authoritative)\nA scripted pass already grouped the findings → read ${agentPaths.INTEL_ROOT}/correlation-${taskId}.json and use it as the backbone of the de-dup:\n- "exact_duplicate_groups": findings that share {view, vuln-class, locus, param} — emit each group as exactly ONE finding (keep the listed "keep" id, drop the "dropped" ids).\n- "cross_view_candidates": per vuln-class, the white-box vs black-box findings that may be the SAME root cause. Confirm by reading each one's evidence, then merge true matches into one "Confirmed white-box + black-box" entry (worst severity). Findings NOT grouped here stay separate — do NOT invent correlations beyond these candidates.\nYour CORRELATION TABLE + executive counts MUST be consistent with this de-duplicated set.`
