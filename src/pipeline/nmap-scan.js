@@ -50,9 +50,11 @@ function httpServicesOf(host, ports) {
   return [...new Set(urls)]
 }
 
-function runNmapScan(target, { timeoutMs = 8 * 60 * 1000 } = {}) {
+function runNmapScan(target, { timeoutMs = 8 * 60 * 1000, ip } = {}) {
   return new Promise(resolve => {
-    const host = extractHost(target)
+    // scan the box IP when given (hostname targets that aren't in DNS); else the URL host.
+    // httpServices still report the original host so the vhost flows downstream.
+    const host = (ip && /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) ? ip : extractHost(target)
     if (!host || !/^[a-zA-Z0-9.\-]+$/.test(host)) {
       return resolve({ ok: false, host, error: 'invalid host', ports: [], httpServices: [] })
     }

@@ -2315,7 +2315,26 @@ async function _runtracerAgentInner(target, taskId) {
 
   log(`🕷️  TRACER crawl4ai: ${sTarget} → ${outDir}`)
 
-  const host = (() => { try { return safeHost(new URL(target).hostname) } catch(e) { return safeHost(target) } })()
+  let host = (() => { try { return safeHost(new URL(target).hostname) } catch(e) { return safeHost(target) } })()
+
+  // canonical-target (Phase 0.45): if a vhost was pinned, crawl the IP with a Host header so
+  // CLI tools resolve (the vhost isn't in DNS). _hHdr is appended to katana/ffuf.
+  let _crawlTarget = sTarget, _hHdr = ''
+  try {
+    const cf = `${agentPaths.INTEL_ROOT}/canonical-target-${sTaskId}.json`
+    if (fs.existsSync(cf)) {
+      const c = JSON.parse(fs.readFileSync(cf, 'utf-8'))
+      if (c && c.vhost && c.ip && c.requires_host_header) {
+        const portPart = ((c.scheme === 'https' && c.port === 443) || (c.scheme === 'http' && c.port === 80)) ? '' : ':' + c.port
+        _crawlTarget = safeUrl(`${c.scheme}://${c.ip}${portPart}`)
+        _hHdr = ` -H "Host: ${safeHost(c.vhost)}"`
+        host = safeHost(c.vhost)
+        log(`   🎯 crawl pinned to vhost ${c.vhost} via Host header on ${c.ip}`)
+      } else if (c && c.canonical_url) {
+        _crawlTarget = safeUrl(c.canonical_url)
+      }
+    }
+  } catch {}
 
   const run = (cmd, timeout) => {
     let result = ''
@@ -2339,7 +2358,7 @@ async function _runtracerAgentInner(target, taskId) {
   try {
     fs.mkdirSync(outDir, { recursive: true })
     log(`   Phase A1: katana fast crawl (no browser)...`)
-    const katanaOut = run(`katana -u "${sTarget}" -d 3 -jc -jsl -aff -o ${outDir}/katana-urls.txt 2>/dev/null`, 120000)
+    const katanaOut = run(`katana -u "${_crawlTarget}"${_hHdr} -d 3 -jc -jsl -aff -o ${outDir}/katana-urls.txt 2>/dev/null`, 120000)
     const katanaUrls = fs.existsSync(`${outDir}/katana-urls.txt`) ? fs.readFileSync(`${outDir}/katana-urls.txt`, 'utf-8').trim().split('\n').filter(Boolean) : []
     log(`   katana: ${katanaUrls.length} URLs`)
 
@@ -2449,7 +2468,7 @@ async function _runtracerAgentInner(target, taskId) {
     log(`🔄 Running fallback crawl tools (katana + ffuf)...`)
     try {
       const tmpKatana = `/tmp/ek-${sTaskId}-katana.txt`
-      run(`katana -u "${sTarget}" -d 4 -jc -aff -silent -o ${tmpKatana} 2>/dev/null`)
+      run(`katana -u "${_crawlTarget}"${_hHdr} -d 4 -jc -aff -silent -o ${tmpKatana} 2>/dev/null`)
       if (fs.existsSync(tmpKatana)) {
         fs.readFileSync(tmpKatana,'utf-8').split('\n').filter(l=>l.trim()&&l.startsWith('http')).forEach(u=>discovered.add(u.trim()))
       }
@@ -2460,7 +2479,7 @@ async function _runtracerAgentInner(target, taskId) {
         ? '/usr/share/seclists/Discovery/Web-Content/common.txt'
         : '/usr/share/wordlists/dirb/common.txt'
       if (fs.existsSync(wl)) {
-        const ffuf = run(`ffuf -u "${sTarget}/FUZZ" -w "${wl}" -mc 200,201,301,302,403 -t 20 -timeout 5 -s 2>/dev/null`)
+        const ffuf = run(`ffuf -u "${_crawlTarget}/FUZZ"${_hHdr} -w "${wl}" -mc 200,201,301,302,403 -t 20 -timeout 5 -s 2>/dev/null`)
         ffuf.split('\n').filter(l=>l.trim()).forEach(d => discovered.add(`${sTarget}/${d.trim()}`))
       }
     } catch(e) {}
@@ -3692,12 +3711,22 @@ proceed normally — assumptions stay implicit.
       nmapBlock = nmapPromptBlock(JSON.parse(fs.readFileSync(_nmapFile, 'utf8')), _nmapFile)
     }
   } catch {}
+  // canonical-target block (Phase 0.45) — vhost + MANDATORY --resolve/Host directive.
+  let canonBlock = ''
+  try {
+    const _canonFile = `${agentPaths.INTEL_ROOT}/canonical-target-${taskId}.json`
+    if (fs.existsSync(_canonFile)) {
+      const { canonicalPromptBlock } = require('./src/pipeline/target-resolver')
+      canonBlock = canonicalPromptBlock(JSON.parse(fs.readFileSync(_canonFile, 'utf8')), _canonFile)
+    }
+  } catch {}
 
   return PENTEST_COVERAGE + `\nYou are ${agentUpper}, pentest specialist in ${squad}. Target: ${targetUrl}. Task: ${taskTitle}. TaskID: ${taskId}. WAF: ${wafStatus || 'unknown'}.
 ${goalLine}${techLine}${profileFragment}${MUST_GATES}${feedbackCtx}${liveFindings}${graphCtx}
-${nmapBlock}${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
+${canonBlock}${nmapBlock}${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
 Read your skill: cat ${agentPaths.skillsDir(agentLower)}/*/SKILL.md
 Read bypass refs: cat ${agentPaths.skillsDir(agentLower)}/*/references/*.md 2>/dev/null
+Read canonical target (Phase 0.45 — vhost + --resolve mapping): cat ${agentPaths.INTEL_ROOT}/canonical-target-${taskId}.json 2>/dev/null
 Read nmap heart-truth (Phase 0.4 — every open port/service): cat ${agentPaths.INTEL_ROOT}/nmap-${taskId}.json 2>/dev/null
 Read endpoints: cat ${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json 2>/dev/null
 Read endpoint-models (Phase 1.8): cat ${agentPaths.INTEL_ROOT}/endpoint-models-${taskId}.jsonl 2>/dev/null
@@ -4532,6 +4561,29 @@ async function dispatchPentestParallel(dispatch) {
       log(`ℹ️ Model override requested (${modelOverride}) but requires gateway restart. Using current default model.`)
     }
 
+    // ── Resolve the box IP up front (needed by nmap + vhost resolution). For a hostname
+    // target not in DNS with no IP available, abort LOUD rather than burn agent budget. ──
+    let _boxIp = null
+    try {
+      const { resolveInputIp } = require('./src/pipeline/target-resolver')
+      let _scope0 = {}; try { _scope0 = JSON.parse(fs.readFileSync(`${agentPaths.INTEL_ROOT}/scope-${taskId}.json`, 'utf8')) } catch {}
+      _boxIp = await resolveInputIp(targetUrl, dispatch.meta || {}, _scope0)
+    } catch {}
+    {
+      const _ih = (() => { try { return new URL(/^[a-z]+:\/\//i.test(targetUrl) ? targetUrl : 'http://' + targetUrl).hostname } catch { return String(targetUrl) } })()
+      const _ihIsIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(_ih)
+      if (!_ihIsIp && !_boxIp) {
+        log(`🚨 ENVIRONMENT UNRESOLVED — cannot resolve ${_ih} to an IP`)
+        logActivity('NEXUS', `🚨 ENVIRONMENT UNRESOLVED — ${_ih} has no IP`, {
+          type: 'env-unresolved', squad, taskId, projectId: projectId || '',
+          details: `Host ${_ih} is not in DNS and no box IP was provided. Fix: add the box IP to In-Scope, or run once: echo "<IP> ${_ih}" | sudo tee -a /etc/hosts. Aborting to save agent cost.`,
+        })
+        try { fs.writeFileSync(`${agentPaths.INTEL_ROOT}/canonical-target-${taskId}.json`, JSON.stringify({ input: targetUrl, vhost: _ih, unresolved: true }, null, 2)) } catch {}
+        updateProgress(100, 'Aborted — environment unresolved')
+        throw new Error(`Environment unresolved — ${_ih} has no IP (pre-flight check failed)`)
+      }
+    }
+
     // ── PRE-FLIGHT: Reachability check ──
     try {
       const { execSync } = require('child_process')
@@ -4557,36 +4609,8 @@ async function dispatchPentestParallel(dispatch) {
     const endpointMapFile = `${agentPaths.INTEL_ROOT}/pentest-endpoints-${taskId}.json`
     let wafStatus = 'unknown'
     let techContext = '' // populated after Phase 1 recon
-
-    // Run WAF detection
-    log(`🔍 Phase 0: WAF detection for ${targetUrl}`)
-    logActivity('NEXUS', `🔍 Phase 0: WAF detection for ${targetUrl}`, {
-      type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
-      details: `Target: ${targetUrl}\nChecking WAF presence before dispatching specialists`
-    })
-    updateProgress(5, 'Phase 0: WAF detection')
-
-    try {
-      const { execSync } = require('child_process')
-      // Sanitize URL to prevent command injection
-      const safeUrlWaf = safeUrl(targetUrl)
-      const safeTaskId = String(taskId).replace(/[^a-zA-Z0-9_-]/g, '')
-      const headerCheck = execSync(`curl -sI "${safeUrlWaf}" 2>/dev/null | grep -iE "server:|x-powered|cloudflare|akamai|incapsula|f5|barracuda|sucuri|imperva|aws" || true`, { timeout: 15000 }).toString().trim()
-      const wafProbe = execSync(`curl -s "${safeUrlWaf}/?test='" -o /tmp/waf-test-${safeTaskId}.html -w "%{http_code}" 2>/dev/null || true`, { timeout: 15000 }).toString().trim()
-      const wafBody = execSync(`grep -i "request rejected\\|access denied\\|blocked\\|forbidden\\|cloudflare\\|captcha\\|challenge" /tmp/waf-test-${safeTaskId}.html 2>/dev/null | head -3 || true`, { timeout: 5000 }).toString().trim()
-
-      if (wafBody || headerCheck.match(/cloudflare|akamai|incapsula|f5|barracuda|sucuri|imperva/i)) {
-        const wafType = headerCheck.match(/cloudflare|akamai|incapsula|f5|barracuda|sucuri|imperva/i)?.[0] || 'Unknown'
-        wafStatus = `detected — ${wafType}`
-        logActivity('NEXUS', `⚠️ WAF detected: ${wafType}`, { type: 'waf', squad, taskId, projectId: projectId || '' })
-      } else {
-        wafStatus = 'none detected'
-        logActivity('NEXUS', `✅ No WAF detected`, { type: 'waf', squad, taskId, projectId: projectId || '' })
-      }
-    } catch (e) {
-      log(`⚠️ WAF detection failed: ${e.message}`)
-      wafStatus = 'detection failed — assume present'
-    }
+    let _canon = null            // canonical-target (vhost) resolution — set by Phase 0.45
+    let _resolveArgs = ''        // ` --resolve vhost:port:ip -H "Host: vhost"` for daemon curls
 
     // ── Phase 0.4: nmap service scan — the HEART TRUTH. Deterministic, daemon-run,
     // BEFORE the recon agents + crawl. Discovers every open port/service on the host (all
@@ -4616,7 +4640,7 @@ async function dispatchPentestParallel(dispatch) {
           type: 'nmap-scan', squad, taskId, projectId: projectId || '',
           details: `Deterministic nmap -sV -p- --min-rate 3000 -T4 on the host (all 65535 ports). The heart-truth artifact every recon + specialist agent reads.`,
         })
-        const nmap = await runNmapScan(targetUrl, { timeoutMs: 8 * 60 * 1000 })
+        const nmap = await runNmapScan(targetUrl, { timeoutMs: 8 * 60 * 1000, ip: _boxIp })
         try { fs.writeFileSync(`${agentPaths.INTEL_ROOT}/nmap-${taskId}.json`, JSON.stringify(nmap, null, 2)) } catch {}
         if (nmap.ok && nmap.ports.length) {
           log(`🛰️ Phase 0.4: nmap found ${nmap.ports.length} open port(s): ${nmapSummary(nmap)}`)
@@ -4634,12 +4658,93 @@ async function dispatchPentestParallel(dispatch) {
       } catch (e) { log(`⚠️ Phase 0.4 nmap (non-fatal): ${e.message}`) }
     }
 
+    // ── Phase 0.45: Target/vhost resolution — pin the CANONICAL target so every probe +
+    // agent + crawl hits the real app. Detects vhosts (IP 301→hostname, Host-header diff),
+    // mutates targetUrl to the canonical URL, and exposes _resolveArgs for the daemon curls.
+    // Fail-soft (no vhost → canonical = the primary web service / the input URL). ──
+    if (phaseEnabled('0.45', squad)) {
+      try {
+        const { resolveTarget, curlResolveArgs, isIp } = require('./src/pipeline/target-resolver')
+        let _nmapArt = null; try { _nmapArt = JSON.parse(fs.readFileSync(`${agentPaths.INTEL_ROOT}/nmap-${taskId}.json`, 'utf8')) } catch {}
+        const _httpServices = (_nmapArt && Array.isArray(_nmapArt.httpServices)) ? _nmapArt.httpServices : []
+        _canon = await resolveTarget(targetUrl, { ip: _boxIp, httpServices: _httpServices, timeoutMs: 60000 })
+        try { fs.writeFileSync(`${agentPaths.INTEL_ROOT}/canonical-target-${taskId}.json`, JSON.stringify(_canon, null, 2)) } catch {}
+        _resolveArgs = curlResolveArgs(_canon)
+        if (_canon.canonical_url && _canon.canonical_url !== targetUrl) {
+          log(`🎯 Phase 0.45: canonical target → ${_canon.canonical_url}${_canon.vhost ? ` (vhost ${_canon.vhost} on ${_canon.ip})` : ''}`)
+          targetUrl = _canon.canonical_url // every downstream prompt/probe/report now uses the real app
+        }
+        logActivity('NEXUS', `🎯 Phase 0.45: target resolved${_canon.vhost ? ` — vhost ${_canon.vhost}:${_canon.port}` : ''}`, {
+          type: 'target-resolve', squad, taskId, projectId: projectId || '',
+          details: _canon.vhost
+            ? `Canonical: ${_canon.canonical_url}\nVhost ${_canon.vhost} on ${_canon.ip}:${_canon.port} (NOT in DNS — tools use --resolve/Host header)\nEvidence: ${(_canon.detection && _canon.detection.evidence) || ''}`
+            : `Canonical: ${_canon.canonical_url} (no vhost — direct host)`,
+        })
+        // Scope same-IP equivalence: a vhost on an in-scope IP is the SAME host — add it so
+        // the scope gates (phases 0·0 / 3·06) don't mark its findings OUT_OF_SCOPE. Same-IP only.
+        if (_canon.vhost && _canon.ip) {
+          try {
+            const _sf = `${agentPaths.INTEL_ROOT}/scope-${taskId}.json`
+            withFileLock(_sf, () => {
+              let sc = {}; try { sc = JSON.parse(fs.readFileSync(_sf, 'utf8')) } catch {}
+              sc.in_scope = Array.isArray(sc.in_scope) ? sc.in_scope : []
+              const ipInScope = sc.in_scope.some(s => String(s).split(/[/:]/)[0] === _canon.ip) || isIp(_canon.ip)
+              if (ipInScope && !sc.in_scope.includes(_canon.vhost)) {
+                sc.in_scope.push(_canon.vhost)
+                sc.infra_dependencies = sc.infra_dependencies || {}
+                sc.infra_dependencies[_canon.vhost] = _canon.ip
+                fs.writeFileSync(_sf, JSON.stringify(sc, null, 2))
+                log(`🎯 Phase 0.45: added vhost ${_canon.vhost} to scope (same IP ${_canon.ip})`)
+              }
+            })
+          } catch (e) { log(`⚠️ Phase 0.45 scope-equiv (non-fatal): ${e.message}`) }
+        }
+        // /etc/hosts surface for the browser crawl (CLI tools already use --resolve)
+        if (_canon.vhost && !_canon.in_hosts) {
+          logActivity('NEXUS', `🔧 One-time host entry for browser crawl`, {
+            type: 'env-action', squad, taskId, projectId: projectId || '',
+            details: `CLI tools already resolve the vhost via --resolve. For the browser crawl, run once:\n  echo "${_canon.ip} ${_canon.vhost}" | sudo tee -a /etc/hosts`,
+          })
+        }
+      } catch (e) { log(`⚠️ Phase 0.45 target-resolve (non-fatal): ${e.message}`) }
+    }
+
+    // ── Phase 0: WAF detection — runs on the CANONICAL target (after vhost resolution) ──
+    log(`🔍 Phase 0: WAF detection for ${targetUrl}`)
+    logActivity('NEXUS', `🔍 Phase 0: WAF detection for ${targetUrl}`, {
+      type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
+      details: `Target: ${targetUrl}\nChecking WAF presence before dispatching specialists`
+    })
+    updateProgress(8, 'Phase 0: WAF detection')
+
+    try {
+      const { execSync } = require('child_process')
+      // Sanitize URL to prevent command injection. _resolveArgs pins the vhost (--resolve + Host).
+      const safeUrlWaf = safeUrl(targetUrl)
+      const safeTaskId = String(taskId).replace(/[^a-zA-Z0-9_-]/g, '')
+      const headerCheck = execSync(`curl -sI${_resolveArgs} "${safeUrlWaf}" 2>/dev/null | grep -iE "server:|x-powered|cloudflare|akamai|incapsula|f5|barracuda|sucuri|imperva|aws" || true`, { timeout: 15000 }).toString().trim()
+      const wafProbe = execSync(`curl -s${_resolveArgs} "${safeUrlWaf}/?test='" -o /tmp/waf-test-${safeTaskId}.html -w "%{http_code}" 2>/dev/null || true`, { timeout: 15000 }).toString().trim()
+      const wafBody = execSync(`grep -i "request rejected\\|access denied\\|blocked\\|forbidden\\|cloudflare\\|captcha\\|challenge" /tmp/waf-test-${safeTaskId}.html 2>/dev/null | head -3 || true`, { timeout: 5000 }).toString().trim()
+
+      if (wafBody || headerCheck.match(/cloudflare|akamai|incapsula|f5|barracuda|sucuri|imperva/i)) {
+        const wafType = headerCheck.match(/cloudflare|akamai|incapsula|f5|barracuda|sucuri|imperva/i)?.[0] || 'Unknown'
+        wafStatus = `detected — ${wafType}`
+        logActivity('NEXUS', `⚠️ WAF detected: ${wafType}`, { type: 'waf', squad, taskId, projectId: projectId || '' })
+      } else {
+        wafStatus = 'none detected'
+        logActivity('NEXUS', `✅ No WAF detected`, { type: 'waf', squad, taskId, projectId: projectId || '' })
+      }
+    } catch (e) {
+      log(`⚠️ WAF detection failed: ${e.message}`)
+      wafStatus = 'detection failed — assume present'
+    }
+
     // ── Phase 0.1: Auth type detection — INFORM agents, don't restrict ──
     let authType = 'unknown'
     try {
       const safeUrl_local = safeUrl(targetUrl)
-      const responseHeaders = execSync(`curl -sI -L --max-time 10 "${safeUrl_local}" 2>/dev/null || true`, { timeout: 15000 }).toString()
-      const responseBody = execSync(`curl -s -L --max-time 10 "${safeUrl_local}" 2>/dev/null | head -c 5000 || true`, { timeout: 15000 }).toString()
+      const responseHeaders = execSync(`curl -sI -L${_resolveArgs} --max-time 10 "${safeUrl_local}" 2>/dev/null || true`, { timeout: 15000 }).toString()
+      const responseBody = execSync(`curl -s -L${_resolveArgs} --max-time 10 "${safeUrl_local}" 2>/dev/null | head -c 5000 || true`, { timeout: 15000 }).toString()
 
       if (responseHeaders.match(/login\.microsoftonline|azure.*ad|aadsts/i) || responseBody.match(/login\.microsoftonline|azure.*ad|aadsts/i)) {
         authType = 'azure-ad'
@@ -4689,7 +4794,7 @@ async function dispatchPentestParallel(dispatch) {
       // endpoint map uses {endpoints,forms,apiEndpoints} keys, not {technology,fingerprint}.
       try {
         const safeUrl_local = safeUrl(targetUrl)
-        const respHeaders = execSync(`curl -sI -L --max-time 10 "${safeUrl_local}" 2>/dev/null || true`, { timeout: 15000 }).toString()
+        const respHeaders = execSync(`curl -sI -L${_resolveArgs} --max-time 10 "${safeUrl_local}" 2>/dev/null || true`, { timeout: 15000 }).toString()
         const headerMap = {}
         respHeaders.split(/\r?\n/).forEach(line => {
           const m = line.match(/^([^:]+):\s*(.*)$/)
