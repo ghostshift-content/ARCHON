@@ -7,6 +7,10 @@ const __roots = require('../../paths') // portable roots (KURU_*_ROOT) — see p
 // process (ported from the operator's own GitLab review methodology):
 //
 //   Phase 0   sourceDir validation
+//   Phase 0b  App Blueprint — CURATOR reads inventories + tree + bootstrap/auth/
+//             config files → a 1-page architecture/auth/data-flow/shared-infra doc
+//             that grounds discovery + every feature mapper (catches cross-feature
+//             vulns the feature-by-feature pass would miss in isolation)
 //   Phase 0a  Inventories — scripted enumeration (routes/api/graphql/workers/
 //             services/finders/policies/serializers/downloads/search/tokens)
 //   Phase 0b  Feature discovery — gitlab preset (43) | generic (CURATOR) | meta.features
@@ -52,7 +56,7 @@ const CLASS = {
   'account-takeover': { agent: 'siphon',      module: null, catalog: null },
 }
 const MAPPER_POOL = ['marshal', 'siphon', 'cipher', 'quill', 'beacon', 'breaker']
-const PHASES = ['inventories', 'discovery', 'mapping', 'consolidate', 'phase2', 'verify', 'report']
+const PHASES = ['inventories', 'blueprint', 'discovery', 'mapping', 'consolidate', 'phase2', 'verify', 'report']
 const WAVE = 3 // RAM-safe parallelism (mirrors GATE-134 stocks batching)
 
 // The fixed Phase-1 feature-map contract (enforced in the prompt; full template on disk).
@@ -159,6 +163,24 @@ Methodology pack (read these for the exact contract): ${METH}/
 Use bash (rg/grep/cat/sed) to enumerate and read source. This is MAPPING + EVIDENCE work — produce files, not chat.`
 }
 
+function blueprintPrompt(taskId, sourceDir, outDir, invDir) {
+  return `You are CURATOR, code-review squad leader. Produce the APP BLUEPRINT — a one-page architectural orientation that EVERY downstream feature reviewer reads first. Understand the whole system BEFORE the parts.
+
+${commonHeader(taskId, sourceDir, outDir, invDir)}
+
+Read the inventories + the source-tree layout + the key bootstrap/config files (framework entrypoints, routing tables, auth middleware, ORM/models, settings/env, docker/CI). Do NOT map features yet — this is orientation.
+
+Write a concise (~1 page) blueprint to ${outDir}/phase1-maps/app-blueprint.md with EXACTLY these sections:
+1. ## What this application is — purpose, domain, primary actors/personas.
+2. ## Tech stack & infrastructure — languages, framework(s), datastores, queues/workers, external services, how it deploys.
+3. ## Authentication & authorization model — how a request is authenticated (session/JWT/OAuth/API key), how identity → roles, where authZ is enforced (middleware/decorators/policy objects), and how object ownership / tenancy is checked. Name the EXACT files.
+4. ## Shared infrastructure & cross-cutting code — middleware, base controllers, serializers, input parsing/sanitization, file storage, payment, rate-limiting, logging — anything MANY features depend on (where cross-feature vulns hide).
+5. ## Data flow & trust boundaries — where untrusted input enters, how it reaches sinks (DB/render/shell/HTTP), and which trust boundaries it crosses.
+6. ## Highest-risk areas to prioritize — 3-7 architectural hot spots for Phase 2, each with the file/dir and why.
+
+Cite exact files/dirs. Then reply one line: stack, auth mechanism, top architectural risk.`
+}
+
 function featureMapPrompt(agent, feature, taskId, sourceDir, outDir, invDir) {
   const outFile = `${outDir}/phase1-maps/features/${feature.slug}.md`
   return `You are ${agent.toUpperCase()}, a Phase-1 feature-mapping agent on the code-review squad (leader CURATOR).
@@ -172,6 +194,7 @@ Phase 1 is **mapping, not vulnerability hunting** — do NOT report confirmed vu
 areas, suspicious paths, Phase-2 leads, gaps, assumptions, and required follow-up.
 
 ## Method (feature-by-feature, evidence-based)
+0. Read the App Blueprint at ${outDir}/phase1-maps/app-blueprint.md FIRST — use its auth/authZ model + shared-infra map when tracing this feature's auth/actor/object-lookup/serializer paths (so you catch where this feature relies on shared, possibly-flawed, infrastructure).
 1. grep the inventory files in ${invDir}/ scoped to this feature's keywords, then read the live source under ${sourceDir}.
 2. Build the Endpoint/Action Ledger — ONE ROW per route+method / mutation / worker / action. Never merge GET/POST/PUT/DELETE. Never "CRUD reviewed".
 3. Trace auth / actor / object-lookup / serializer / worker paths for representative and high-risk rows.
@@ -195,7 +218,8 @@ function discoveryPrompt(taskId, sourceDir, outDir, invDir, cap) {
 
 ${commonHeader(taskId, sourceDir, outDir, invDir)}
 
-Read the inventories + the source tree layout (top-level dirs, route/controller/module groupings) and propose the
+Read the App Blueprint at ${outDir}/phase1-maps/app-blueprint.md (architecture/auth/shared-infra/data-flow) and the
+inventories + source tree layout (top-level dirs, route/controller/module groupings), then propose the
 distinct security-relevant FEATURE AREAS to map (e.g. authentication, file-upload, admin, api-keys, search, webhooks…).
 Group by business capability, not by file. Cap at ${cap} features (most security-relevant first).
 
@@ -312,7 +336,18 @@ async function runCodeReview(dispatch, deps) {
     buildInventories(sourceDir, invDir, preset, log)
   }
 
-  // Phase 0b — feature queue
+  // Phase 0b — App Blueprint (understand the whole system before mapping the parts).
+  // Produces app-blueprint.md (architecture / auth model / shared infra / data flow)
+  // that discovery + every feature mapper read first — surfaces cross-feature vulns
+  // (shared serializer, global middleware, one auth gate) that per-feature passes miss.
+  if (runPhase('blueprint')) {
+    updateProgress(13, 'Phase 0b: CURATOR app blueprint')
+    logActivity('CURATOR', `🧭 Phase 0b: app blueprint (architecture / auth / shared infra / data flow)`, { taskId, squad, projectId: projectId || '' })
+    const bRes = await spawnAgent('curator', taskId, blueprintPrompt(taskId, sourceDir, outDir, invDir), `task-${taskId}-blueprint`, null)
+    trackCosts([bRes])
+  }
+
+  // Phase 0c — feature queue
   let features = []
   if (Array.isArray(meta.features) && meta.features.length) {
     features = meta.features.map(f => typeof f === 'string' ? { slug: slugify(f), name: f } : f).slice(0, maxFeatures)
@@ -321,7 +356,7 @@ async function runCodeReview(dispatch, deps) {
     try { features = JSON.parse(fs.readFileSync(PRESET_GITLAB, 'utf8')).features.slice(0, maxFeatures) } catch { features = [] }
     log(`📋 GitLab preset feature queue: ${features.length}`)
   } else if (runPhase('discovery')) {
-    updateProgress(16, 'Phase 0b: CURATOR feature discovery')
+    updateProgress(16, 'Phase 0c: CURATOR feature discovery')
     const dRes = await spawnAgent('curator', taskId, discoveryPrompt(taskId, sourceDir, outDir, invDir, maxFeatures), `task-${taskId}-discovery`, null)
     trackCosts([dRes])
     try {
