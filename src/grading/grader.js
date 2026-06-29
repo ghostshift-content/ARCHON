@@ -29,7 +29,8 @@ const fs = require('fs')
 const anthropicKey = require('../integrations/anthropic-key')
 // (2026-06-04) AgentRunner port — replaces the raw `claude --print` spawn in
 // _refineViaCLIInner with runAgent(spec). Adapter selected by process.env.ADAPTER
-// (default 'cli'). Returns { text, usage, model, raw } already unwrapped, or throws.
+// (default 'sdk' — Agent SDK over subscription OAuth, no API key). Returns
+// { text, usage, model, raw } already unwrapped, or throws.
 const { runAgent } = require('../../agents/runner/agent-runner')
 const targetClassifier = (() => { try { return require('../routing/target-classifier') } catch { return null } })()
 const tracer = (() => { try { return require('../integrations/tracer') } catch { return { span: () => ({ end: () => {} }), event: () => {} } } })()
