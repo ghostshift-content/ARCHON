@@ -61,8 +61,8 @@ test('banner is fail-soft (try/catch wrapping)', () => {
 test('banner does NOT trigger on clean run (CONFIRMED + no indeterminate)', () => {
   const fnStart = SRC.indexOf('function prependPublicationStatusBanner')
   const fnSlice = SRC.slice(fnStart, fnStart + 4000)
-  assert.match(fnSlice, /if\s*\(\s*!arbiterWeak\s*&&\s*!judgeWeak\s*\)\s*return/,
-    'must short-circuit when both signals are clean')
+  assert.match(fnSlice, /if\s*\(\s*!arbiterWeak\s*&&\s*!judgeWeak\s*&&\s*!judgeFailed\s*\)\s*return/,
+    'must short-circuit when all signals are clean (arbiter, judge-weak, judge-failed)')
 })
 
 test('all verificationLoop call sites invoke the banner', () => {

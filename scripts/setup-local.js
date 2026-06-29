@@ -43,6 +43,10 @@ for (const d of DIRS) {
   const p = path.join(INTEL, d)
   if (!fs.existsSync(p)) { fs.mkdirSync(p, { recursive: true }); info('created ' + (d || '.')) }
 }
+// The data layer holds engagement briefs + scope configs with operator-entered
+// test credentials. Restrict the root to the owner (0700) so other local users
+// can't read them. Best-effort — ignore on platforms without POSIX modes.
+try { fs.chmodSync(INTEL, 0o700); info('chmod 0700 ' + INTEL) } catch {}
 
 // ── 2. Config files (sane, gate-valid defaults) ──
 // Only written if absent. Sources: module fallbacks (model-router._hardcodedFallback)

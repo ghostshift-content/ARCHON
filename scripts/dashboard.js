@@ -228,7 +228,7 @@ ${credTable}
 > Authenticate as EACH role and test cross-role authorization (IDOR, privilege escalation, role confusion). Respect scope strictly — never touch out-of-scope hosts.
 `
   const briefPath = path.join(INTEL, `pentest-brief-${taskId}.md`)
-  fs.writeFileSync(briefPath, brief)
+  fs.writeFileSync(briefPath, brief, { mode: 0o600 }) // brief embeds the test-credential table
   return briefPath
 }
 
@@ -246,7 +246,8 @@ function deriveIterationLabel(meta) {
 }
 const engPath = (E) => path.join(INTEL, `engagement-${E}.json`)
 function readEngagement(E) { try { return JSON.parse(fs.readFileSync(engPath(String(E)), 'utf8')) } catch { return null } }
-function writeEngagement(E, obj) { const t = engPath(String(E)) + '.tmp'; fs.writeFileSync(t, JSON.stringify(obj, null, 2)); fs.renameSync(t, engPath(String(E))) }
+// mode 0600 — engagement sidecar carries operator-entered test credentials.
+function writeEngagement(E, obj) { const t = engPath(String(E)) + '.tmp'; fs.writeFileSync(t, JSON.stringify(obj, null, 2), { mode: 0o600 }); fs.renameSync(t, engPath(String(E))) }
 // resolve the engagement a taskId belongs to (it may be the root or any iteration). null = standalone task.
 function resolveEngagementId(taskId) {
   const id = String(taskId)
@@ -542,13 +543,28 @@ function json(res, code, obj) { res.writeHead(code, { 'content-type': 'applicati
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
   const p = url.pathname
+  // Baseline hardening headers — cheap + harmless on localhost, real value if exposed.
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  // Optional API bearer-token gate — OFF by default (local single-operator). Set
+  // ARCHON_PORTAL_TOKEN to require `Authorization: Bearer <token>` on /api/* so the
+  // portal is safe behind a tunnel/reverse-proxy without code changes. Static SPA
+  // assets stay open so the page still loads; the proxy/client supplies the header.
+  const _portalToken = process.env.ARCHON_PORTAL_TOKEN
+  if (_portalToken && p.startsWith('/api/')) {
+    if ((req.headers['authorization'] || '') !== `Bearer ${_portalToken}`) return json(res, 401, { error: 'unauthorized' })
+  }
   try {
     if (req.method === 'GET' && p === '/api/state') return json(res, 200, state())
     if (req.method === 'GET' && p === '/api/squads') return json(res, 200, { squads: squads() })
     if (req.method === 'GET' && p === '/api/report') {
-      const rel = (url.searchParams.get('f') || '').replace(/\.\.+/g, '') // no traversal
-      const full = path.join(INTEL, rel)
-      if (!full.startsWith(INTEL)) return json(res, 400, { error: 'bad path' })
+      // Canonicalize then enforce the INTEL_ROOT boundary — path.resolve collapses
+      // any ../ and the path.sep suffix prevents a sibling-dir prefix bypass
+      // (e.g. /var/intel-evil). Robust where a regex strip + bare startsWith is not.
+      const rel = url.searchParams.get('f') || ''
+      const full = path.resolve(INTEL, rel)
+      if (full !== INTEL && !full.startsWith(INTEL + path.sep)) return json(res, 403, { error: 'forbidden' })
       try { res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }); res.end(fs.readFileSync(full, 'utf-8')) }
       catch { json(res, 404, { error: 'report not found' }) }
       return

@@ -764,13 +764,18 @@ function prependPublicationStatusBanner(taskId, arbiterResult) {
     const verdict = arbiterResult?.verdict || 'UNKNOWN'
     const passRate = arbiterResult?.passRate ?? 0
 
+    // Judge could not run at all (Phase 3.9 threw) — findings are un-vetted.
+    const judgeIncompleteFlag = `${agentPaths.INTEL_ROOT}/judge-incomplete-${taskId}.flag`
+    const judgeFailed = fs.existsSync(judgeIncompleteFlag)
+
     const arbiterWeak = verdict === 'FALSE_POSITIVE' ||
                           (verdict === 'PARTIAL' && passRate < 70)
     const judgeWeak = indeterminateCount > 0
 
-    if (!arbiterWeak && !judgeWeak) return // no banner needed — clean run
+    if (!arbiterWeak && !judgeWeak && !judgeFailed) return // no banner needed — clean run
 
     const reasons = []
+    if (judgeFailed) reasons.push(`judge-verifier (Phase 3.9) FAILED to run — High/Critical findings are NOT independently confirmed and may be false positives`)
     if (verdict === 'FALSE_POSITIVE') reasons.push(`ARBITER verdict: FALSE_POSITIVE`)
     else if (verdict === 'PARTIAL' && passRate < 70) reasons.push(`ARBITER verdict: PARTIAL (${passRate}% < 70% threshold)`)
     if (judgeWeak) reasons.push(`${indeterminateCount} Critical/High finding(s) flagged INDETERMINATE by judge-verifier (auto-capped at Medium pending manual review)`)
@@ -791,7 +796,8 @@ function prependPublicationStatusBanner(taskId, arbiterResult) {
     const existing = fs.readFileSync(reportPath, 'utf-8')
     if (existing.startsWith('> ⚠️ **VERIFICATION INCOMPLETE')) return // already prepended (idempotent)
     fs.writeFileSync(reportPath, banner + existing)
-    log(`⚠️ Prepended publication-status banner to ${reportPath} (verdict=${verdict}, indeterminate=${indeterminateCount})`)
+    try { if (judgeFailed) fs.unlinkSync(judgeIncompleteFlag) } catch {} // consumed
+    log(`⚠️ Prepended publication-status banner to ${reportPath} (verdict=${verdict}, indeterminate=${indeterminateCount}, judgeFailed=${judgeFailed})`)
   } catch (e) {
     log(`⚠️ Banner prepend failed (non-fatal): ${e.message}`)
   }
@@ -6096,7 +6102,16 @@ The output MUST validate against the schema. You cannot emit prose — only the 
           log(`⚖️  Phase 3.9 skipped — no VALIDATED-FINDINGS file at ${validatedFile}`)
         }
       } catch (e) {
-        log(`⚖️  Phase 3.9 error (non-fatal, SCRIBE will use raw VALIDATED-FINDINGS): ${e.message}`)
+        // The judge is the gate that confirms/downgrades High/Critical. If it
+        // could NOT run, the report must NOT silently ship the raw (un-judged)
+        // findings — drop a marker so the published report carries a loud
+        // "VERIFICATION INCOMPLETE" banner (see prependPublicationStatusBanner).
+        log(`⚖️  Phase 3.9 error — judge could not run; report will be flagged VERIFICATION INCOMPLETE: ${e.message}`)
+        try { fs.writeFileSync(`${agentPaths.INTEL_ROOT}/judge-incomplete-${taskId}.flag`, String(e && e.message || e)) } catch {}
+        logActivity('NEXUS', `⚠️ Phase 3.9 judge FAILED — findings un-judged, report flagged for manual review`, {
+          type: 'judge-incomplete', squad, taskId, projectId: projectId || '',
+          details: String(e && e.message || e),
+        })
       }
     }
 
@@ -7937,6 +7952,9 @@ async function generateReportForTask(taskId) {
   }
   try {
     await spawnAgent(PENTEST_REPORTER, taskId, prompt, `task-${taskId}-scribe-triaged`, task.model || null)
+    // Stamp the publication-status banner on the triage-gated report too — this
+    // is the path that fires if the judge (Phase 3.9) failed earlier.
+    try { prependPublicationStatusBanner(taskId, null) } catch {}
     const t2 = readJSON(TASKS_FILE) || []; const tk = t2.find(t => String(t.id) === String(taskId))
     if (tk) { tk.status = 'done'; tk.progress = 100; tk.statusMessage = 'Report generated'; tk.lastUpdate = new Date().toISOString(); writeJSON(TASKS_FILE, t2) }
     log(`✅ Generate-report: report written for ${taskId}`)

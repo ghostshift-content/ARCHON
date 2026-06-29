@@ -4,12 +4,13 @@
 // bughunter-ai — runs BEFORE any specialist fires. Complements the
 // existing post-finding scope-validator.js (shipped 2026-05-15 morning).
 //
-// Universal across all 5 squads via squadPolicy adapter (pentest /
-// cloud-security / network-pentest / code-review / stocks).
+// Universal across squads via the squadPolicy adapter (pentest / code-review).
 //
-// Fail-soft when scope config is missing — returns "warned", not
-// "blocked". Reason: backward compat with legacy dispatches that
-// pre-date the scope-config requirement.
+// Fail-CLOSED when scope config is missing — returns "blocked". A pentest tool
+// must never fire at a target with no declared scope. The normal product flow
+// always writes scope-<taskId>.json, so a missing config means an injected or
+// buggy dispatch — exactly when a hard stop is wanted. An operator who really
+// wants a scope-less run sets ARCHON_SCOPE_OVERRIDE=1 (downgrades to "warned").
 
 'use strict'
 
@@ -24,9 +25,15 @@ function validateDispatch(dispatch, squadPolicy, scopeConfig) {
     return { status: PREDISPATCH_STATUS.BLOCKED, reason: 'missing dispatch or squad policy' }
   }
   if (!scopeConfig) {
+    if (process.env.ARCHON_SCOPE_OVERRIDE === '1') {
+      return {
+        status: PREDISPATCH_STATUS.WARNED,
+        reason: `no scope config for taskId=${dispatch.taskId || 'unknown'} — allowed via ARCHON_SCOPE_OVERRIDE`,
+      }
+    }
     return {
-      status: PREDISPATCH_STATUS.WARNED,
-      reason: `no scope config for taskId=${dispatch.taskId || 'unknown'} — fail-open for backward compat`,
+      status: PREDISPATCH_STATUS.BLOCKED,
+      reason: `no scope config for taskId=${dispatch.taskId || 'unknown'} — fail-closed (set ARCHON_SCOPE_OVERRIDE=1 to allow a scope-less dispatch)`,
     }
   }
   const target = squadPolicy.extractTarget(dispatch)
