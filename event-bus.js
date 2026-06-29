@@ -3311,7 +3311,10 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
     // Watchdog kill now calls the bridge's duck-typed handle.kill() (→ aborts the
     // in-flight run → bridge maps to code 143), not child.kill.
     const NO_MOVEMENT_MS = 15 * 60 * 1000 // 15 minutes no stream data = potentially stuck
-    const HARD_MAX_RUNTIME_MS = 45 * 60 * 1000 // 45 min absolute max per agent
+    // Recon agents (SCOUT/RANGER) map surface FAST — a tighter 15min cap stops one from sinking
+    // the whole run into deep exploitation (their job is breadth; Phase 2 specialists go deep).
+    const _isReconAgent = ['scout', 'ranger'].includes(agentName.toLowerCase())
+    const HARD_MAX_RUNTIME_MS = (_isReconAgent ? 15 : 45) * 60 * 1000 // recon 15min, others 45min
     const DONE_GRACE_MS = 8 * 60 * 1000 // 8 min grace after agent reports "done" in activity log
     // ACTIVITY-STALL (2026-06-08): catches the "streaming/thinking but producing NOTHING" hang
     // that NO_MOVEMENT misses — lastDataTime keys off the stream, so an agent that keeps
@@ -3742,9 +3745,14 @@ proceed normally — assumptions stay implicit.
     }
   } catch {}
 
+  // Recon agents (SCOUT/RANGER) map surface + flag exploitable vulns FAST — they must NOT
+  // sink the whole run budget into deep exploitation (that's the Phase 2 specialists' job).
+  const _reconBlock = PENTEST_RECON.includes(agentLower)
+    ? `\n## RECON SCOPE + TIME BOUNDARY (you are a recon agent)\nYour job: map the attack surface and FLAG exploitable vulns with a QUICK proof (one request that demonstrates it), then emit-finding it immediately. Do NOT spend the run deep-exploiting / mass-dumping — the Phase 2 specialists do that from your flagged findings. Target ~10-12 min: breadth over depth. When you've mapped the surface and flagged the obvious vulns, STOP and return so the pipeline advances to the specialists.\n`
+    : ''
   return PENTEST_COVERAGE + `\nYou are ${agentUpper}, pentest specialist in ${squad}. Target: ${targetUrl}. Task: ${taskTitle}. TaskID: ${taskId}. WAF: ${wafStatus || 'unknown'}.
 ${goalLine}${techLine}${profileFragment}${MUST_GATES}${feedbackCtx}${liveFindings}${graphCtx}
-${canonBlock}${nmapBlock}${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
+${_reconBlock}${canonBlock}${nmapBlock}${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
 Read your skill: cat ${agentPaths.skillsDir(agentLower)}/*/SKILL.md
 Read bypass refs: cat ${agentPaths.skillsDir(agentLower)}/*/references/*.md 2>/dev/null
 Read canonical target (Phase 0.45 — vhost + --resolve mapping): cat ${agentPaths.INTEL_ROOT}/canonical-target-${taskId}.json 2>/dev/null
@@ -3756,8 +3764,10 @@ Read attack plan (Phase 1.9): cat ${agentPaths.INTEL_ROOT}/attack-plan-${taskId}
 Read WAF bypass reference (use when a WAF vendor is named): cat ${agentPaths.AGENTS_ROOT}/agents/refs/waf-bypass.md 2>/dev/null
 Read memory: cat ${agentPaths.lessonsPath(agentLower)} 2>/dev/null
 
-## CROSS-COLLABORATION — record EVERY finding so other agents chain off it + it reaches the report
-For EACH finding run this ONE command (it writes clean JSON for you — NEVER hand-write JSON into the findings file):
+## RECORDING FINDINGS — MANDATORY: a finding ONLY counts if emitted via the tool below
+A finding you describe in your reply or echo to a log is INVISIBLE to the pipeline — it will NOT
+reach the operator, the validator, or the report. The ONLY way a finding is counted is this command.
+Run it the INSTANT you confirm (or strongly suspect) something — do NOT batch them to the end.
 node ${agentPaths.AGENTS_ROOT}/tools/emit-finding.js --task ${taskId} --agent ${agentUpper} --type confirmed|suspected|surface --severity critical|high|medium|low|info --confidence high|medium|low --url "URL" --relation backend-of|redirect-to|api-for|subdomain-of|same-app --parent "${targetUrl}" --auth none|cookie|bearer|saml|azure-ad|custom --details "WHAT_YOU_FOUND" --impact "WHAT_AN_ATTACKER_GAINS_concretely" --tested "what,you,tested" --not-tested "what,remains" --reproduction-file /tmp/repro-${agentUpper}.txt --payloads-file /tmp/payloads-${agentUpper}.txt
 Multi-line evidence goes in the temp files first, e.g.: the exact request/response or command output → /tmp/repro-${agentUpper}.txt; each payload (incl WAF-bypass mutations + which landed), one per line → /tmp/payloads-${agentUpper}.txt. Short single-line fields can use --reproduction "curl ..." instead of the file flag.
 Worked example:
@@ -3773,8 +3783,10 @@ Always populate \`tested\` + \`not_tested\` so other agents know the gaps.
 2. What assumptions does this app make that you can break?
 (Skill files cover the standard payload library — focus this phase on the chains and broken-assumption ideas your skill doesn't enumerate.)
 
-Write findings to ACTIVITY-LOG.jsonl with taskId=${taskId}.
-echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"${agentUpper}","action":"SUSPECTED Finding: TITLE","details":"EVIDENCE","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}","type":"finding","status":"suspected"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
+## PROGRESS LOG (status only — NOT findings; findings go through emit-finding.js above)
+Use the activity log ONLY for human-readable progress notes (what you're testing now). It does NOT
+record findings — never put a finding here instead of emitting it.
+echo '{"ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","agent":"${agentUpper}","action":"PROGRESS: what you are testing now","details":"context","taskId":"${taskId}","projectId":"${projectId || ''}","squad":"${squad}","type":"progress"}' >> ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
 Execute now.${missedSignalsBlock}`
 }
 
@@ -4606,21 +4618,36 @@ async function dispatchPentestParallel(dispatch) {
     }
 
     // ── PRE-FLIGHT: Reachability check ──
+    // Abort ONLY if the HOST itself is down (no ping). A bare-URL HTTP probe hits the default
+    // port (80/443), but the app is often on another port (e.g. 3000) that the Phase 0.4 nmap
+    // will find — so an HTTP failure alone must NOT abort a box that's actually up.
     try {
       const { execSync } = require('child_process')
-      // Sanitize URL to prevent command injection
       const safeUrl_local = safeUrl(targetUrl)
-      const reachCheck = execSync(`curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${safeUrl_local}" 2>/dev/null || echo "000"`, { timeout: 15000 }).toString().trim()
-      if (reachCheck === '000') {
-        log(`🚫 Pre-flight FAILED: ${targetUrl} unreachable (HTTP 000 / timeout)`)
-        logActivity('NEXUS', `🚫 Target unreachable: ${targetUrl} — aborting pentest`, {
-          type: 'preflight-fail', squad, taskId, projectId: projectId || '',
-          details: `Pre-flight reachability check failed. Target returned HTTP 000 (connection timeout). Aborting to save agent costs. Fix: verify target is up and accessible from this server.`
-        })
-        updateProgress(100, 'Aborted — target unreachable')
-        throw new Error(`Target ${targetUrl} unreachable — pre-flight check failed`)
+      // capture the HTTP code WITHOUT the old `|| echo 000` concat bug ("000000" defeated the check)
+      let httpCode = '000'
+      try { httpCode = execSync(`curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${safeUrl_local}"`, { timeout: 15000 }).toString().trim() || '000' }
+      catch (ce) { httpCode = (ce.stdout || '').toString().trim() || '000' }
+      const httpOk = /^[1-5]\d\d$/.test(httpCode) && httpCode !== '000'
+      if (httpOk) { log(`✅ Pre-flight: ${targetUrl} reachable (HTTP ${httpCode})`) }
+      else {
+        // HTTP on the default port didn't answer — is the host itself up?
+        const _host = (() => { try { return safeHost(new URL(/^[a-z]+:\/\//i.test(targetUrl) ? targetUrl : 'http://' + targetUrl).hostname) } catch { return safeHost(targetUrl) } })()
+        const _ip = _boxIp || _host
+        let pingOk = false
+        try { execSync(`ping -c 1 -W 2 ${_ip}`, { timeout: 5000 }); pingOk = true } catch {}
+        if (pingOk) {
+          log(`✅ Pre-flight: ${targetUrl} — no HTTP on default port (code ${httpCode}) but host ${_ip} is UP (ping); nmap will find the real ports`)
+        } else {
+          log(`🚫 Pre-flight FAILED: host ${_ip} unreachable (no HTTP, no ping)`)
+          logActivity('NEXUS', `🚫 Target unreachable: ${targetUrl} — aborting pentest`, {
+            type: 'preflight-fail', squad, taskId, projectId: projectId || '',
+            details: `Host ${_ip} did not respond to HTTP (code ${httpCode}) OR ping. Aborting to save agent costs. Fix: verify the box is up + reachable (VPN connected?).`
+          })
+          updateProgress(100, 'Aborted — target unreachable')
+          throw new Error(`Target ${targetUrl} unreachable — pre-flight check failed`)
+        }
       }
-      log(`✅ Pre-flight: ${targetUrl} reachable (HTTP ${reachCheck})`)
     } catch (e) {
       if (e.message.includes('pre-flight check failed')) throw e
       log(`⚠️ Pre-flight check error: ${e.message} — continuing anyway`)

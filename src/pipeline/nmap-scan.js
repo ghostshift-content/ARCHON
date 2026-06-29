@@ -83,7 +83,7 @@ function nmapPromptBlock(r, nmapFilePath) {
   const web = r.httpServices.length
     ? `\nWeb services discovered (test EVERY one, not just the URL in your task):\n${r.httpServices.map(u => '  - ' + u).join('\n')}`
     : ''
-  return `\n## AUTHORITATIVE NMAP — HEART TRUTH (read FIRST, test EVERY service)\nA full -p- service scan already ran on the host. This is ground truth — every open port/service:\n${rows}${web}\nTest EVERY service above (FTP, SSH, web on any port, APIs, DBs) — do NOT limit yourself to the single URL in your task. Raw scan: cat ${nmapFilePath} 2>/dev/null\n`
+  return `\n## AUTHORITATIVE NMAP — HEART TRUTH (read FIRST, test EVERY service)\nA full -p- -sV service scan ALREADY RAN on the host. This is ground truth — every open port/service:\n${rows}${web}\nDO NOT re-run a full port scan (no \`nmap -p-\`, no \`-T2/--max-rate\` sweeps) — it is DONE and wastes ~25 min. Only run a targeted \`nmap -sV -sC -p <known-port>\` on a specific service if you need deeper version/script detail. Test EVERY service above (FTP, SSH, web on any port, APIs, DBs) — do NOT limit yourself to the single URL in your task. Raw scan: cat ${nmapFilePath} 2>/dev/null\n`
 }
 
 module.exports = { runNmapScan, extractHost, parseNmapXml, httpServicesOf, nmapSummary, nmapPromptBlock }
