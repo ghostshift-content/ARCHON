@@ -68,6 +68,9 @@ test('parseauditorEntry extracts CONFIRMED verdicts; drops KILLED + non-verdict 
     taskId,
     ts: '2026-05-11T05:00:00Z',
     action: 'CONFIRMED — F-001: No Account Lockout on VPN Authentication',
+    // Real AUDITOR CONFIRMED entries carry replayable evidence — the evidence
+    // contract demotes a CONFIRMED claim that has none.
+    details: "Confirmed via curl: curl -s 'https://vpn.example.com/login' -d 'user=x&pass=wrong' (x10) → 200, no lockout",
   })
   const r = parseauditorEntry(okLine, taskId)
   assert.ok(r)

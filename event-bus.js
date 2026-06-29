@@ -3700,6 +3700,7 @@ Read memory: cat ${agentPaths.lessonsPath(agentLower)} 2>/dev/null
 ## CROSS-COLLABORATION — share findings for other agents to chain off
 echo '{"agent":"${agentUpper}","type":"confirmed|suspected|surface","url":"URL","relation":"backend-of|redirect-to|api-for|subdomain-of|same-app","parent":"${targetUrl}","auth":"none|cookie|bearer|saml|azure-ad|custom","tested":["what-you-tested"],"not_tested":["what-remains"],"details":"WHAT_YOU_FOUND","severity":"critical|high|medium|low|info","confidence":"high|medium|low","impact":"WHAT_AN_ATTACKER_GAINS_concretely","reproduction":"EXACT_CURL_COMMAND_OR_STEPS","payloads_tried":["each payload incl WAF-bypass mutations + which landed"]}' >> ${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl
 On every CONFIRMED finding you MUST fill "impact" with the concrete attacker gain (e.g. "read any user's invoices via IDOR", "execute OS commands as www-data"), not just the severity word.
+EVIDENCE CONTRACT: only set type=confirmed if you CAPTURED replayable evidence (the exact request/response, command output, or DOM proof) and put it in "reproduction". No captured evidence → type=suspected. A confirmed claim without evidence is demoted automatically — it does not help you to over-claim.
 Always populate \`tested\` + \`not_tested\` so other agents know the gaps.
 
 ## CREATIVE ATTACK PHASE — after your skill's standard checks

@@ -38,6 +38,7 @@ const path = require('node:path')
 const crypto = require('node:crypto')
 const { extractFirstUrl } = require('./url-extractor')
 const { validateFinding } = require('./finding-schema')
+const { enforceContract } = require('../src/pipeline/evidence-contract')
 
 const ACTIVITY_LOG = (__roots.INTEL_ROOT + '/ACTIVITY-LOG.jsonl')
 const INTEL_DIR = __roots.INTEL_ROOT
@@ -184,9 +185,15 @@ function parseauditorEntry(rawLine, taskId) {
     sentry_ts: entry.ts || new Date().toISOString(),
     source: 'auditor-validated-builder',
   }
+  // Evidence contract: a CONFIRMED record with no replayable evidence is demoted
+  // to NEEDS-LIVE (not treated as proven) rather than silently published.
+  const contracted = enforceContract(record)
+  if (contracted.evidence_demoted) {
+    console.warn(`[auditor-validated-builder] evidence-contract: ${contracted.id} demoted CONFIRMED→NEEDS-LIVE (no replayable evidence) taskId=${contracted.taskId || '?'}`)
+  }
   // Task 4: enforce FindingSchema at producer boundary. Auto-repair + warn,
   // never reject — silent data loss is the failure mode we're closing.
-  const validated = validateFinding(record)
+  const validated = validateFinding(contracted)
   if (validated.warnings.length > 0) {
     for (const w of validated.warnings) {
       console.warn(`[auditor-validated-builder] auto-repair: ${w} (taskId=${record.taskId || '?'})`)
