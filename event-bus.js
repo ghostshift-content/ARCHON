@@ -928,10 +928,8 @@ function blockReportPublication(taskId, arbiterResult, reason) {
 // Pentest agents — dynamic with hardcoded fallbacks
 // v2: Added FORGE (SSTI), LEDGER (Business Logic) to always-run list
 const FALLBACK_PENTEST_SPECIALISTS = ['viper', 'drill', 'relay', 'vault', 'warden', 'forge', 'ledger', 'sentry', 'gateway']
-// Apply the per-squad operational cap from squad.json (GATE-101 config, now LIVE).
-// Fail-soft: no/invalid config → uncapped (today's behavior). This makes squad.json
-// actually consumed at dispatch and makes auto-applier's squad_config_patch effective
-// (it was a runtime no-op before). maxSpecialists only ever REDUCES the list, never grows it.
+// Apply the per-squad operational cap (maxSpecialists) from squad.json.
+// Fail-soft: no/invalid config → uncapped. Only ever REDUCES the list, never grows it.
 function _applySquadCap(squad, list) {
   try {
     const cfg = require('./agents/squad-config-loader').loadSquadConfig(squad)
@@ -3343,55 +3341,6 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
         }
       } catch (_markerErr) { /* fail-soft: marker post-processor must never break the pipeline */ }
 
-      // ── Episode Record (upgraded 2026-06-05): real findingCount + suppressionCount ──
-      // gradeScore is 0 here (gradeTask() hasn't run yet) — updateTaskGrade() patches
-      // it retroactively once the task-level grade is known. findingCount and
-      // suppressionCount are read from disk at settle time (best-effort, fail-soft).
-      try {
-        let _findingCount = 0
-        try {
-          const lfFile = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
-          if (fs.existsSync(lfFile)) {
-            _findingCount = fs.readFileSync(lfFile, 'utf-8').split('\n').filter(Boolean)
-              .filter(l => { try { const o = JSON.parse(l); return (o.agent||'').toUpperCase() === String(agentName).toUpperCase() } catch { return false } })
-              .length
-          }
-        } catch {}
-
-        let _suppressionCount = 0
-        try {
-          const slFile = (agentPaths.INTEL_ROOT + '/suppression-ledger.jsonl')
-          if (fs.existsSync(slFile)) {
-            _suppressionCount = fs.readFileSync(slFile, 'utf-8').split('\n').filter(Boolean)
-              .filter(l => { try { const o = JSON.parse(l); return o.taskId === taskId && (o.agentName||'').toUpperCase() === String(agentName).toUpperCase() } catch { return false } })
-              .length
-          }
-        } catch {}
-
-        require('./agents/episode-record').emitEpisode({
-          taskId,
-          squad,
-          agentName,
-          phase: 'specialist',
-          outcome: (code === 0 || code === 1) ? 'completed' : 'failed',
-          gradeScore: null,  // null = UNGRADED; patched to the real value by updateTaskGrade() only if the task is actually graded
-          costUsd: cost && cost.totalCost || 0,
-          durationMs: Date.now() - spawnTime,
-          adapterUsed: resolvedAdapterName(),
-          suppressionCount: _suppressionCount,
-          findingCount: _findingCount,
-          // Learning-signal metadata. These come via opts (the wave/reflexion maps live
-          // in dispatchPentestParallel's scope, NOT here) — referencing them directly was a
-          // ReferenceError swallowed by the catch below, so episodes.jsonl was NEVER written
-          // for any squad and the learning loop had zero data. Fixed 2026-06-08.
-          waveNumber: (opts && opts.waveNumber) || 0,
-          reflexionContextUsed: !!(opts && opts.reflexionContextUsed),
-          actualModel: (cost && cost.model) || null,
-        })
-      } catch (epErr) {
-        // LOUD now — a swallowed throw here is what hid the dead-episode bug for weeks
-        log(`⚠️ episode emit failed for ${agentName} (${epErr.message}) — learning loop loses this signal`)
-      }
 
       resolve({ agentName, code, cost, output })
     }
@@ -8304,24 +8253,6 @@ async function dispatchToAgent(dispatch) {
       // Grade the combined output
       const gradeResult = await gradeTask(agentId, taskId, squad, dispatch)
 
-      // Retroactively patch specialist episode gradeScores with task-level passRate
-      try { if (gradeResult && Number.isFinite(gradeResult.passRate)) require('./agents/episode-record').updateTaskGrade(taskId, gradeResult.passRate / 100) } catch {}
-
-      // ── Quality Baseline Tracker (B4, 2026-06-05) ──
-      try {
-        const qt = require('./agents/quality-tracker')
-        qt.recordRunQuality({
-          taskId,
-          squad,
-          agentName: leader,
-          passed: (gradeResult && Number.isFinite(gradeResult.passRate)) ? (gradeResult.passedCount || 0) : null,
-          total: (gradeResult && Number.isFinite(gradeResult.passRate)) ? (gradeResult.totalExp || 0) : null,
-          gradeScore: (gradeResult && Number.isFinite(gradeResult.passRate)) ? gradeResult.passRate : null,
-          costUsd: totalCost || 0,
-          durationMs: 0,
-          adapterUsed: resolvedAdapterName(),
-        })
-      } catch {}
 
       // Run separate LLM grader (independent context)
       runSeparateGrader(taskId, taskTitle, squad).catch(e => log(`⚠️ LLM grader async error: ${e.message}`))
@@ -8467,15 +8398,6 @@ async function dispatchToAgent(dispatch) {
     runningAgents.delete(leader)
     setAgentIdle(leader)
     logEvent('TASK_DONE', { taskId, squad, totalCost: typeof totalCost !== 'undefined' ? totalCost : 0 })
-    // ── Post-dispatch learning loop (2026-06-09) ──
-    // OBSERVE→DISTILL→PROPOSE was dormant: episodes accrued but runLoop was NEVER invoked.
-    // Fire it here in PROPOSE-ONLY mode (autoApply:false → human-tap) so the auto-improve loop
-    // actually produces proposals after each run. Fire-and-forget, fail-soft (pure-JS, no LLM).
-    try {
-      require('./agents/learning-loop').runLoop({ squad, windowDays: 7, autoApply: false })
-        .then(r => { if (r && r.proposals > 0) log(`🧠 Learning loop: ${r.proposals} proposal(s) queued for review — node agents/learning-loop.js list`) })
-        .catch(() => {})
-    } catch {}
 
     // Mark task done
     try {
@@ -9002,15 +8924,6 @@ Execute now! Start by reading your skills, then begin the assessment.`
       runningAgents.delete(leader)
       setAgentIdle(leader)
       logEvent('TASK_DONE', { taskId, squad, exitCode: code })
-      // ── Post-dispatch learning loop (2026-06-09) ──
-      // OBSERVE→DISTILL→PROPOSE was dormant: episodes accrued but runLoop was NEVER invoked.
-      // Fire it here in PROPOSE-ONLY mode (autoApply:false → human-tap) so the auto-improve loop
-      // actually produces proposals after each run. Fire-and-forget, fail-soft (pure-JS, no LLM).
-      try {
-        require('./agents/learning-loop').runLoop({ squad, windowDays: 7, autoApply: false })
-          .then(r => { if (r && r.proposals > 0) log(`🧠 Learning loop: ${r.proposals} proposal(s) queued for review — node agents/learning-loop.js list`) })
-          .catch(() => {})
-      } catch {}
 
       // ── API Error Detection + Auto-Retry ──
       if (code !== 0) {
@@ -9112,24 +9025,6 @@ Execute now! Start by reading your skills, then begin the assessment.`
       // Grade
       const gradeResult = await gradeTask(agentId, taskId, squad, dispatch)
 
-      // Retroactively patch specialist episode gradeScores with task-level passRate
-      try { if (gradeResult && Number.isFinite(gradeResult.passRate)) require('./agents/episode-record').updateTaskGrade(taskId, gradeResult.passRate / 100) } catch {}
-
-      // ── Quality Baseline Tracker (B4, 2026-06-05) ──
-      try {
-        const qt = require('./agents/quality-tracker')
-        qt.recordRunQuality({
-          taskId,
-          squad,
-          agentName: leader,
-          passed: (gradeResult && Number.isFinite(gradeResult.passRate)) ? (gradeResult.passedCount || 0) : null,
-          total: (gradeResult && Number.isFinite(gradeResult.passRate)) ? (gradeResult.totalExp || 0) : null,
-          gradeScore: (gradeResult && Number.isFinite(gradeResult.passRate)) ? gradeResult.passRate : null,
-          costUsd: cost?.totalCost || 0,
-          durationMs: 0,
-          adapterUsed: resolvedAdapterName(),
-        })
-      } catch {}
 
       // Run separate LLM grader (independent context)
       runSeparateGrader(taskId, taskTitle, squad).catch(e => log(`⚠️ LLM grader async error: ${e.message}`))

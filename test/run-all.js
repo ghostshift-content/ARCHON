@@ -26,10 +26,7 @@ const BUN_FILES = new Set([
   'grader.test.js',
   'phase-envelope.test.js',
   'suppression-ledger.test.js',
-  'quality-tracker.test.js',
   'squad-config-loader.test.js',
-  'episode-record.test.js',
-  'learning-loop.test.js',
   'goal-evaluator.test.js',
 ])
 

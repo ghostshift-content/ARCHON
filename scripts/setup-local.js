@@ -35,7 +35,7 @@ console.log(`  INTEL_ROOT  = ${INTEL}`)
 // ── 1. Directory skeleton ──
 const DIRS = [
   '', 'reports', 'tasks', 'orchestrator', 'streams', 'handoffs', 'pentest',
-  'code-review', 'episodes', 'trajectory', 'archive', 'poc-evidence', 'scope',
+  'code-review', 'trajectory', 'archive', 'poc-evidence', 'scope',
   'logs', 'quarantine',
 ]
 console.log('\n[1/3] Directories')
@@ -149,8 +149,7 @@ const STATE = {
 }
 const TOUCH = [
   'ACTIVITY-LOG.jsonl', 'suppression-ledger.jsonl', 'verification-log.jsonl',
-  'learning-proposals.jsonl', 'episodes/episodes.jsonl', 'orchestrator/events.jsonl',
-  'trajectory/observations.jsonl',
+  'orchestrator/events.jsonl', 'trajectory/observations.jsonl',
 ]
 
 console.log('\n[3/3] State files')
