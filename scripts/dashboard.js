@@ -448,13 +448,16 @@ function findingsForSingleTask(id, label) {
     const d = detail[f.id] || {}
     const poc = d.poc || f.reproduction_method || f.reproduction || ''
     if (f.url) seenUrls.add(_normUrl(f.url))
+    const cvss = typeof d.cvss_score === 'number' ? d.cvss_score : (typeof f.cvss_score === 'number' ? f.cvss_score : (f.cvss || null))
     out.push({
       key: id + '::' + f.id, srcTask: id, iteration: label || '',
       id: f.id, severity: titleSev(f.severity), title: f.title || f.id,
-      cvss: typeof d.cvss_score === 'number' ? d.cvss_score : (typeof f.cvss_score === 'number' ? f.cvss_score : (f.cvss || null)),
+      cvss,
       cvssVector: d.cvss_vector || f.cvss_vector || '',
       cwe: d.cwe || f.cwe || '',
       testSteps: Array.isArray(d.test_steps) ? d.test_steps : [],
+      // lifecycle: validated by AUDITOR; 'scored' once CVSS has been enriched (Phase 3.1)
+      stage: cvss != null ? 'scored' : 'validated',
       agent: f.original_agent || f.agent || '', status: f.validation_status || 'CONFIRMED',
       url: f.url || '', method: f.method || '',
       description: d.description || f.description || f.summary || '',
@@ -477,7 +480,9 @@ function findingsForSingleTask(id, label) {
       key: id + '::' + fid, srcTask: id, iteration: label || '',
       id: fid, severity: titleSev(f.severity), title: _liveTitle(f),
       cvss: null, cvssVector: '', cwe: f.cwe || '', testSteps: [],
-      agent: f.agent || '', status: _liveStatus(f),
+      // lifecycle: the finding agent's own claim — NOT yet validator-confirmed (amber, not green)
+      stage: _liveStatus(f) === 'CONFIRMED' ? 'agent-confirmed' : 'suspected',
+      agent: f.agent || '', status: _liveStatus(f) === 'CONFIRMED' ? 'AGENT-CONFIRMED' : 'SUSPECTED',
       url: f.url || '', method: '',
       description: f.details || '', poc: f.reproduction || '', validation: '',
       impact: f.impact || '', remediation: '',

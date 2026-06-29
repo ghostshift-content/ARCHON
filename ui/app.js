@@ -418,6 +418,15 @@ function renderIterBar() {
   $('#fnRunAnother').onclick = () => { const f = $('#fnIterForm'); f.style.display = f.style.display === 'none' ? 'block' : 'none' }
   $$('#fnIterBar .iter-chip').forEach(c => c.onclick = () => { fnFilter = c.dataset.iter; renderIterBar(); renderFindings() })
 }
+// lifecycle pill: agent-confirmed (amber) → validated (green) → scored (green + CVSS) → suspected (grey)
+function stagePill(f) {
+  const s = f.stage || (f.source === 'validated' ? 'validated' : 'agent-confirmed')
+  if (s === 'scored') return `<span class="fstatus ok" title="Validator-confirmed and CVSS-scored">✓ Validated · CVSS</span>`
+  if (s === 'validated') return `<span class="fstatus ok" title="Confirmed by the validator (AUDITOR)">✓ Validated</span>`
+  if (s === 'agent-confirmed') return `<span class="fstatus amber" title="The finding agent confirmed this — awaiting validator">● Agent-confirmed</span>`
+  if (s === 'suspected') return `<span class="fstatus muted" title="Suspected — not yet confirmed">Suspected</span>`
+  return ''
+}
 // severity summary reflects the CURRENT triage across the WHOLE engagement (overrides applied, rejected excluded)
 function recountSummary() {
   const counts = {}; for (const s of SEV) counts[s] = 0
@@ -438,7 +447,7 @@ function renderFindings() {
       <div class="fmain">
         <span class="badge fbadge sev-${sevNow.toLowerCase()}">${esc(sevNow)}</span>
         ${cvssNow != null ? `<span class="fcvss">CVSS ${cvssNow}</span>` : ''}
-        ${v.verdict === 'rejected' ? '<span class="fcancelled">✕ Cancelled</span>' : (f.status ? `<span class="fstatus ${/confirm/i.test(f.status) ? 'ok' : 'warn'}">${/confirm/i.test(f.status) ? '✓ Confirmed' : (f.status === 'NEEDS-LIVE' ? 'Needs-live' : 'Unconfirmed')}</span>` : '')}
+        ${v.verdict === 'rejected' ? '<span class="fcancelled">✕ Cancelled</span>' : stagePill(f)}
         <span class="ftitle">${esc(f.title)}</span>
         ${f.iteration ? `<span class="iter-tag">${esc(f.iteration)}</span>` : ''}
         <div class="seg fverdict" data-noopen><button data-fv="confirmed" class="${v.verdict !== 'rejected' ? 'on' : ''}" type="button" title="Confirm">✓</button><button data-fv="rejected" class="${v.verdict === 'rejected' ? 'on' : ''}" type="button" title="Reject">✕</button></div>
@@ -496,7 +505,7 @@ function openFindingPage(key) {
   const tags = [
     f.cvss != null ? `<span class="fcvss">CVSS ${f.cvss}</span>` : '',
     f.cwe ? `<span class="fcwe">${esc(f.cwe)}</span>` : '',
-    f.status ? `<span class="fstatus ${/confirm/i.test(f.status) ? 'ok' : 'warn'}">${/confirm/i.test(f.status) ? '✓ Confirmed' : (f.status === 'NEEDS-LIVE' ? 'Needs-live' : 'Unconfirmed')}</span>` : '',
+    stagePill(f),
   ].filter(Boolean).join(' ')
   $('#fdInfo').innerHTML = `<h3>${esc(f.id)} · ${esc(f.agent || '')} ${tags}</h3>
     ${sec('Description', f.description)}

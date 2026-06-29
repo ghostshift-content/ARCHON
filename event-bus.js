@@ -3683,9 +3683,15 @@ Read attack plan (Phase 1.9): cat ${agentPaths.INTEL_ROOT}/attack-plan-${taskId}
 Read WAF bypass reference (use when a WAF vendor is named): cat ${agentPaths.AGENTS_ROOT}/agents/refs/waf-bypass.md 2>/dev/null
 Read memory: cat ${agentPaths.lessonsPath(agentLower)} 2>/dev/null
 
-## CROSS-COLLABORATION — share findings for other agents to chain off
-echo '{"agent":"${agentUpper}","type":"confirmed|suspected|surface","url":"URL","relation":"backend-of|redirect-to|api-for|subdomain-of|same-app","parent":"${targetUrl}","auth":"none|cookie|bearer|saml|azure-ad|custom","tested":["what-you-tested"],"not_tested":["what-remains"],"details":"WHAT_YOU_FOUND","severity":"critical|high|medium|low|info","confidence":"high|medium|low","impact":"WHAT_AN_ATTACKER_GAINS_concretely","reproduction":"EXACT_CURL_COMMAND_OR_STEPS","payloads_tried":["each payload incl WAF-bypass mutations + which landed"]}' >> ${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl
-On every CONFIRMED finding you MUST fill "impact" with the concrete attacker gain (e.g. "read any user's invoices via IDOR", "execute OS commands as www-data"), not just the severity word.
+## CROSS-COLLABORATION — record EVERY finding so other agents chain off it + it reaches the report
+For EACH finding run this ONE command (it writes clean JSON for you — NEVER hand-write JSON into the findings file):
+node ${agentPaths.AGENTS_ROOT}/tools/emit-finding.js --task ${taskId} --agent ${agentUpper} --type confirmed|suspected|surface --severity critical|high|medium|low|info --confidence high|medium|low --url "URL" --relation backend-of|redirect-to|api-for|subdomain-of|same-app --parent "${targetUrl}" --auth none|cookie|bearer|saml|azure-ad|custom --details "WHAT_YOU_FOUND" --impact "WHAT_AN_ATTACKER_GAINS_concretely" --tested "what,you,tested" --not-tested "what,remains" --reproduction-file /tmp/repro-${agentUpper}.txt --payloads-file /tmp/payloads-${agentUpper}.txt
+Multi-line evidence goes in the temp files first, e.g.: the exact request/response or command output → /tmp/repro-${agentUpper}.txt; each payload (incl WAF-bypass mutations + which landed), one per line → /tmp/payloads-${agentUpper}.txt. Short single-line fields can use --reproduction "curl ..." instead of the file flag.
+Worked example:
+  printf '%s\\n' 'GET /download/0 HTTP/1.1' 'Host: 10.0.0.1' '' '→ 200, leaks creds nathan:hunter2' > /tmp/repro-${agentUpper}.txt
+  node ${agentPaths.AGENTS_ROOT}/tools/emit-finding.js --task ${taskId} --agent ${agentUpper} --type confirmed --severity critical --confidence high --url "http://10.0.0.1/download/0" --details "Unauthenticated IDOR exposes PCAP files with cleartext FTP creds" --impact "Any unauthenticated user downloads every capture + recovers FTP credentials" --reproduction-file /tmp/repro-${agentUpper}.txt
+This helper guarantees your finding is recorded without corruption even when reproduction contains newlines, quotes, or backslashes (USER\\|PASS). Run it once per finding.
+On every CONFIRMED finding you MUST fill --impact with the concrete attacker gain (e.g. "read any user's invoices via IDOR", "execute OS commands as www-data"), not just the severity word.
 EVIDENCE CONTRACT: only set type=confirmed if you CAPTURED replayable evidence (the exact request/response, command output, or DOM proof) and put it in "reproduction". No captured evidence → type=suspected. A confirmed claim without evidence is demoted automatically — it does not help you to over-claim.
 Always populate \`tested\` + \`not_tested\` so other agents know the gaps.
 
@@ -5470,6 +5476,18 @@ async function dispatchPentestParallel(dispatch) {
         }
       } catch (__envErr) {
         log(`⚠️ Phase 3.05 envelope guard error (non-fatal): ${__envErr.message}`)
+      }
+
+      // ── PHASE 3.1: Auto-enrich validated findings (CVSS + detail) right after they're
+      // built, so the Findings tab shows SCORED findings live during the run — not only at
+      // report time. enrichFindingsForTask first ensureValidatedFindings (promotes live
+      // findings if AUDITOR produced none), so this is also the safety net for empty VALIDATED.
+      // Fail-soft; idempotent (report-time enrich overwrites with the same data). ──
+      if (phaseEnabled('3.1', squad)) {
+        try {
+          await enrichFindingsForTask(taskId)
+          log(`💯 Phase 3.1: Auto-enriched findings (CVSS + detail) for ${taskId}`)
+        } catch (__enrErr) { log(`⚠️ Phase 3.1 auto-enrich (non-fatal): ${__enrErr.message}`) }
       }
 
       // ── PHASE 3.055: Challenger — adversarial refuter for top CONFIRMED findings ──
