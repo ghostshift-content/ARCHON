@@ -198,6 +198,39 @@ there.
 
 ---
 
+## 6b. Autonomous mode (AI-driven, autonomous)
+
+ARCHON reasons about the target and adapts payloads to it — you don't configure this,
+it happens inside the run:
+
+1. **Fingerprint (Phase 0.6)** — identifies the *exact* stack (e.g. "Adobe AEM 6.5",
+   WAF vendor) → `env-fingerprint-<taskId>.json`.
+2. **Strategist (Phase 1.9)** — ATLAS ranks *what to attack first*, stack-specific →
+   `attack-plan-<taskId>.json`.
+3. **Adaptive exploitation (Phase 2)** — specialists generate payloads **specific to the
+   product** (AEM → AEM payloads, not generic) and, when a WAF is named, fire → read the
+   block → **mutate with vendor-specific bypasses** → refire. Every attempt is logged.
+4. **Re-plan (Phase 3.087)** — after the round, ATLAS lists the follow-ups + **attack
+   chains** still worth chasing → "Recommended Next Round" in the report.
+
+### Proving impact with a live PoC (gated — authorized engagements only)
+
+By default ARCHON **describes** impact but never fires an exploit to demonstrate it. To
+have the **Exploit-Prover** fire a *benign* payload that proves impact (RCE → `echo
+<nonce>`, confirmed only if the nonce comes back), an engagement must clear **all three
+gates**:
+
+- `ARCHON_ACTIVE_POC=enabled` in the daemon env, **and**
+- the dispatch carries `engagement_mode: "active-poc"`, **and**
+- a valid `active_poc_permission` token (issuer, expiry, `scope_domains`, capabilities).
+
+Miss any one → nothing fires (logged as "no fire"). Only enable this against targets you
+are explicitly authorized to actively exploit. `ARCHON_AUTONOMY=enabled` (hop-capped via
+`ARCHON_AUTONOMY_HOPS`) surfaces the re-plan's high-value follow-ups as an auto-chase
+signal; the re-plan intel itself is always produced.
+
+---
+
 ## 7. Troubleshooting setup
 
 | Symptom | Likely cause | Fix |

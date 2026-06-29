@@ -94,6 +94,8 @@ Optional, off by default:
 | `ARCHON_SCOPE_OVERRIDE=1` | allow a dispatch with **no** scope config (Phase 0.0 fails *closed* by default — a missing scope blocks the run) |
 | `ARCHON_CALENDAR=1` | enable the calendar scheduler (a mission-control feature; off in the OSS build) |
 | `KURU_MISSION_CONTROL_DATA` | path to an optional mission-control data dir (`agents.json`/`squads.json`/`calendar.json`); absent is fine — the pipeline has built-in role fallbacks |
+| `ARCHON_ACTIVE_POC=enabled` | allow the gated Exploit-Prover to **fire a benign payload** that *proves* impact (RCE → `echo <nonce>`). Requires `engagement_mode: active-poc` + a valid permission token in the dispatch. **Off by default — fires nothing.** Authorized engagements only. |
+| `ARCHON_AUTONOMY=enabled` + `ARCHON_AUTONOMY_HOPS=<n>` | surface the re-planning loop's high-value follow-ups as an autonomy signal (hop-capped). The re-plan *intel* is always produced; this just flags auto-chase. |
 
 ### Prerequisites & failure modes
 
