@@ -5987,7 +5987,11 @@ Be brief and specific. This is an adversarial check.`
     // createHandoff() — no LLM involved. handoff-protocol enforces the
     // 3-per-finding cap as the idempotence guarantee, so re-running on the
     // same task is safe. Fail-soft per finding+rule.
-    try {
+    // Gated on Phase 3.45 (squad.json enabledPhases). In this 2-squad build the
+    // rule targets (cloud-security/network-pentest/code-review capabilities) have
+    // no capabilities.json, so every emitted handoff dead-letters to handoffs/failed/.
+    // Disabled by default; remove '3.45' from enabledPhases keeps the inbox empty.
+    if (phaseEnabled('3.45', squad)) try {
       const __ruleGen = require('./agents/rule-based-handoff-generator')
       const __hp = require('./agents/handoff-protocol')
       // 2026-05-11: Switched from shared /root/intel/pentest/VALIDATED-FINDINGS.jsonl
@@ -10752,9 +10756,16 @@ function startWatcher() {
     }
   }
   // Kick the first sweep on next tick so startup isn't blocked, then poll every 30s.
-  setImmediate(() => { runHandoffSweep().catch(e => log(`⚠️ Handoff initial sweep: ${e.message}`)) })
-  setInterval(() => { runHandoffSweep().catch(e => log(`⚠️ Handoff sweep: ${e.message}`)) }, 30000)
-  log('📨 Handoff inbox watcher started (30s poll, fail-soft)')
+  // Gated on Phase 3.45: with the rule-based producer disabled (no resolvable
+  // cross-squad targets in this 2-squad build) the inbox stays empty, so there is
+  // nothing to sweep — skip the perpetual no-op poll entirely.
+  if (phaseEnabled('3.45', 'pentest')) {
+    setImmediate(() => { runHandoffSweep().catch(e => log(`⚠️ Handoff initial sweep: ${e.message}`)) })
+    setInterval(() => { runHandoffSweep().catch(e => log(`⚠️ Handoff sweep: ${e.message}`)) }, 30000)
+    log('📨 Handoff inbox watcher started (30s poll, fail-soft)')
+  } else {
+    log('📨 Handoff inbox watcher NOT started (Phase 3.45 disabled — no resolvable cross-squad targets)')
+  }
 
   // Arm the per-mutation checkpoint persister now that we're past bootstrapping.
   // From here on, EVERY runningAgents.add/delete + runningTasks.add/delete writes
