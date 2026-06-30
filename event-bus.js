@@ -2385,9 +2385,13 @@ async function _runtracerAgentInner(target, taskId) {
   const { runWithHeartbeat } = require('./agents/long-running-spawn')
   let crawl4aiSuccess = false
   try {
-    // Full depth crawl with memory-safe timeout — no missing endpoints
-    // Connect to existing Chrome on port 18800 via CDP — no new browser spawn, saves ~2GB RAM
-    const crawlCmd = `CRAWL4AI_CDP_URL=http://localhost:18800 timeout 300 python3 ${agentPaths.skillsDir('tracer')}/web-crawling/scripts/crawl4ai_crawler.py -u "${sTarget}" -d 4 --max-pages 200 -o "${outDir}" 2>&1`
+    // Full depth crawl with memory-safe timeout — no missing endpoints.
+    // Reuse a persistent Chrome on CDP 18800 IF one is up (saves ~2GB RAM); otherwise let
+    // crawl4ai self-spawn its own playwright browser so the crawl works out of the box.
+    let _cdpPrefix = ''
+    try { require('child_process').execSync('curl -sf -o /dev/null --max-time 2 http://localhost:18800/json/version', { timeout: 3000 }); _cdpPrefix = 'CRAWL4AI_CDP_URL=http://localhost:18800 ' }
+    catch { _cdpPrefix = '' } // no CDP Chrome → self-spawn
+    const crawlCmd = `${_cdpPrefix}timeout 300 python3 ${agentPaths.skillsDir('tracer')}/web-crawling/scripts/crawl4ai_crawler.py -u "${sTarget}" -d 4 --max-pages 200 -o "${outDir}" 2>&1`
     log(`   Phase A3: crawl4ai browser crawl (depth 4, max 200, CDP reuse, 5min timeout, heartbeat 30s)...`)
     const crawlResult = await runWithHeartbeat(crawlCmd, {
       timeout: 200000,
