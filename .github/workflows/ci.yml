@@ -24,7 +24,7 @@ jobs:
       - name: secret / PII / client-data scan
         run: node scripts/scan-secrets.js
       - name: gitleaks (defense in depth)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
