@@ -50,6 +50,6 @@
     "acorn": "^8.16.0"
   },
   "optionalDependencies": {
-    "playwright": "^1.59.1"
+    "playwright": "^1.61.1"
   }
 }
