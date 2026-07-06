@@ -24,8 +24,28 @@ function _feature(f, batch) {
 // Build a fresh ledger from assigned batches (each: {id, domain, risk, owner, features:[{slug,name,domain,risk_hint}]}).
 function build(taskId, batches) {
   const features = {}
-  for (const b of batches || []) for (const f of (b.features || [])) features[f.slug] = _feature(f, b)
-  return recount({ taskId: String(taskId), features_total: 0, features_done: 0, batches_total: 0, batches_done: 0, features })
+
+  for (const b of batches || []) {
+    for (const f of (b.features || [])) {
+
+      if (features[f.slug]) {
+        throw new Error(
+          `duplicate feature slug detected: ${f.slug}`
+        )
+      }
+
+      features[f.slug] = _feature(f, b)
+    }
+  }
+
+  return recount({
+    taskId: String(taskId),
+    features_total: 0,
+    features_done: 0,
+    batches_total: 0,
+    batches_done: 0,
+    features
+  })
 }
 
 // Recompute rollup counts: features_done = terminal features; batches_done = batches whose features are all terminal.

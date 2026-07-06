@@ -83,3 +83,26 @@ test('blockers surfaced; save/load round-trip', () => {
   assert.equal(r.features.login.status, 'blocked'); assert.equal(r.features_total, 3)
   assert.equal(L.load(path.join(dir, 'nope')), null) // missing → null (fail-soft)
 })
+
+test('rejects duplicate feature slugs across batches', () => {
+  assert.throws(() => {
+    L.build('task1', [
+      {
+        id: 'batch-a',
+        features: [
+          {
+            slug: 'login'
+          }
+        ]
+      },
+      {
+        id: 'batch-b',
+        features: [
+          {
+            slug: 'login'
+          }
+        ]
+      }
+    ])
+  }, /duplicate feature slug/)
+})
