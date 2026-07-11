@@ -24,6 +24,7 @@ const __roots = require('../../paths') // portable roots (KURU_*_ROOT) — see p
 const fs = require('fs')
 const path = require('path')
 const https = require('https')
+const { getAnthropicApiAgent } = require('../integrations/proxy-config')
 
 const CONFIG_PATH = (__roots.INTEL_ROOT + '/model-config.json')
 const OVERRIDES_PATH = (__roots.INTEL_ROOT + '/agent-model-overrides.json')
@@ -343,6 +344,11 @@ function _headerString(p0) {
 
 function _fetchAvailableModels(apiKey) {
   return new Promise((resolve, reject) => {
+    // Route through the operator's configured intercepting proxy (Burp/ZAP/
+    // mitmproxy), if any — see src/integrations/proxy-config.js. `agent` is
+    // simply omitted (undefined) when no proxy is configured, so this is a
+    // no-op for the default (unproxied) path.
+    const agent = getAnthropicApiAgent()
     const req = https.request({
       hostname: 'api.anthropic.com',
       path: '/v1/models',
@@ -352,6 +358,7 @@ function _fetchAvailableModels(apiKey) {
         'anthropic-version': '2023-06-01',
       },
       timeout: 5000,
+      ...(agent ? { agent } : {}),
     }, (res) => {
       const chunks = []
       res.on('data', (c) => chunks.push(c))

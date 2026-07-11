@@ -8,6 +8,16 @@ All notable changes to ARCHON are documented here. The format follows
 
 _Post-1.2 work in progress — see [BACKLOG.md](./BACKLOG.md) and [ROADMAP.md](./ROADMAP.md)._
 
+### Added
+- **Intercepting-proxy support (Burp Suite / ZAP / mitmproxy)** — `ARCHON_PROXY_URL` (+
+  `ARCHON_PROXY_ENABLED`/`_BYPASS`/`_CA_CERT`/`_INSECURE`) routes all outbound agent HTTP/HTTPS
+  traffic — every subprocess a specialist agent's Bash tool spawns (curl/nuclei/sqlmap/git/wget/
+  python/node), the chain-verifier's curl replay, the browser-verifier's headless Chromium, and
+  ARCHON's own `api.anthropic.com` startup check — through a single configurable proxy. Off by
+  default; loopback targets always bypass the proxy so local fixtures/staging keep working. See
+  `src/integrations/proxy-config.js` and the README's "Proxying traffic through Burp Suite" section.
+  Closes the roadmap gap noted in `src/safety/production-safety.js`.
+
 ## [1.2.0] — 2026-07-07
 
 Source-runtime parity: the whole static / white-box pipeline now runs as the same controlled,

@@ -26,6 +26,7 @@
 
 const os = require('os')
 const anthropicKey = require('../../../src/integrations/anthropic-key')
+const proxyConfig = require('../../../src/integrations/proxy-config')
 
 // ───────────────────────────────────────────────────────────────────────────
 // EXTRA-ENV ALLOWLIST (INVARIANT v2.1-A1, narrowed): the ONLY non-base env keys
@@ -54,6 +55,15 @@ const ALLOWED_EXTRA_KEYS = ['AGENT_TASK_ID']
  *                       absent so CLI falls back to OAuth auth
  *   <extras>          — caller-supplied keys, each of which MUST be in
  *                       ALLOWED_EXTRA_KEYS (else throws). Narrow allowlist only.
+ *   HTTP_PROXY / HTTPS_PROXY / NO_PROXY (+ lowercase) / NODE_EXTRA_CA_CERTS /
+ *   NODE_TLS_REJECT_UNAUTHORIZED — injected from proxy-config.js IFF an operator
+ *                       has configured an intercepting proxy (Burp Suite, ZAP,
+ *                       mitmproxy, ...). This is what routes agent-fired
+ *                       curl/nuclei/sqlmap/git/wget/node/python subprocesses
+ *                       through the proxy. See proxy-config.js for the config
+ *                       surface (ARCHON_PROXY_URL/_ENABLED/_BYPASS/_CA_CERT/
+ *                       _INSECURE). Absent entirely when no proxy is configured —
+ *                       zero behavior change for operators who don't opt in.
  *
  * @param {object} [opts]
  * @param {object} [opts.extras]      - extra env keys to inject; each key MUST be
@@ -133,6 +143,16 @@ function buildSpawnEnv(opts = {}) {
       if (val !== undefined && val !== null) env[key] = String(val)
     }
   }
+
+  // Intercepting-proxy support (Burp Suite / ZAP / mitmproxy / any HTTP(S) or
+  // SOCKS proxy) — see proxy-config.js. This is a DEDICATED, named set of keys
+  // (not a generic passthrough), so it doesn't weaken the v2.1-A1 allowlist
+  // invariant above: an operator opts in explicitly via ARCHON_PROXY_URL /
+  // ARCHON_PROXY_ENABLED, and getProxyEnv() returns {} (no-op) otherwise.
+  // This is what makes every curl/nuclei/sqlmap/git/wget/node/python subprocess
+  // an agent's Bash tool spawns visible in the proxy — not just ARCHON's own
+  // direct API calls.
+  Object.assign(env, proxyConfig.getProxyEnv())
 
   return env
 }

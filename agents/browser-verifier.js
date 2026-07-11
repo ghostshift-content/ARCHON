@@ -23,6 +23,7 @@
 
 const { chromium } = require('playwright')
 const { validateRecipe } = require('./browser-recipe-validator')
+const { getPlaywrightProxyOption } = require('../src/integrations/proxy-config')
 
 const STEP_TIMEOUT_MS = 15_000
 const FINDING_TIMEOUT_MS = 60_000
@@ -81,11 +82,22 @@ async function verifyRecipe(recipe, opts = {}) {
     const result = await runWithTimeout(
       FINDING_TIMEOUT_MS,
       async () => {
+        // Route this recipe's browser traffic through the operator's configured
+        // intercepting proxy (Burp Suite / ZAP / mitmproxy), if any — see
+        // src/integrations/proxy-config.js. undefined when no proxy is
+        // configured, which Playwright treats as "no proxy" (no behavior change
+        // for operators who haven't opted in).
+        const proxy = getPlaywrightProxyOption()
         browser = await chromium.launch({
           headless: true,
           args: LAUNCH_ARGS,
+          ...(proxy ? { proxy } : {}),
         })
 
+        // ignoreHTTPSErrors already covers Burp's self-signed MITM cert without
+        // requiring ARCHON_PROXY_CA_CERT for the browser path specifically —
+        // curl/nuclei/sqlmap (via proxy-config's NODE_EXTRA_CA_CERTS/--cacert)
+        // still need the CA cert or ARCHON_PROXY_INSECURE to trust it.
         const contextOpts = { ignoreHTTPSErrors: true }
         if (recipe.setup && recipe.setup.viewport) {
           contextOpts.viewport = recipe.setup.viewport

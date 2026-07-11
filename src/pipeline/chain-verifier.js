@@ -21,6 +21,7 @@
 const { spawnSync } = require('child_process')
 const { isCorsAssertion, extractFinalResponse } = require('../../agents/redirect-aware-curl')
 const { guardRequest } = require('../safety/production-safety')
+const _proxyConfig = require('../integrations/proxy-config')
 
 // Maximum time per step (seconds). Prevents runaway curls.
 const STEP_TIMEOUT_SEC = 15
@@ -44,14 +45,21 @@ const ALLOWED_COMMANDS = Object.freeze([
 const ALLOWED_COMMAND = 'curl'
 
 // Loopback fixtures/targets must bypass an inherited proxy — http_proxy/HTTPS_PROXY in the env
-// (common on CI / corporate networks) otherwise routes 127.0.0.1 through a dead proxy and every
-// replay step returns HTTP/STATUS/000, so a valid exploit chain looks unverified when it's fine.
-// Belt-and-suspenders with the per-command --noproxy _augmentCurlArgs adds for loopback URLs;
-// preserves any operator-set NO_PROXY so real proxied engagements keep working.
+// (common on CI / corporate networks, or an ARCHON_PROXY_URL Burp config — see
+// src/integrations/proxy-config.js) otherwise routes 127.0.0.1 through a dead/intercepting
+// proxy and every replay step returns HTTP/STATUS/000, so a valid exploit chain looks
+// unverified when it's fine. Belt-and-suspenders with the per-command --noproxy
+// _augmentCurlArgs adds for loopback URLs; preserves any operator-set NO_PROXY so real
+// proxied engagements keep working.
+//
+// getProxyEnv() is merged in BEFORE the NO_PROXY override below so that an
+// ARCHON_PROXY_URL-style config (not just a raw HTTP_PROXY/HTTPS_PROXY the operator
+// exported themselves) also reaches curl — the two paths converge on the same env either way.
 function _execEnv() {
-  const base = process.env.NO_PROXY || process.env.no_proxy || ''
-  const merged = base ? `${base},127.0.0.1,localhost` : '127.0.0.1,localhost'
-  return { ...process.env, NO_PROXY: merged, no_proxy: merged }
+  const merged = { ...process.env, ..._proxyConfig.getProxyEnv() }
+  const base = merged.NO_PROXY || merged.no_proxy || ''
+  const noProxy = base ? `${base},127.0.0.1,localhost` : '127.0.0.1,localhost'
+  return { ...merged, NO_PROXY: noProxy, no_proxy: noProxy }
 }
 
 /**
@@ -390,6 +398,11 @@ function _augmentCurlArgs(args) {
   if (!args.some(a => typeof a === 'string' && a.includes('HTTP/STATUS/%{http_code}'))) {
     out.push('-w', '\nHTTP/STATUS/%{http_code}\n')
   }
+  // Trust an intercepting proxy's MITM certificate (Burp/ZAP/mitmproxy), if
+  // configured. curl already picks up HTTP_PROXY/HTTPS_PROXY from _execEnv()
+  // below — this only adds the TLS-trust piece, which curl needs as an
+  // explicit flag. No-op ([] ) when no proxy is configured.
+  out.push(..._proxyConfig.getCurlProxyArgs())
   return out
 }
 

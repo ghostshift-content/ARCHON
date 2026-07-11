@@ -66,6 +66,7 @@ missing (Node, the `claude` login, optional tools). Run **`npm run doctor`** any
 - [Field-tested — a real CVE](#field-tested--a-real-cve)
 - [Usage](#usage)
 - [Configuration](#configuration)
+- [Proxying traffic through Burp Suite](#proxying-traffic-through-burp-suite)
 - [Project structure](#project-structure)
 - [Safety & scope](#-safety--scope)
 - [Testing](#testing)
@@ -327,9 +328,59 @@ Optional, **off by default**:
 | `ARCHON_AUTONOMY=enabled` + `ARCHON_AUTONOMY_HOPS=<n>` | Surface the re-planning loop's follow-ups as an autonomy signal (hop-capped). The re-plan intel is always produced; this only flags auto-chase. |
 | `ARCHON_ENABLE_AUTONOMOUS_OS=1` (+ `ARCHON_ENABLE_<block>` / `ARCHON_DRIVE_<block>`) | Master switch for the experimental **Autonomous Agent OS** layer (Mission Director, knowledge graph, pattern catalogs, decision logging). Tri-state per block: enable ⇒ *shadow* (observe + write to `var/intel/shadow`, drives nothing); add `DRIVE` ⇒ *active*. **Off by default; flag-off is byte-identical to the deterministic pipeline.** See [ROADMAP.md](./ROADMAP.md). |
 | `ADAPTER=cli` | Use the CLI runner adapter (rollback floor) instead of the default SDK adapter. |
+| `ARCHON_PROXY_URL` | Route all outbound agent HTTP/HTTPS traffic through an intercepting proxy (Burp Suite, ZAP, mitmproxy). See **[Proxying traffic through Burp Suite](#proxying-traffic-through-burp-suite)** below. |
 
 `var/` (all runtime state, findings, reports) is gitignored. See **[SETUP-LOCAL.md](./SETUP-LOCAL.md)** for
 the portable-roots model in detail.
+
+---
+
+## Proxying traffic through Burp Suite
+
+For pentest workflows where you want every request ARCHON's agents make visible in Burp (or ZAP,
+mitmproxy, any HTTP(S)/SOCKS proxy) — for inspection, manual tampering, Collaborator, or just a
+complete record of the engagement — set one env var:
+
+```bash
+# .env.local, or exported before `npm start`
+ARCHON_PROXY_URL=http://127.0.0.1:8080   # Burp's default listener
+```
+
+That's it — proxying is **off by default** and this one var turns it on. It routes:
+
+- Every subprocess a specialist agent's Bash tool spawns — `curl`, `nuclei`, `sqlmap`, `git`, `wget`,
+  `python`, `node`, and anything else the agent invokes — via `HTTP_PROXY`/`HTTPS_PROXY` env forwarding
+  (`agents/runner/adapters/common.js`).
+- The `chain-verifier` step-replay engine's own `curl` calls (`src/pipeline/chain-verifier.js`).
+- The headless Chromium the `browser-verifier` agent launches for DOM-XSS / postMessage / CSP-bypass
+  verification, via Playwright's native `proxy` option.
+- ARCHON's own `api.anthropic.com` calls (optional — only the low-frequency startup model-list check).
+
+Loopback targets (`127.0.0.1`, `localhost`, `::1`) are **always** bypassed regardless of this setting, so
+proxying a remote engagement never silently breaks requests to a local fixture or staging app you're
+also running.
+
+**TLS**: Burp's MITM cert isn't in your system trust store by default, so HTTPS requests through the
+proxy will fail TLS verification unless you either:
+
+1. **Trust Burp's CA (recommended)** — export it from Burp (`Proxy` → `Options` → `Import / export CA
+   certificate` → Certificate in DER format, or PEM) and point `ARCHON_PROXY_CA_CERT` at the PEM file.
+   This makes verification actually pass, rather than disabling it.
+2. **Skip verification** — set `ARCHON_PROXY_INSECURE=1`. Convenient for a short-lived local session;
+   avoid leaving it on for anything longer.
+
+Full config surface (all optional beyond `ARCHON_PROXY_URL`):
+
+| Var | Effect |
+|---|---|
+| `ARCHON_PROXY_URL` | Proxy URL, e.g. `http://127.0.0.1:8080`. If unset, falls back to standard `HTTPS_PROXY`/`HTTP_PROXY`. |
+| `ARCHON_PROXY_ENABLED` | Explicit on/off. Default: enabled iff a proxy URL was resolved. `0` force-disables even with a URL set. |
+| `ARCHON_PROXY_BYPASS` | Comma-separated extra `NO_PROXY` entries (e.g. `*.internal,10.0.0.0/8`), in addition to the always-bypassed loopback hosts. |
+| `ARCHON_PROXY_CA_CERT` | Path to a PEM CA cert to trust (Burp's exported CA) — makes TLS verification pass through the MITM cleanly. |
+| `ARCHON_PROXY_INSECURE` | `1` to skip TLS verification entirely instead of trusting a CA cert. Off by default. |
+
+Implementation: `src/integrations/proxy-config.js` is the single source of truth all of the above reads
+from — see the header comment there for the full design rationale.
 
 ---
 

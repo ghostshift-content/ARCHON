@@ -14,10 +14,16 @@
 //      the request paths ARCHON ITSELF executes (the chain-verifier curl replay).
 //      A backstop for the LLM-constructed commands ARCHON runs directly.
 //
-// Residual risk (documented in SECURITY.md): ARCHON does not proxy the HTTP that
-// the specialist agents fire through their own tools, so layer 1 (prompt) is the
-// primary guard there. A network egress proxy that enforces this for ALL agent
-// traffic is a roadmap item.
+// Residual risk (documented in SECURITY.md): layer 1 (prompt) remains the
+// PRIMARY guard on what the specialist agents' own tools do — proxying traffic
+// gives an operator VISIBILITY into it (for inspection/debugging/pentesting
+// workflows via Burp Suite, ZAP, mitmproxy, etc.), not an additional
+// enforcement layer. See src/integrations/proxy-config.js (opt-in via
+// ARCHON_PROXY_URL) — it routes agent-fired curl/nuclei/sqlmap/git/wget/
+// node/python subprocess traffic, the Playwright browser-verifier agent, and
+// ARCHON's own api.anthropic.com calls through a configured proxy. A proxy
+// that also ENFORCES production-safety (blocking, not just observing,
+// destructive requests) for all agent traffic remains a roadmap item.
 //
 // Escape hatch for AUTHORIZED destructive testing (e.g. your own staging):
 //   ARCHON_ALLOW_DESTRUCTIVE=1  (default unset ⇒ fully safe). Mirrors the direct

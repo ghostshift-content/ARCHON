@@ -52,11 +52,14 @@ is the default and the recommended one. Authorized destructive testing opts out 
 `ARCHON_ALLOW_DESTRUCTIVE=1`.
 
 **Residual risk (stated honestly):** specialist agents fire their own HTTP through their tools
-(curl / nuclei / sqlmap), which ARCHON does not currently proxy — so for that traffic the guarantee is
-the prompt contract, not a network interlock. For maximum safety on sensitive production targets, prefer
-a **static / white-box** run (reads source, fires **zero** requests) or use **test accounts**. A network
-egress proxy that enforces the guard for all agent traffic is on the roadmap. Authorized destructive
-testing (e.g. your own staging) can opt out with `ARCHON_ALLOW_DESTRUCTIVE=1` (default off).
+(curl / nuclei / sqlmap). ARCHON can now *route* that traffic through an operator-configured
+intercepting proxy for visibility — `ARCHON_PROXY_URL` (see README's "Proxying traffic through Burp
+Suite" and `src/integrations/proxy-config.js`) — but the proxy is passive: it does not itself enforce
+the destructive-pattern guard, so the guarantee on that traffic remains the prompt contract, not a
+network interlock. For maximum safety on sensitive production targets, prefer a **static / white-box**
+run (reads source, fires **zero** requests) or use **test accounts**. A proxy layer that also
+*enforces* the guard for all agent traffic (not just observes it) remains on the roadmap. Authorized
+destructive testing (e.g. your own staging) can opt out with `ARCHON_ALLOW_DESTRUCTIVE=1` (default off).
 
 ## No secrets or client data in the repo
 
