@@ -871,6 +871,15 @@ async function runCodeReview(dispatch, deps) {
   // (retryable rate limit — resumes after cooldown, NEVER a coverage gap) · blocked (real miss, no map file).
   const mapAndRecord = async (batch, sessionSuffix) => {
     if (cancelled()) return null
+    // Idempotent resume: if every feature in this batch already has a map on disk (e.g. a targeted re-run that
+    // reuses a prior scan's mapping), mark them done and SKIP the mapper spawn entirely — no re-map, no tokens.
+    if (batch.features.length && batch.features.every(f => mapExists(f.slug))) {
+      for (const f of batch.features) ledger = mappingLedger.setFeature(ledger, f.slug, { status: 'done', depth: 'fast' })
+      mappingLedger.save(outDir, ledger)
+      emitRuntimeEvent({ session_id: batch.id, owner: batch.owner, phase: 'mapping', status: 'reused', assigned_total: batch.features.length, mapped_count: ledger.features_mapped, message: `worker ${batch.owner}: ${batch.features.length} feature(s) already mapped — reused (no re-map)` })
+      updateProgress(25 + Math.round(15 * ledger.features_mapped / Math.max(1, ledger.features_total)), mappingStatusLine(ledger, ledger.features_total))
+      return null
+    }
     for (const f of batch.features) ledger = mappingLedger.setFeature(ledger, f.slug, { status: 'in_progress', owner: batch.owner })
     mappingLedger.save(outDir, ledger)
     emitRuntimeEvent({ session_id: batch.id, owner: batch.owner, phase: 'mapping', status: 'session_start', assigned_total: batch.features.length, message: `worker ${batch.owner} mapping ${batch.features.length} feature(s)` })

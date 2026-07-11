@@ -50,6 +50,28 @@ test('M4: 45 features across 3 domains map in 3 persistent sessions, each mappin
   fs.rmSync(srcDir, { recursive: true, force: true }); fs.rmSync(outDir, { recursive: true, force: true })
 })
 
+test('idempotent resume: pre-existing feature maps skip the mapper spawn (no re-map, no tokens)', async () => {
+  const srcDir = makeSourceDir()
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reuseout-'))
+  const features = ['alpha', 'beta', 'gamma'].map(s => ({ slug: s, name: s, domain: 'misc', risk_hint: 'medium', keywords: s }))
+  // simulate a prior scan: every feature's map already exists on disk
+  fs.mkdirSync(`${outDir}/phase1-maps/features`, { recursive: true })
+  for (const f of features) fs.writeFileSync(`${outDir}/phase1-maps/features/${f.slug}.md`, `# ${f.slug}`)
+  let mapSpawns = 0
+  const deps = {
+    spawnAgent: async (agentName, taskId, prompt, sessionSuffix) => {
+      if (sessionSuffix && sessionSuffix.includes('-batch') && !sessionSuffix.includes('-batchR')) mapSpawns++
+      return { agentName, code: 0, cost: { totalCost: 0, tokens: { total: 1 } }, output: '{}' }
+    },
+    trackCosts: () => {}, updateProgress: () => {}, log: () => {}, logActivity: () => {},
+  }
+  const res = await cr.runCodeReview({ taskId: 'reuse-1', squad: 'code-review-squad', projectId: '',
+    meta: { sourceDir: srcDir, vulnClasses: ['xss'], outputDir: outDir, features, phasesOnly: ['mapping'], deepMap: false } }, deps)
+  assert.equal(mapSpawns, 0, 'NO mapper session spawned — the on-disk maps were reused')
+  assert.equal(res.featuresMapped, 3, 'all three features counted as mapped (reused)')
+  fs.rmSync(srcDir, { recursive: true, force: true }); fs.rmSync(outDir, { recursive: true, force: true })
+})
+
 test('M4: the mapping prompt is a persistent long-running worker, not a one-feature agent', () => {
   const batch = { id: 'auth_identity-1', domain: 'auth_identity', risk: 'mixed', owner: 'marshal',
     features: [{ slug: 'login', name: 'Login' }, { slug: 'reset', name: 'Reset' }] }
