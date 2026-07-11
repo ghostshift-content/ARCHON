@@ -817,6 +817,18 @@ async function saveTriage() {
   return api('POST', '/api/triage', { byTask })
 }
 $('#fnSave').onclick = async () => { const r = await saveTriage(); if (r && !r.error) toast('Triage saved', `${r.triaged} verdict(s)`, 'ok'); else toast('Save failed', r && r.error, 'err') }
+// Export all findings → one combined Markdown file, or a Zip of per-finding .md files (+ combined). The server
+// streams an attachment; a hidden <a download> triggers the save without navigating away.
+function exportFindings(fmt) {
+  if (!fnTaskId) return toast('Nothing to export', 'No run selected', 'err')
+  if (!fnFindings.length) return toast('Nothing to export', 'No findings for this run', 'err')
+  const a = document.createElement('a')
+  a.href = `/api/findings/export?fmt=${fmt}&taskId=${encodeURIComponent(fnTaskId)}`
+  a.download = ''; document.body.appendChild(a); a.click(); a.remove()
+  toast('Export started', `findings-${fnTaskId}.${fmt === 'md' ? 'md' : 'zip'}`, 'ok')
+}
+$('#fnExportMd').onclick = () => exportFindings('md')
+$('#fnExportZip').onclick = () => exportFindings('zip')
 $('#fnEnrich').onclick = async () => {
   const r = await api('POST', '/api/enrich-findings', { taskId: fnTaskId })
   if (r && !r.error) toast('Enriching findings…', 'AUDITOR writing description / impact / remediation — reload in ~1 min', 'ok')

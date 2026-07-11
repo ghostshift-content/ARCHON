@@ -745,6 +745,51 @@ function findingsForTask(taskId) {
     findings: items, counts, total: items.length, triaged: items.filter(i => i.triage).length,
   }
 }
+// ── Export findings as Markdown (one combined file) or Zip (per-finding .md + combined) ──
+function _slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'finding' }
+function findingToMarkdown(f) {
+  const L = [`# [${f.severity || '?'}] ${f.title || 'Untitled finding'}`, '']
+  L.push([f.id && `**ID:** ${f.id}`, f.severity && `**Severity:** ${f.severity}${f.cvss != null ? ` (CVSS ${f.cvss})` : ''}`,
+    (f.confirmation_status || f.confirmation) && `**Status:** ${f.confirmation_status || f.confirmation}`,
+    f.cwe && `**CWE:** ${f.cwe}`, f.agent && `**Agent:** ${f.agent}`].filter(Boolean).join(' · '))
+  if (f.file) L.push('', `**Location:** \`${f.file}${f.line ? ':' + f.line : ''}\``)
+  if (f.url) L.push('', `**Endpoint:** \`${(f.method || '').trim()} ${f.url}\``)
+  const sec = (t, body, fenced) => { const b = body && String(body).trim(); if (b) L.push('', `## ${t}`, '', fenced ? '```\n' + b + '\n```' : b) }
+  sec('Description', f.description); sec('Impact', f.impact); sec('Data flow', f.dataFlow)
+  sec('Vulnerable code', f.codeBlock, true); sec('Proof of concept', f.poc || f.rawRequest, !!f.rawRequest); sec('Remediation', f.remediation)
+  return L.join('\n') + '\n'
+}
+function buildFindingsExport(taskId) {
+  const r = findingsForTask(taskId), items = r.findings || []
+  const sevLine = SEV_ORDER.map(s => (r.counts[s] ? `${s}: ${r.counts[s]}` : null)).filter(Boolean).join(' · ')
+  const header = `# Findings — ${taskId}\n\n${r.total} finding(s)${sevLine ? ` (${sevLine})` : ''}\nExported ${new Date().toISOString()}\n`
+  const toc = items.map((f, i) => `${i + 1}. [${f.severity}] ${f.title}`).join('\n')
+  const combined = [header, '## Contents\n\n' + toc, ...items.map(f => '\n---\n\n' + findingToMarkdown(f))].join('\n')
+  const files = items.map((f, i) => ({ name: `findings/${String(i + 1).padStart(2, '0')}-${_slug(f.id)}-${_slug(f.title)}.md`, data: findingToMarkdown(f) }))
+  files.unshift({ name: 'ALL-FINDINGS.md', data: combined })
+  return { combined, files, count: r.total }
+}
+// ponytail: minimal store/deflate ZIP writer — avoids an archiver/jszip dep (Node ships zlib.crc32 + deflateRawSync)
+function zipBuffer(entries) {
+  const zlib = require('zlib'), local = [], central = []; let offset = 0
+  for (const e of entries) {
+    const name = Buffer.from(e.name, 'utf8'), data = Buffer.isBuffer(e.data) ? e.data : Buffer.from(String(e.data), 'utf8')
+    const crc = zlib.crc32(data) >>> 0, comp = zlib.deflateRawSync(data)
+    const lh = Buffer.alloc(30)
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(8, 8); lh.writeUInt16LE(0x21, 12)
+    lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(comp.length, 18); lh.writeUInt32LE(data.length, 22); lh.writeUInt16LE(name.length, 26)
+    local.push(lh, name, comp)
+    const ch = Buffer.alloc(46)
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(8, 10); ch.writeUInt16LE(0x21, 14)
+    ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(comp.length, 20); ch.writeUInt32LE(data.length, 24); ch.writeUInt16LE(name.length, 28); ch.writeUInt32LE(offset, 42)
+    central.push(ch, name)
+    offset += lh.length + name.length + comp.length
+  }
+  const cd = Buffer.concat(central), eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10)
+  eocd.writeUInt32LE(cd.length, 12); eocd.writeUInt32LE(offset, 16) // CD size @12, CD offset @16 (not 14)
+  return Buffer.concat([...local, cd, eocd])
+}
 function iterationsForTask(taskId) {
   const E = resolveEngagementId(taskId)
   const eng = E ? readEngagement(E) : null
@@ -932,6 +977,20 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && p === '/api/cancel') {
       try { return json(res, 200, cancelTask(await readBody(req))) }
       catch (e) { return json(res, 400, { error: e.message }) }
+    }
+    if (req.method === 'GET' && p === '/api/findings/export') {
+      const taskId = url.searchParams.get('taskId') || ''
+      const fmt = (url.searchParams.get('fmt') || 'zip').toLowerCase()
+      if (!taskId) { res.writeHead(400); return res.end('taskId required') }
+      const ex = buildFindingsExport(taskId)
+      if (!ex.count) { res.writeHead(404); return res.end('no findings to export') }
+      if (fmt === 'md') {
+        res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8', 'content-disposition': `attachment; filename="findings-${taskId}.md"`, 'cache-control': 'no-store' })
+        return res.end(ex.combined)
+      }
+      const zip = zipBuffer(ex.files)
+      res.writeHead(200, { 'content-type': 'application/zip', 'content-disposition': `attachment; filename="findings-${taskId}.zip"`, 'cache-control': 'no-store' })
+      return res.end(zip)
     }
     if (req.method === 'GET' && p === '/api/findings') {
       return json(res, 200, findingsForTask(url.searchParams.get('taskId') || ''))
