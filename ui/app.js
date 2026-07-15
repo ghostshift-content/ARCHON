@@ -65,7 +65,44 @@ function show(view) {
   $$('.nav button[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view))
   currentView = view
   const main = document.querySelector('.main'); if (main) main.scrollTop = 0
+  if (view === 'studio') renderStudio()
 }
+
+// M12: Studio — create/list custom personas & patterns (no code edit). All rendered values esc()'d.
+async function renderStudio() {
+  let per = { builtin: [], custom: [] }, pat = { classes: [], custom: [] }
+  try { per = await api('GET', '/api/personas') } catch {}
+  try { pat = await api('GET', '/api/patterns') } catch {}
+  const pl = $('#studioPersonaList')
+  if (pl) pl.innerHTML = [
+    ...(per.builtin || []).map(p => `<div class="studio-row"><b>${esc(p.name)}</b> <span class="badge">built-in</span><span class="hint"> ${esc(p.report_style || '')}</span></div>`),
+    ...(per.custom || []).map(p => `<div class="studio-row"><b>${esc(p.name)}</b> <span class="badge" style="background:var(--accent-2,#8b9dff)">custom</span> <button class="btn sm" data-del-persona="${esc(p.id)}">delete</button></div>`),
+  ].join('') || '<div class="hint">none</div>'
+  const ql = $('#studioPatternList')
+  if (ql) ql.innerHTML = `<div class="hint">${(pat.classes || []).length} classes loaded</div>` +
+    (pat.custom || []).map(f => `<div class="studio-row"><b>${esc(f)}</b> <span class="badge" style="background:var(--accent-2,#8b9dff)">custom pack</span></div>`).join('')
+  $$('#studioPersonaList [data-del-persona]').forEach(b => b.onclick = async () => {
+    await api('DELETE', '/api/personas?id=' + encodeURIComponent(b.dataset.delPersona)); renderStudio()
+  })
+}
+function _bindStudio() {
+  const save = $('#pfSave'); if (save) save.onclick = async () => {
+    const body = { id: $('#pfId').value, name: $('#pfName').value, report_style: $('#pfReport').value,
+      evidence_strictness: $('#pfStrict').value, scan_depth: $('#pfDepth').value, description: $('#pfDesc').value,
+      preferred_patterns: $('#pfPref').value.split(',').map(s => s.trim()).filter(Boolean) }
+    const r = await api('POST', '/api/personas', body)
+    $('#pfMsg').textContent = r && r.ok ? '✓ created' : ('✕ ' + ((r && r.error) || 'failed'))
+    if (r && r.ok) { $('#pfId').value = $('#pfName').value = ''; renderStudio() }
+  }
+  const qsave = $('#qfSave'); if (qsave) qsave.onclick = async () => {
+    const body = { class: $('#qfClass').value, name: $('#qfName').value, mode: $('#qfMode').value,
+      patterns: [{ id: $('#qfPid').value, name: $('#qfPname').value, description: $('#qfPdesc').value }] }
+    const r = await api('POST', '/api/patterns', body)
+    $('#qfMsg').textContent = r && r.ok ? '✓ created' : ('✕ ' + ((r && r.error) || 'failed'))
+    if (r && r.ok) { $('#qfPid').value = $('#qfPname').value = ''; renderStudio() }
+  }
+}
+_bindStudio()
 $$('[data-view]').forEach(b => b.addEventListener('click', () => show(b.dataset.view)))
 
 /* ── full-page report ── */
@@ -558,7 +595,39 @@ function renderTaskOverview(force) {
   const cc = $('#tdCancel'); if (cc) cc.onclick = async () => { cc.disabled = true; const r = await api('POST', '/api/cancel', { taskId: t.id }); toast(r && !r.error ? 'Cancel sent' : 'Cancel failed', t.id, r && !r.error ? 'ok' : 'err') }
   // M5: static/white-box runs get a Source Runtime card (planner decision, honest mapping counts, per-worker
   // progress). The API returns null for non-source tasks, so this is a no-op for pentest.
-  if (/code-review/.test(String(t.squad || '')) || t.mode === 'white-box' || t.mode === 'static') injectSourceRuntimeCard(t)
+  if (/code-review/.test(String(t.squad || '')) || t.mode === 'white-box' || t.mode === 'static') { injectSourceRuntimeCard(t); injectMissionCard(t) }
+}
+// M7: Mission Control — the team operation live (task board + session plan + coverage + team + decisions).
+// Reads /api/mission (observe-only; derived from existing artifacts). All values esc()'d.
+async function injectMissionCard(t) {
+  let d = null
+  try { d = await api('GET', '/api/mission?taskId=' + encodeURIComponent(t.id)) } catch {}
+  if (!d || !d.board || !(d.board.counts && d.board.counts.total)) return
+  const host = $('#td-overview'); if (!host || String(tdTaskId) !== String(t.id)) return
+  const c = d.board.counts || {}, sp = d.sessionPlan
+  const stat = (label, val, color) => `<div class="src-stat"><span class="src-stat-v"${color ? ` style="color:${color}"` : ''}>${esc(String(val))}</span><span class="src-stat-l">${esc(label)}</span></div>`
+  const team = (d.team || []).map(m => `<span class="rchip">${esc(m.agent)}<span style="opacity:.6"> · ${esc(m.role || '?')}</span></span>`).join('') || '<span class="hint">no active teammates</span>'
+  const feed = (d.decisions || []).slice(-8).reverse().map(e => `<div class="src-worker-ev"><span style="color:var(--fg-dim)">${esc(String(e.ts || '').slice(11, 19))}</span> ${esc(e.agent || '')}: ${esc(e.decision || '')}</div>`).join('')
+  const html = `
+    <div class="card mission-card" style="margin-bottom:16px">
+      <h3 style="margin:0 0 2px">Mission Control <span style="font-weight:400;color:var(--fg-dim);font-size:12px">· team operation (observe-only)</span></h3>
+      ${sp ? `<div class="hint" style="margin:4px 0 12px">Session plan: <b>${esc(String(sp.session_count))}</b> planned · <b>${esc(String(sp.active_concurrency))}</b> active · ${esc(sp.strategy || '')}${sp.reason ? ` — ${esc(sp.reason)}` : ''}</div>` : ''}
+      <div class="src-stats">
+        ${stat('Board tasks', c.total || 0)}
+        ${stat('Completed', c.completed || 0, 'var(--emerald)')}
+        ${stat('Candidates', c.candidate_found || 0, (c.candidate_found ? 'var(--accent-2, #8b9dff)' : ''))}
+        ${stat('No issue', c.no_issue || 0)}
+        ${stat('Running', (c.running || 0) + (c.claimed || 0))}
+        ${stat('Blocked', c.blocked || 0, (c.blocked ? 'var(--rose, #ef4444)' : ''))}
+      </div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border, rgba(255,255,255,.08))">
+        <div style="font-weight:600;font-size:13px;margin-bottom:6px">Team activity</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${team}</div>
+      </div>
+      ${feed ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border, rgba(255,255,255,.08))"><div style="font-weight:600;font-size:13px;margin-bottom:6px">Decision log</div><div class="src-feed">${feed}</div></div>` : ''}
+    </div>`
+  const existing = host.querySelector('.mission-card')
+  if (existing) existing.outerHTML = html; else host.insertAdjacentHTML('afterbegin', html)
 }
 async function injectSourceRuntimeCard(t) {
   let d = null
@@ -596,11 +665,16 @@ async function injectSourceRuntimeCard(t) {
   const pipelineHtml = (p && (p.candidates_emitted || p.validated)) ? section('Findings Pipeline', `<div class="src-stats">
           ${stat('Candidates', p.candidates_emitted || 0)}
           ${stat('In triage', p.in_triage || 0)}
+          ${stat('Triaged', p.triaged || 0)}
+          ${stat('Auditor verdicts', p.auditor_verdicts || 0)}
           ${stat('Validated', p.validated || 0, 'var(--accent-2, #8b9dff)')}
           ${stat('Judged', p.judged || 0, 'var(--emerald)')}
           ${stat('Needs live', p.needs_live || 0, p.needs_live ? 'var(--amber, #f59e0b)' : '')}
           ${stat('Runtime confirmed', p.runtime_confirmed || 0, 'var(--emerald)')}
           ${stat('Disproven', p.disproven || 0, p.disproven ? 'var(--rose, #ef4444)' : '')}
+          ${stat('Audit quarantined', p.audit_quarantined || 0, p.audit_quarantined ? 'var(--rose, #ef4444)' : '')}
+          ${stat('Triage quarantined', p.triage_quarantined || 0, p.triage_quarantined ? 'var(--rose, #ef4444)' : '')}
+          ${p.candidate_ledger_total ? stat('Ledger total', p.candidate_ledger_total) : ''}
         </div>`) : ''
   // M7: white-box validation breakdown — source-confirmed vs needs-live vs runtime-confirmed vs disproven.
   const v = d.validation

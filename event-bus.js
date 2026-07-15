@@ -268,15 +268,18 @@ function logEvent(type, data) {
 
 // Broadcast agent stream chunk — writes to file for UI polling
 // Server.js watches this dir and emits WebSocket events
-function broadcastAgentStream(taskId, agent, chunk) {
-  // Write to a manifest file that server.js can watch
+function broadcastAgentStream(taskId, agent, chunk, streamKey) {
+  // Write to a manifest file that server.js can watch. F7: key by the per-SESSION streamKey so concurrent
+  // sessions of the same persona are distinct entries/files and never overwrite one another.
   try {
     const manifest = path.join(STREAMS_DIR, 'manifest.json')
     let data = {}
     try { data = JSON.parse(fs.readFileSync(manifest, 'utf-8')) } catch {}
     if (!data[taskId]) data[taskId] = {}
-    data[taskId][agent] = {
-      file: `${agent.toLowerCase()}-${taskId}.stream`,
+    const key = streamKey || `${agent.toLowerCase()}-${taskId}`
+    data[taskId][key] = {
+      file: `${key}.stream`,
+      agent,
       updatedAt: Date.now(),
       status: chunk.includes('[COMPLETED]') ? 'done' : 'running',
     }
@@ -3349,8 +3352,12 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
     // append to it as progress arrives.)
     const streamDir = (agentPaths.INTEL_ROOT + '/streams')
     try { fs.mkdirSync(streamDir, { recursive: true }) } catch {}
-    const streamFile = path.join(streamDir, `${agentName.toLowerCase()}-${taskId}.stream`)
-    try { fs.writeFileSync(streamFile, '') } catch {} // reset
+    // F7: unique per-SESSION stream identity — <persona>-<taskId>-<sessionId> — so concurrent same-persona
+    // sessions (e.g. two MARSHAL leads) each own an append-only stream and never overwrite each other's history.
+    const _sid = sessionSuffix ? String(sessionSuffix).replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(-32) : ''
+    const streamKey = `${agentName.toLowerCase()}-${taskId}${_sid ? '-' + _sid : ''}`
+    const streamFile = path.join(streamDir, `${streamKey}.stream`)
+    try { fs.writeFileSync(streamFile, '') } catch {} // reset (this session's own file only)
 
     let streamBuffer = ''
     let streamFlushTimer = null
@@ -3360,7 +3367,7 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
       try {
         fs.appendFileSync(streamFile, streamBuffer)
         // Also emit WebSocket event for live UI
-        broadcastAgentStream(taskId, agentName.toUpperCase(), streamBuffer)
+        broadcastAgentStream(taskId, agentName.toUpperCase(), streamBuffer, streamKey)
       } catch {}
       streamBuffer = ''
     }
@@ -3478,7 +3485,7 @@ function spawnAgent(agentName, taskId, message, sessionSuffix, modelOverride, op
       // Flush remaining stream and signal completion
       if (streamFlushTimer) { clearTimeout(streamFlushTimer); streamFlushTimer = null }
       flushStream()
-      broadcastAgentStream(taskId, agentName.toUpperCase(), '\n[COMPLETED]')
+      broadcastAgentStream(taskId, agentName.toUpperCase(), '\n[COMPLETED]', streamKey)
       // Clean up stream file after 5 min
       setTimeout(() => { try { fs.unlinkSync(streamFile) } catch {} }, 5 * 60 * 1000)
       runningAgents.delete(agentName.toUpperCase())
@@ -8631,6 +8638,9 @@ async function runSeparateGrader(taskId, taskTitle, squad) {
 // any error logs and returns; the iteration still has its own FINAL-REPORT.
 async function normalizeCodeReviewFindings(taskId, outDir, deployUrl) {
   try {
+    // §2: the holistic reconcile already produced the AUTHORITATIVE board (rebuilt from all candidates by
+    // candidate_id). cr-normalize is a SECOND LLM writer that would overwrite it — skip so there is ONE writer.
+    if (fs.existsSync(`${agentPaths.INTEL_ROOT}/VALIDATED-AUTHORITATIVE-${taskId}.flag`)) { log(`🔁 cr-normalize: holistic reconcile owns VALIDATED-FINDINGS (authoritative) — skipping to preserve the reconciled board`); return }
     if (!outDir) outDir = `${agentPaths.INTEL_ROOT}/code-review/${taskId}`
     const verdictsFile = `${outDir}/phase2/AUDITOR-VERDICTS.md`
     if (!fs.existsSync(verdictsFile)) { log(`🔁 cr-normalize: no AUDITOR-VERDICTS for ${taskId} — skipping`); return }
@@ -8859,6 +8869,9 @@ function _isRealFinding(f) {
 async function runTriagerForTask(taskId) {
   const { readFindingsFile, normalizeFinding } = require('./agents/finding-schema')
   const vf = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
+  // §2: the holistic reconcile already deduped by candidate_id + owns the authoritative board — a second
+  // LLM dedup/merge could re-collapse distinct candidates. Skip so the reconciled board is the final one.
+  if (fs.existsSync(`${agentPaths.INTEL_ROOT}/VALIDATED-AUTHORITATIVE-${taskId}.flag`)) { log(`🧹 Phase 3.052 triager: holistic reconcile owns the board (authoritative) — skipping dedup/merge`); return }
   if (!fs.existsSync(vf)) { log(`🧹 triager: no validated findings for ${taskId}`); return }
   const orig = readFindingsFile(vf)
   if (orig.length <= 1) { log(`🧹 triager: ${orig.length} finding — nothing to dedup/merge for ${taskId}`); return }
@@ -9013,13 +9026,17 @@ STEP 2 — if REAL, write the complete finding. Match the gold format: cat the c
 // the confirmed count). Only started when Phase 2.7 is enabled (else the old batch flow runs).
 function startStreamingTriage(taskId, squad, projectId, targetUrl) {
   const { nextBatch, triageWorkers, triageSessions } = require('./src/pipeline/streaming-triage')
+  const { identityKey } = require('./src/pipeline/suspected-dedup')
   const _isCodeReview = /code-review/.test(String(squad || ''))
   const { parseFindingsJsonl } = require('./src/pipeline/loose-jsonl')
   const liveFile = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
   const detailFile = `${agentPaths.INTEL_ROOT}/findings-detail-${taskId}.json`
   const valFile = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
+  const quarantineFile = `${agentPaths.INTEL_ROOT}/triage-quarantine-${taskId}.jsonl`
   const EX = `${agentPaths.AGENTS_ROOT}/common/reporting/templates/examples`
   const seen = new Set()
+  const _triageAttempts = new Map()      // §6: canonicalKey → # batch attempts (bounded requeue, never silent drop)
+  const MAX_TRIAGE_ATTEMPTS = 2
   let running = true, idn = 0, confirmed = 0
   // #5: emit the ACTUAL triage session count to the Source Runtime timeline (code-review only) so the UI shows
   // real sessions, not an estimate. Only on change, fail-soft — telemetry must never break triage.
@@ -9061,6 +9078,63 @@ function startStreamingTriage(taskId, squad, projectId, targetUrl) {
     flow('TRIAGER', `✅ → board: ${rec.title} (${rec.severity})`, `Validated + written — now #${confirmed} on the Findings tab.`)
   }
 
+  // §6: the immutable candidate identity — join key + how a finding's TITLE/CLASS/feature are decided. The
+  // TRIAGER may change the VERDICT (keep/drop) + severity + writeup, but NEVER the vulnerability being reviewed.
+  const _cidOf = (f) => String(f.candidate_id || f.duplicate_key || f.id || '')
+  const _titleOf = (f) => {
+    const t = String(f.title || '').trim(); if (t) return t.split(/[:.\n]/)[0].slice(0, 70)
+    const cls = String(f.vulnerability_class || f.cwe || 'issue').replace(/[-_]/g, ' ')
+    const feat = String(f.feature || f.file || '').trim()
+    return (feat ? `${cls} in ${feat}` : cls).slice(0, 70)
+  }
+
+  // §6: PERSISTENT batch triage — ONE model session claims MANY candidates (not one spawnAgent per candidate).
+  // Results are joined STRICTLY by the immutable candidate_id the model echoes back (never array position / order).
+  // A candidate the model omits from its response is REQUEUED (bounded), then QUARANTINED — never silently dropped.
+  async function triageBatch(candidates) {
+    const items = candidates.map((f) => ({ id: `T-${++idn}`, cid: _cidOf(f), f }))
+    for (const { f } of items) { const a = (f.agent || f.original_agent || 'AGENT').toUpperCase(); flow(a, `📤 → TRIAGE: ${_titleOf(f)}`, `handed to a persistent triage session (batch of ${items.length}).`) }
+    const batchFile = `${agentPaths.INTEL_ROOT}/triage-batch-${taskId}-${items[0].id}.jsonl`
+    try { fs.unlinkSync(batchFile) } catch {}
+    const prompt = `You are TRIAGER. Validate these ${items.length} source-review candidates in ONE pass — read the actual source at each file:line and decide if the source→sink claim is real.\n\nCandidates (each has an immutable candidate_id — echo it EXACTLY, do NOT alter it, the class, or the feature):\n` +
+      items.map(({ f }) => `- candidate_id: ${_cidOf(f)}\n    class=${f.vulnerability_class || f.cwe || '?'} feature=${f.feature || '?'} at ${f.file || '?'}:${f.line ?? '?'} · source=${f.source || '?'} → sink=${f.sink || '?'} · hypothesis: ${String(f.hypothesis || f.details || '').slice(0, 200)}`).join('\n') +
+      `\n\nFor EACH candidate append ONE JSON line to ${batchFile} (create the dir first):\n{"candidate_id":"<echo the exact candidate_id above>","keep":true|false,"reason":"<why>","severity":"Critical|High|Medium|Low|Info","cvss_vector":"CVSS:3.1/AV:…","cvss_score":0.0,"confirmation_status":"SOURCE_CONFIRMED|NEEDS_LIVE_VALIDATION","code_block":"<the vulnerable source lines>","description":"…","impact":"…","remediation":"…"}\n\nRules: echo the candidate_id VERBATIM so your verdict binds to the right candidate. Validate the SPECIFIC hypothesis stated above — do not substitute a different concern. ALWAYS score CVSS 3.1: publish the FULL vector matching the proven impact (IDOR read → C:H/I:N; SQLi → C:H/I:H; never all-N on a real bug) and the cvss_score it computes to — a kept finding with no CVSS vector is incomplete. Keep only real source-substantiated findings; a source-only finding is SOURCE_CONFIRMED (never RUNTIME_CONFIRMED, no url); if exploitability needs runtime/missing code → NEEDS_LIVE_VALIDATION; drop false positives with a reason. EXACTLY one line per candidate_id — do not omit any.`
+    try { await spawnAgent('triager', taskId, prompt, `task-${taskId}-triage-batch-${items[0].id}`, null, { timeoutMs: 10 * 60 * 1000 }) }
+    catch (e) { flow('TRIAGER', `⚠️ triage batch error (${e.message}) — requeueing ${items.length} candidate(s)`); for (const { f } of items) _requeueOrQuarantine(f); return }
+    // §6: join by candidate_id ONLY (normalized for case/whitespace echo drift — never by position/order).
+    const _nk = (s) => String(s || '').trim().toLowerCase()
+    const byCid = {}
+    try { for (const l of fs.readFileSync(batchFile, 'utf8').split('\n')) { const s = l.trim(); if (!s) continue; let r; try { r = JSON.parse(s) } catch { try { r = JSON.parse(s.replace(/\\(?!["\\/bfnrtu])/g, '\\\\')) } catch { r = null } } if (r && (r.candidate_id || r.id)) byCid[_nk(r.candidate_id || r.id)] = r } } catch {}
+    try { fs.unlinkSync(batchFile) } catch {}
+    for (const { id, cid, f } of items) {
+      const d = byCid[_nk(cid)]
+      const title = _titleOf(f)
+      if (!d) { _requeueOrQuarantine(f); continue }        // §6: NO verdict for this id → requeue, never drop
+      _triageAttempts.delete(identityKey(f))              // got a verdict → clear the retry counter
+      if (d.keep === false) { flow('TRIAGER', `🗑️ dropped: ${title}${d.reason ? ` — ${String(d.reason).slice(0, 80)}` : ''}`, `TRIAGER rejected as a false positive.`); continue }
+      // §1/§6: IDENTITY is immutable — strip any title/feature/class the model may have echoed so the vulnerability
+      // being reviewed can never be swapped. The model contributes only verdict + severity + writeup.
+      const dSafe = { ...d }; delete dSafe.title; delete dSafe.feature; delete dSafe.vulnerability_class; if (f.cwe) delete dSafe.cwe
+      const detail = {}; try { Object.assign(detail, JSON.parse(fs.readFileSync(detailFile, 'utf8'))) } catch {}
+      detail[id] = dSafe; try { writeAtomic(detailFile, JSON.stringify(detail, null, 2)) } catch (e) { log(`⚠️ batch-triage detail write: ${e.message}`); continue }
+      const rec = require('./src/pipeline/stream-record').shapeStreamValidated(f, dSafe, { id, title, agent: (f.agent || f.original_agent || 'AGENT').toUpperCase(), taskId })
+      try { fs.appendFileSync(valFile, JSON.stringify(rec) + '\n') } catch (e) { log(`⚠️ batch-triage validated write: ${e.message}`) }
+      confirmed++
+      flow('TRIAGER', `✅ → board: ${rec.title} (${rec.severity})`, `Validated in a persistent session — now #${confirmed} on the Findings tab.`)
+    }
+  }
+
+  // §6: a candidate with no triage verdict returns to RETRYABLE (un-seen so the next tick re-picks it), bounded by
+  // MAX_TRIAGE_ATTEMPTS; past the bound it is QUARANTINED with a reason (recorded, never silently disappearing).
+  function _requeueOrQuarantine(f) {
+    const k = identityKey(f)
+    const n = (_triageAttempts.get(k) || 0) + 1; _triageAttempts.set(k, n)
+    // Only requeue while the poll loop is still running (a re-pick needs a future tick); on the final drain
+    // (running=false) a miss goes straight to quarantine so it is recorded rather than silently lost.
+    if (n < MAX_TRIAGE_ATTEMPTS && running) { seen.delete(k); flow('TRIAGER', `↩️ requeue (attempt ${n}/${MAX_TRIAGE_ATTEMPTS}): ${_titleOf(f)}`, 'No triage verdict in the batch response — returned to the queue for retry.') }
+    else { try { fs.appendFileSync(quarantineFile, JSON.stringify({ candidate_id: _cidOf(f), feature: f.feature || '', vulnerability_class: f.vulnerability_class || '', file: f.file || '', reason: `no triage verdict after ${MAX_TRIAGE_ATTEMPTS} attempts`, candidate: f }) + '\n') } catch {} flow('TRIAGER', `⛔ quarantined: ${_titleOf(f)} — no verdict after ${MAX_TRIAGE_ATTEMPTS} attempts`, 'Recorded in triage-quarantine — a coverage gap, not a silent drop.') }
+  }
+
   async function tick() {
     if (!fs.existsSync(liveFile)) return
     let recs = []; try { recs = parseFindingsJsonl(fs.readFileSync(liveFile, 'utf8')) } catch { return }
@@ -9071,12 +9145,19 @@ function startStreamingTriage(taskId, squad, projectId, targetUrl) {
     // reproduces the old strictly-serial drain (one-by-one, emit order).
     // S4 (parity §6): source-review triage follows the candidate→session ladder (cap 4); black-box keeps the
     // backlog-scaled pool. Both stay bounded by the operator triageConcurrency cap.
-    const workers = _isCodeReview
-      ? Math.min(triageSessions(fresh.length), _cap(squad, 'triageConcurrency', TRIAGE_MAX_WORKERS))
-      : triageWorkers(_cap(squad, 'triageConcurrency', TRIAGE_MAX_WORKERS), _cap(squad, 'triageScaleStep', TRIAGE_SCALE_STEP), fresh.length, _cap(squad, 'triageMinWorkers', TRIAGE_MIN_WORKERS))
-    emitTriageSessions(workers, fresh.length) // #5: record the real triage session count on the timeline
-
-    await runWithConcurrency(fresh, workers, triageOne)
+    if (_isCodeReview) {
+      // F8: partition the fresh candidates into N PERSISTENT triage sessions (each claims MANY candidates) —
+      // model calls = N sessions per tick, NOT one per candidate.
+      const nSess = Math.max(1, Math.min(triageSessions(fresh.length), _cap(squad, 'triageConcurrency', TRIAGE_MAX_WORKERS)))
+      emitTriageSessions(nSess, fresh.length)
+      const batches = Array.from({ length: nSess }, () => [])
+      fresh.forEach((f, i) => batches[i % nSess].push(f))
+      await runWithConcurrency(batches.filter((b) => b.length), nSess, triageBatch)
+    } else {
+      const workers = triageWorkers(_cap(squad, 'triageConcurrency', TRIAGE_MAX_WORKERS), _cap(squad, 'triageScaleStep', TRIAGE_SCALE_STEP), fresh.length, _cap(squad, 'triageMinWorkers', TRIAGE_MIN_WORKERS))
+      emitTriageSessions(workers, fresh.length)
+      await runWithConcurrency(fresh, workers, triageOne)
+    }
   }
 
   const loop = (async () => {
@@ -9499,6 +9580,20 @@ async function dispatchToAgent(dispatch) {
             }
           } catch (e) { log(`⚠️ onFindingsReady ${tid} (non-fatal): ${e.message}`) }
         },
+        // §1: JUDGE-BEFORE-REPORT. The dispatcher calls this after reconcile + enrich and BEFORE SCRIBE so the
+        // final report is Judge-gated (incorporates downgrades/rejections). Writes JUDGED-FINDINGS-<tid>.jsonl;
+        // the daemon's own post-return judge then no-ops (JUDGED already exists). Fail-soft → SCRIBE still runs.
+        runJudgeForTask: async (tid, vf, target) => {
+          try {
+            if (!fs.existsSync(vf) || !fs.readFileSync(vf, 'utf8').trim()) return null
+            const { runJudge, callRealLLM } = freshRequire('./scripts/run-judge-verifier')
+            const _judgeLLM = (p, o) => callRealLLM(p, { model: 'claude-haiku-4-5', ...(o || {}) })
+            const _jr = await runJudge({ taskId: tid, file: vf, target: target || '', outputDir: agentPaths.INTEL_ROOT, callLLM: _judgeLLM, promotionMode: true })
+            const _js = _jr && _jr.summary
+            if (_js) logActivity('NEXUS', `⚖️ Judge complete: ${_js.confirmed} confirmed / ${_js.downgraded} downgraded`, { type: 'phase-complete', squad, taskId: tid, projectId: projectId || '', details: `Output: ${_jr.outFile || ''}` })
+            return _jr
+          } catch (e) { log(`⚠️ runJudgeForTask ${tid} (non-fatal): ${e.message}`); return null }
+        },
       })
       // A dispatcher {error} (bad sourceDir / empty feature queue) must FAIL the run — not fall
       // through to 'done' with no findings, and (white-box) not auto-launch a pentest off a failed
@@ -9557,7 +9652,11 @@ async function dispatchToAgent(dispatch) {
       // static review target='' (no live URL) → the judge degrades gracefully; source findings stay
       // SOURCE_CONFIRMED (they carry no url). Fail-soft: judging never blocks 'done'.
       try {
-        if (fs.existsSync(_vf) && fs.readFileSync(_vf, 'utf8').trim()) {
+        const _jf = `${agentPaths.INTEL_ROOT}/JUDGED-FINDINGS-${taskId}.jsonl`
+        const _alreadyJudged = (() => { try { return fs.existsSync(_jf) && fs.readFileSync(_jf, 'utf8').trim().length > 0 } catch { return false } })()
+        if (_alreadyJudged) {
+          log(`⚖️ Judge already ran before SCRIBE (Judge-gated report) — skipping the end-of-run judge`)
+        } else if (fs.existsSync(_vf) && fs.readFileSync(_vf, 'utf8').trim()) {
           const { runJudge, callRealLLM } = freshRequire('./scripts/run-judge-verifier')
           const _judgeLLM = (p, o) => callRealLLM(p, { model: 'claude-haiku-4-5', ...(o || {}) })
           const _jr = await runJudge({ taskId, file: _vf, target: (dispatch.meta && dispatch.meta.deployUrl) || '', outputDir: agentPaths.INTEL_ROOT, callLLM: _judgeLLM, promotionMode: true })
@@ -9594,7 +9693,13 @@ async function dispatchToAgent(dispatch) {
         const task = tasks.find(t => String(t.id) === String(taskId))
         // never clobber a terminal state (cancelled/failed) back to 'done' (last-write race guard)
         if (task && !['cancelled', 'failed'].includes(String(task.status || '').toLowerCase())) {
-          task.status = 'done'
+          // §4: propagate the dispatcher's completion gate to a VISIBLE task status — a run with quarantined
+          // candidates or a blocked report must NOT read as a clean 'done'.
+          const _cg = crResult && crResult.completionGate
+          if (_cg && _cg.status === 'REPORT_BLOCKED') { task.status = 'blocked-validation'; task.statusMessage = `Report blocked: ${(_cg.gaps || []).join('; ')}`.slice(0, 300) }
+          else if (_cg && _cg.status === 'COMPLETE_WITH_GAPS') { task.status = 'complete-with-gaps'; task.statusMessage = `Completed with gaps: ${(_cg.gaps || []).join('; ')}`.slice(0, 300) }
+          else { task.status = 'done'; task.statusMessage = task.statusMessage || 'Complete' }
+          task.completionGate = _cg || { status: 'COMPLETE' }
           task.progress = 100
           task.totalCost = Math.round(totalCostLocal * 10000) / 10000
           task.costs = allCostsLocal

@@ -8,19 +8,15 @@
 // instead of many short-lived spawns. More sessions = more concurrent draw on the one subscription bucket, so
 // concurrency is capped hard and shrunk when quota is unhealthy.
 
-// Session ladder by feature count (spec §1). Index by how many features there are. This is the CEILING when
-// quota is healthy; applyQuota() shrinks it under rate-limit pressure. No 2-session tier by design — the spec
-// jumps 1→3 so mid-size scans still parallelise, and the quota gate is what protects the rate limit.
-function baseSessions(total) {
-  if (total <= 30) return 1
-  if (total <= 90) return 3
-  if (total <= 200) return 4
-  if (total <= 500) return 5
-  return 6
-}
+// R1: the session ladder is now UNIFIED — this planner delegates the count to src/runtime/session-planner
+// (the §6 ladder: 1-25→1, 26-75→2, 76-150→3, 151-300→4, 301+→5). One planner truth; no two ladders. The output
+// SHAPE below stays backward-compatible so the dispatcher/UI/artifacts don't break; only the counts follow §6
+// (gentler on concurrency). Quota reduces ACTIVE concurrency, not session count (§6).
+const _sessionPlanner = require('../runtime/session-planner')
+function baseSessions(total) { return _sessionPlanner.baseSessions(total) }
 
-const DEFAULT_MAX_CONCURRENT = 3 // default cap on ACTIVE Claude sessions at once
-const HARD_MAX_SESSIONS = 6      // absolute ceiling regardless of feature count/quota
+const DEFAULT_MAX_CONCURRENT = _sessionPlanner.DEFAULT_MAX_CONCURRENT // 3 active sessions at once
+const HARD_MAX_SESSIONS = _sessionPlanner.HARD_MAX_SESSIONS           // absolute ceiling (§6 → 5)
 
 // Quota health → how aggressively we open sessions. 'cooling' means a live cooldown is in effect.
 function applyQuota(base, quota) {
@@ -79,20 +75,20 @@ function planSourceRuntime(input) {
   const features = (input && input.features) || []
   const total = features.length
   const quota = (input && input.quota) || 'healthy'
-  const base = baseSessions(total)
-  let mapping_sessions = applyQuota(base, quota)
-  // operator override caps (never raises above what the ladder/quota chose)
+  // R1/§6: session COUNT comes straight from the unified ladder — quota does NOT shrink it (that's what changed).
+  let mapping_sessions = baseSessions(total)
+  // operator override caps (never raises above what the ladder chose)
   if (input && Number.isFinite(input.maxSessions)) mapping_sessions = Math.min(mapping_sessions, Math.max(1, input.maxSessions))
   mapping_sessions = Math.max(1, Math.min(mapping_sessions, HARD_MAX_SESSIONS))
   // never ask for more sessions than there are features to map
   mapping_sessions = Math.min(mapping_sessions, total)
   if (total === 0) mapping_sessions = 0
 
-  // shard FIRST (splitting oversized domains into balanced chunks), then derive concurrency from what actually
-  // got built — so max_concurrent can never exceed the real session count (fixes {sessions:1, concurrent:3}).
+  // shard FIRST (splitting oversized domains into balanced chunks), then derive ACTIVE concurrency: §6 quota
+  // reduces how many run NOW, never the session count. max_concurrent can never exceed the real session count.
   const sessions = mapping_sessions > 0 ? shard(features, mapping_sessions) : []
   const effective = sessions.length || mapping_sessions
-  const max_concurrent_sessions = Math.min(effective, DEFAULT_MAX_CONCURRENT)
+  const max_concurrent_sessions = Math.max(effective ? 1 : 0, Math.min(effective, _sessionPlanner.applyQuota(effective, quota).active))
 
   const strategy = quota === 'cooling' ? 'paused_rate_limit'
     : effective <= 1 ? 'single_persistent_worker'
@@ -122,29 +118,29 @@ module.exports = { planSourceRuntime, baseSessions, applyQuota, shard, DEFAULT_M
 if (require.main === module) {
   const assert = require('node:assert')
   const mk = (n, domain = 'misc') => Array.from({ length: n }, (_, i) => ({ slug: `${domain}-${i}`, domain }))
-  assert.strictEqual(baseSessions(30), 1); assert.strictEqual(baseSessions(31), 3); assert.strictEqual(baseSessions(90), 3)
-  assert.strictEqual(baseSessions(200), 4); assert.strictEqual(baseSessions(500), 5); assert.strictEqual(baseSessions(9999), 6)
+  // R1: unified §6 ladder (delegated to session-planner)
+  assert.strictEqual(baseSessions(25), 1); assert.strictEqual(baseSessions(26), 2); assert.strictEqual(baseSessions(90), 3)
+  assert.strictEqual(baseSessions(200), 4); assert.strictEqual(baseSessions(500), 5); assert.strictEqual(baseSessions(9999), 5)
   // 20 → single session
   let p = planSourceRuntime({ features: mk(20) })
   assert.strictEqual(p.mapping_sessions, 1); assert.strictEqual(p.strategy, 'single_persistent_worker')
-  // 75 across 3 domains → 3 sessions, 3 concurrent
-  p = planSourceRuntime({ features: [...mk(25, 'auth'), ...mk(25, 'api'), ...mk(25, 'files')] })
-  assert.strictEqual(p.mapping_sessions, 3); assert.strictEqual(p.max_concurrent_sessions, 3)
-  assert.strictEqual(p.sessions.length, 3); assert.strictEqual(p.sessions.reduce((s, x) => s + x.feature_count, 0), 75)
-  // 200 → 4 shards but only 3 concurrent
+  // 200 → 4 shards but only 3 concurrent (all features placed, balanced)
   p = planSourceRuntime({ features: [...mk(50, 'a'), ...mk(50, 'b'), ...mk(50, 'c'), ...mk(50, 'd')] })
   assert.strictEqual(p.mapping_sessions, 4); assert.strictEqual(p.max_concurrent_sessions, 3)
-  // single broad domain must STILL follow the ladder (the collapse bug): 200 misc → 4 balanced ~50 sessions
+  assert.strictEqual(p.sessions.reduce((s, x) => s + x.feature_count, 0), 200)
+  // single broad domain still follows the ladder: 200 misc → 4 balanced ~50 sessions
   p = planSourceRuntime({ features: mk(200, 'misc') })
   assert.strictEqual(p.mapping_sessions, 4); assert.strictEqual(p.sessions.length, 4)
   assert.ok(p.sessions.every(s => s.feature_count >= 40 && s.feature_count <= 60), 'balanced ~50 each')
   assert.ok(p.max_concurrent_sessions <= p.mapping_sessions)
-  assert.strictEqual(planSourceRuntime({ features: mk(1000, 'misc') }).mapping_sessions, 6)
-  // quota cooling → 1 session, paused strategy
+  assert.strictEqual(planSourceRuntime({ features: mk(1000, 'misc') }).mapping_sessions, 5) // §6 caps at 5
+  // §6 quota reduces ACTIVE concurrency, NOT session count; cooling pauses
+  p = planSourceRuntime({ features: mk(200, 'a'), quota: 'warm' })
+  assert.strictEqual(p.mapping_sessions, 4); assert.strictEqual(p.max_concurrent_sessions, 2)
   p = planSourceRuntime({ features: mk(200, 'a'), quota: 'cooling' })
-  assert.strictEqual(p.mapping_sessions, 1); assert.strictEqual(p.strategy, 'paused_rate_limit')
+  assert.strictEqual(p.mapping_sessions, 4); assert.strictEqual(p.max_concurrent_sessions, 1); assert.strictEqual(p.strategy, 'paused_rate_limit')
   // operator override caps sessions
   p = planSourceRuntime({ features: [...mk(50, 'a'), ...mk(50, 'b'), ...mk(50, 'c'), ...mk(50, 'd')], maxSessions: 2 })
   assert.strictEqual(p.mapping_sessions, 2)
-  console.log('ok — source-runtime-planner: session ladder, quota adjustment, domain-aware sharding, caps')
+  console.log('ok — source-runtime-planner: UNIFIED §6 ladder, quota→active-concurrency, domain sharding, caps')
 }

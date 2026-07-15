@@ -49,6 +49,7 @@ const candidateIndex = require('../pipeline/candidate-index') // M5: deduped can
 const decisionLog = require('../pipeline/decision-log') // M6: agentic decision log
 const featureBatching = require('./feature-batching') // S1: domain grouping + batch fanout
 const mappingLedger = require('./mapping-ledger')     // S2: the mapping ledger (source of truth)
+let _dispatchBridge; try { _dispatchBridge = require('../compatibility/dispatch-bridge') } catch { _dispatchBridge = null } // M8-M10/M13: live task-board/decision-log emission (fail-soft, flag-gated ARCHON_TASK_BOARD)
 
 const METH = path.join(__roots.AGENTS_ROOT, 'squads/code-review/methodology')
 
@@ -61,6 +62,122 @@ function readLiveFindings(taskId) {
     for (const l of raw.split('\n')) { const s = l.trim(); if (!s) continue; try { out.push(JSON.parse(s)) } catch {} }
     return out
   } catch { return [] }
+}
+
+const _KNOWN_AUDIT_STATUS = new Set(['SOURCE_CONFIRMED', 'NEEDS_LIVE_VALIDATION', 'RUNTIME_CONFIRMED', 'DISPROVEN'])
+
+// §2/§3/§4/§5: THE single authoritative board writer, run once after the AUDITOR. It REBUILDS VALIDATED-FINDINGS
+// from ALL original candidates (not just the triage subset) so a candidate triage omitted is never permanently
+// absent, and it is the ONLY writer after the auditor (cr-normalize / generic-triager / normalize are skipped in
+// holistic mode). Rules:
+//  - identity (feature/class/file/line/source/sink/candidate_id) ALWAYS from the immutable candidate, never the model
+//  - the AUDITOR verdict (joined by candidate_id) decides confirmation_status — authoritative over the triage guess
+//  - NO verdict for a candidate → AUDIT_QUARANTINED (fail-CLOSED, kept out of the report), never fail-open (§4)
+//  - unknown/malformed status → AUDIT_QUARANTINED, never promoted to SOURCE_CONFIRMED (§5)
+//  - DISPROVEN → terminal, excluded from the report set
+// Emits candidate-ledger-<taskId>.jsonl (every candidate → a terminal state) so 12 candidates = 12 terminal verdicts
+// is provable. Atomic (temp+rename). allCandidates = the deduped-by-candidate_id list the auditor reviewed.
+function reconcileBoardFromVerdicts(taskId, verdictsFile, allCandidates, log = () => {}, deployUrl = '') {
+  const _nk = (s) => String(s || '').trim().toLowerCase()
+  const _cid = (x) => _nk(x.candidate_id || x.duplicate_key || x.id)
+  const candidateIds = new Set((allCandidates || []).map(_cid))
+  // §4: parse verdicts, REJECTING duplicates (same candidate_id twice → can't trust which), foreign ids (not in the
+  // candidate set), and malformed records — each logged + quarantined, never silently overwriting or ignored.
+  const verdicts = {}, _dupIds = new Set(), _foreign = [], _malformed = []
+  try {
+    for (const l of fs.readFileSync(verdictsFile, 'utf8').split('\n')) {
+      const s = l.trim(); if (!s) continue
+      let r; try { r = JSON.parse(s) } catch { try { r = JSON.parse(s.replace(/\\(?!["\\/bfnrtu])/g, '\\\\')) } catch { r = null } }
+      if (!r || !r.candidate_id || !r.status) { _malformed.push(s.slice(0, 120)); continue }
+      const k = _nk(r.candidate_id)
+      if (!candidateIds.has(k)) { _foreign.push(r.candidate_id); continue }              // foreign id → drop + log
+      if (verdicts[k]) { _dupIds.add(k); continue }                                       // duplicate → mark ambiguous
+      verdicts[k] = r
+    }
+  } catch { log(`⚠️ reconcile: could not read AUDITOR-VERDICTS.jsonl — every candidate will be AUDIT_QUARANTINED (fail-closed)`) }
+  for (const k of _dupIds) delete verdicts[k]                                             // an ambiguous id gets NO verdict → quarantined below
+  if (_dupIds.size || _foreign.length || _malformed.length) log(`⚠️ reconcile: rejected ${_dupIds.size} duplicate, ${_foreign.length} foreign, ${_malformed.length} malformed auditor verdict(s) — quarantined/ignored, not applied`)
+  // triage writeups (severity/code_block/description/…) from the current streamed VALIDATED file, by candidate_id.
+  const VF = `${__roots.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
+  const triageByCid = {}
+  try { for (const l of fs.readFileSync(VF, 'utf8').split('\n')) { const s = l.trim(); if (!s) continue; let r; try { r = JSON.parse(s) } catch { r = null } if (r) triageByCid[_cid(r)] = r } } catch {}
+
+  const board = []           // authoritative report set (CONFIRMED / NEEDS_LIVE / RUNTIME only)
+  const ledger = []          // every candidate → terminal state (accounting: N candidates = N verdicts)
+  const st = { confirmed: 0, needs_live: 0, runtime: 0, disproven: 0, quarantined_no_verdict: 0, quarantined_unknown: 0, quarantined_ambiguous: 0, runtime_demoted: 0 }
+  const _isWhiteBox = !!deployUrl
+  for (const c of (allCandidates || [])) {
+    const cid = _cid(c)
+    const v = verdicts[cid]
+    const tr = triageByCid[cid]
+    let terminal, confirmation = null, reason = ''
+    if (!v) {
+      terminal = 'AUDIT_QUARANTINED'
+      if (_dupIds.has(cid)) { reason = 'duplicate auditor verdicts (ambiguous)'; st.quarantined_ambiguous++ }
+      else { reason = 'no auditor verdict'; st.quarantined_no_verdict++ }
+    } else {
+      let status = String(v.status || '').toUpperCase()
+      // §2: RUNTIME confirmation is CODE-enforced, not prompt-enforced. The source auditor has no captured runtime
+      // proof, so a RUNTIME_CONFIRMED verdict is never trustworthy here:
+      //   static (no live target)  → the label is impossible → AUDIT_QUARANTINED (fail-closed, protocol violation)
+      //   white-box (live target)  → demote to NEEDS_LIVE_VALIDATION; the DEFERRED pentest confirms it with real proof
+      if (status === 'RUNTIME_CONFIRMED') {
+        if (!_isWhiteBox) { terminal = 'AUDIT_QUARANTINED'; reason = 'RUNTIME_CONFIRMED without a live target (static review) — protocol violation'; st.quarantined_unknown++; ledger.push(_ledgerRow(c, tr, terminal, null, reason, v)); continue }
+        status = 'NEEDS_LIVE_VALIDATION'; reason = 'auditor RUNTIME_CONFIRMED demoted → NEEDS_LIVE (no captured runtime proof at source review; deferred pentest confirms)'; st.runtime_demoted++
+      }
+      if (!_KNOWN_AUDIT_STATUS.has(status)) { terminal = 'AUDIT_QUARANTINED'; reason = `unknown auditor status "${v.status}"`; st.quarantined_unknown++ }
+      else if (status === 'DISPROVEN') { terminal = 'DISPROVEN'; st.disproven++ }
+      else { terminal = status; confirmation = status; if (status === 'NEEDS_LIVE_VALIDATION') st.needs_live++; else st.confirmed++ }
+    }
+    ledger.push(_ledgerRow(c, tr, terminal, confirmation, reason, v))
+    if (confirmation) board.push(_buildBoardRecord(c, tr, confirmation, v, taskId))
+  }
+  const _write = (file, rows) => { const tmp = `${file}.tmp`; fs.writeFileSync(tmp, rows.map(r => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : '')); fs.renameSync(tmp, file) }
+  _write(VF, board)
+  _write(`${__roots.INTEL_ROOT}/candidate-ledger-${taskId}.jsonl`, ledger)
+  // Sentinel: this board is authoritative — downstream writers (cr-normalize / generic-triager) must NOT overwrite it.
+  try { fs.writeFileSync(`${__roots.INTEL_ROOT}/VALIDATED-AUTHORITATIVE-${taskId}.flag`, new Date().toISOString()) } catch {}
+  const quarantined = st.quarantined_no_verdict + st.quarantined_unknown + st.quarantined_ambiguous
+  log(`🔁 Board rebuilt from ${allCandidates.length} candidate(s) by candidate_id → ${board.length} on the report board (${st.confirmed} source-confirmed, ${st.needs_live} needs-live${st.runtime_demoted ? ` incl. ${st.runtime_demoted} demoted-from-runtime` : ''}, ${st.disproven} disproven, ${quarantined} quarantined) — authoritative, atomic. Ledger: candidate-ledger-${taskId}.jsonl`)
+  return { board: board.length, ledger: ledger.length, quarantined, ...st }
+}
+
+// One candidate-ledger row (the accounting record — every candidate reaches one terminal state).
+function _ledgerRow(c, tr, terminal, confirmation, reason, v) {
+  return { candidate_id: c.candidate_id || '', feature: c.feature || '', vulnerability_class: c.vulnerability_class || c.cwe || '', file: c.file || '', triaged: !!tr, terminal_status: terminal, confirmation_status: confirmation, reason: reason || '', auditor_evidence: v ? String(v.evidence || '').slice(0, 300) : '' }
+}
+
+// Build one authoritative board record: identity from the IMMUTABLE candidate, writeup from the triage record if
+// present (else from the candidate), status from the auditor verdict.
+function _buildBoardRecord(c, tr, confirmation, v, taskId) {
+  const needsLive = confirmation === 'NEEDS_LIVE_VALIDATION'
+  const code = (tr && (tr.code_block || tr.vulnerable_code)) || c.code_block || c.vulnerable_code || c.evidence || ''
+  return {
+    id: (tr && tr.id) || `CR-${String(c.candidate_id || '').replace(/[^a-z0-9]+/gi, '-').slice(-16)}`,
+    // §5: the TITLE names the vulnerability → it is identity, taken from the candidate, NOT the triager (which may
+    // only refine description/impact/severity/remediation). Prevents "CSRF candidate → Stored XSS title" cross-wiring.
+    title: c.title || `${String(c.vulnerability_class || c.cwe || 'issue').replace(/[-_]/g, ' ')} in ${c.feature || c.file || ''}`.trim(),
+    severity: (tr && tr.severity) || c.severity || 'Medium',
+    validation_status: needsLive ? 'NEEDS-LIVE' : 'CONFIRMED',
+    confirmation_status: confirmation,
+    requires_runtime_validation: needsLive,
+    original_agent: String(c.agent || c.original_agent || 'MARSHAL').toUpperCase(),
+    cwe: c.cwe || (tr && tr.cwe) || '', taskId: String(taskId), source: 'streaming-triage',
+    // immutable correlation identity — from the candidate, always
+    feature: c.feature || '', vulnerability_class: c.vulnerability_class || c.cwe || '',
+    duplicate_key: c.duplicate_key || '', candidate_id: c.candidate_id || '',
+    workstream_id: c.workstream_id || '', session_id: c.session_id || '',
+    // immutable evidence LOCATION — from the candidate, never the triager (bug#6)
+    file: c.file || '', line: (c.line ?? ''), source: c.source || '', sink: c.sink || '',
+    affected_endpoint: c.endpoint || c.affected_endpoint || '',
+    code_block: code, vulnerable_code: code,
+    // writeup prose from triage (fail-soft to empty — the WRITER phase fills these for confirmed findings)
+    description: (tr && tr.description) || '', impact: (tr && tr.impact) || '', remediation: (tr && tr.remediation) || '',
+    cvss_vector: (tr && tr.cvss_vector) || '', cvss_score: (tr && typeof tr.cvss_score === 'number') ? tr.cvss_score : null,
+    required_blackbox_proof: (tr && tr.required_blackbox_proof) || c.required_blackbox_proof || '',
+    auditor_evidence: v ? String(v.evidence || '').slice(0, 500) : '',
+    evidence_tier: (tr && tr.evidence_tier) || undefined,
+  }
 }
 
 // vuln class → { specialist, phase-2 module, pattern catalog }. The slugs match
@@ -459,6 +576,9 @@ function toLiveCandidate(c, cls, feature, agent, sourceDir, mode) {
     confidence: c.confidence ?? '', hypothesis: c.hypothesis || '', exploit_hypothesis: c.exploit_hypothesis || c.hypothesis || '',
     evidence: c.evidence || '', code_block: c.code_block || c.vulnerable_code || c.evidence || '',
     recommendation: c.recommendation || '', duplicate_key: c.duplicate_key || _dupKey(feature, vClass, fileRel, c),
+    // F22: correlation fields — candidate_id (stable), workstream_id (owning session), session_id.
+    candidate_id: c.candidate_id || c.id || _dupKey(feature, vClass, fileRel, c),
+    workstream_id: c.workstream_id || (feature && feature.slug) || '', session_id: c.session_id || '',
     // a DISPROVEN finding needs nothing further; anything else source-substantiated still wants live proof.
     requires_runtime_validation: c.requires_runtime_validation ?? (status !== 'DISPROVEN'),
     // status and confirmation_status are ONE truth — never let them diverge (that misrepresents validation).
@@ -477,16 +597,29 @@ function candidateDedupeKey(rec) {
 
 // Read a job's candidate JSONL + push each shaped record to the emit sink. Fail-soft: a missing file
 // (specialist wrote none) or malformed lines yield 0 without throwing.
+// F5: LLMs frequently emit *almost*-valid JSON — a lone backslash from a regex (\A, \z, \d) or a Windows path
+// breaks JSON.parse. Repair the common case (escape any backslash that isn't a valid JSON escape), then retry.
+function _repairJsonLine(s) { return s.replace(/\\(?!["\\/bfnrtu])/g, '\\\\') }
+function parseCandidateLine(s) {
+  try { return { ok: true, c: JSON.parse(s) } } catch {}
+  try { return { ok: true, c: JSON.parse(_repairJsonLine(s)), repaired: true } } catch {}
+  return { ok: false, raw: s }
+}
+// F5: emit candidates from a model-written JSONL file, NEVER silently dropping one. Malformed records are
+// repaired where possible, else quarantined to rejected-candidates-<taskId>.jsonl and logged.
 function emitCandidatesFromFile(candFile, cls, feature, agent, taskId, emitCandidate, log, sourceDir, mode) {
   let raw; try { raw = fs.readFileSync(candFile, 'utf8') } catch { return 0 }
-  let n = 0
+  let n = 0, rejected = 0, repaired = 0
+  const rejectFile = `${__roots.INTEL_ROOT}/rejected-candidates-${taskId}.jsonl`
   for (const line of raw.split('\n')) {
     const s = line.trim(); if (!s) continue
-    let c; try { c = JSON.parse(s) } catch { continue }
-    const rec = toLiveCandidate(c, cls, feature, agent, sourceDir, mode)
+    const p = parseCandidateLine(s)
+    if (!p.ok) { rejected++; try { fs.appendFileSync(rejectFile, JSON.stringify({ ts: new Date().toISOString(), taskId, agent: String(agent), cls, reason: 'invalid JSON (unrepairable)', raw: s.slice(0, 4000) }) + '\n') } catch {}; continue }
+    if (p.repaired) repaired++
+    const rec = toLiveCandidate(p.c, cls, feature, agent, sourceDir, mode)
     if (rec) { try { emitCandidate(taskId, rec); n++ } catch {} }
   }
-  if (n && typeof log === 'function') log(`  📡 ${String(agent).toUpperCase()} → ${n} candidate(s) to the live board [${cls}/${feature.slug}]`)
+  if ((n || rejected) && typeof log === 'function') log(`  📡 ${String(agent).toUpperCase()} → ${n} candidate(s)${repaired ? ` (${repaired} repaired)` : ''}${rejected ? `, ⚠️ ${rejected} QUARANTINED → rejected-candidates` : ''} [${cls}/${feature.slug}]`)
   return n
 }
 
@@ -629,13 +762,54 @@ Demote anything you cannot substantiate from source.
 Write verdicts to ${outDir}/phase2/AUDITOR-VERDICTS.md (a table: feature | class | finding | status | evidence). Reply one line: runtime-confirmed/source-confirmed/needs-live/disproven counts.`
 }
 
-function scribePrompt(taskId, projectId, squad, sourceDir, outDir, features, classes, deployUrl, coverage) {
-  return `You are SCRIBE, the reporter. Merge the per-feature Phase-2 reports into ONE final code-review report.
+// §4/§7: holistic-mode reverse-check. There are NO phase2/*.md reports in holistic mode, so the AUDITOR must
+// reverse-check the ACTUAL streamed candidates — each bound to its immutable candidate_id + the SPECIFIC
+// hypothesis it claimed. The auditor may change the VERDICT, never the vulnerability under review.
+function holisticAuditorPrompt(taskId, outDir, candidates, deployUrl, outFile) {
+  outFile = outFile || `${outDir}/phase2/AUDITOR-VERDICTS.jsonl`
+  const liveLine = deployUrl
+    ? `A live target IS available (${deployUrl}): a candidate proven live is RUNTIME_CONFIRMED; source-substantiated but not fired is SOURCE_CONFIRMED.`
+    : `NO live target (source-only): the strongest verdict is SOURCE_CONFIRMED — never RUNTIME_CONFIRMED without live proof.`
+  const list = candidates.map((c) => `- candidate_id: ${c.candidate_id}\n    title: ${String(c.title || c.vulnerability_class || 'issue')} | class=${c.vulnerability_class || c.cwe || '?'} feature=${c.feature || '?'} at ${c.file || '?'}:${c.line ?? '?'}\n    source=${c.source || '?'} → sink=${c.sink || '?'}\n    hypothesis to test: ${String(c.hypothesis || c.exploit_hypothesis || c.details || '').slice(0, 300)}`).join('\n')
+  return `You are AUDITOR, the independent verifier. Reverse-check EACH candidate below by re-reading ITS cited source path. Evaluate the EXACT hypothesis stated for that candidate — do NOT substitute a different concern (e.g. if the claim is "token never persisted", verify persistence, not entropy). You may change the verdict; you must NOT change the vulnerability being reviewed.
+
+Candidates (${candidates.length}):
+${list}
+
+${liveLine}
+
+Confirmation status vocabulary (use EXACTLY one per candidate):
+- RUNTIME_CONFIRMED     — substantiated AND proven against a running target (only if a live target is available).
+- SOURCE_CONFIRMED      — the stated hypothesis is substantiated from source.
+- NEEDS_LIVE_VALIDATION — plausible but depends on runtime/config/caller not visible in source.
+- DISPROVEN             — the source refutes the stated hypothesis (a guard/escape is present).
+
+For EACH candidate append ONE JSON line to ${outFile} (mkdir -p first; APPEND with >>, never overwrite):
+{"candidate_id":"<echo the exact candidate_id above>","status":"SOURCE_CONFIRMED|NEEDS_LIVE_VALIDATION|DISPROVEN|RUNTIME_CONFIRMED","evidence":"<one line citing file:line for THIS hypothesis>"}
+
+Echo the candidate_id VERBATIM so each verdict binds to the right candidate. EXACTLY one line per candidate_id — do not omit any, do not merge two candidates. Also write a human table to ${outDir}/phase2/AUDITOR-VERDICTS.md. Reply one line: source-confirmed/needs-live/disproven counts.`
+}
+
+function scribePrompt(taskId, projectId, squad, sourceDir, outDir, features, classes, deployUrl, coverage, holistic, preliminary) {
+  // §2: white-box source report is PRELIMINARY — live validation of NEEDS_LIVE candidates runs AFTER this, and the
+  // final white-box report is produced once runtime evidence is correlated. Never present this as the final report.
+  const prelimBanner = preliminary
+    ? `\n\n**⚠️ THIS IS A PRELIMINARY SOURCE REVIEW REPORT** — a live target is configured (${deployUrl}) but runtime validation of NEEDS_LIVE_VALIDATION candidates has NOT yet run. Title the report "PRELIMINARY WHITE-BOX REPORT". Do NOT present NEEDS_LIVE findings as runtime-confirmed; the FINAL white-box report follows once source↔runtime evidence is correlated.\n`
+    : ''
+  // §1: in holistic mode there are no phase2/*.md reports — the Judge-gated board IS the finding set. SCRIBE reads
+  // the JUDGED findings (post-downgrade/rejection) so the report can never contradict the judge.
+  const inputs = holistic
+    ? `- ${__roots.INTEL_ROOT}/JUDGED-FINDINGS-${taskId}.jsonl  (the Judge-gated finding set — THE authoritative findings; report these, honoring each record's confirmation_status)
+- ${__roots.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl  (the reconciled board, if JUDGED is absent)
+- ${outDir}/phase2/AUDITOR-VERDICTS.md  (the auditor's evidence notes)
+- ${__roots.INTEL_ROOT}/candidate-ledger-${taskId}.jsonl  (every candidate's terminal state — use for the coverage/accounting section: note DISPROVEN + AUDIT_QUARANTINED counts honestly)`
+    : `- ${outDir}/phase1-maps/consolidated/phase1_completion_gate.md and phase2_review_queue.md
+- ${outDir}/phase2/**/*.md  (per-feature reports, classes: ${classes.join(', ')})
+- ${outDir}/phase2/AUDITOR-VERDICTS.md  (report RUNTIME_CONFIRMED / SOURCE_CONFIRMED / NEEDS_LIVE_VALIDATION findings; note DISPROVEN separately)`
+  return `You are SCRIBE, the reporter. Merge the reviewed findings into ONE ${preliminary ? 'PRELIMINARY' : 'final'} code-review report.${prelimBanner}
 
 Inputs (read all):
-- ${outDir}/phase1-maps/consolidated/phase1_completion_gate.md and phase2_review_queue.md
-- ${outDir}/phase2/**/*.md  (per-feature reports, classes: ${classes.join(', ')})
-- ${outDir}/phase2/AUDITOR-VERDICTS.md  (report RUNTIME_CONFIRMED / SOURCE_CONFIRMED / NEEDS_LIVE_VALIDATION findings; note DISPROVEN separately)
+${inputs}
 
 COVERAGE (deterministic — use these EXACT numbers; do NOT imply the whole codebase was deep-reviewed):
 deeply reviewed ${coverage ? coverage.deeplyReviewed : (features ? features.length : 0)} of ${coverage ? coverage.mapped : (features ? features.length : 0)} mapped features${coverage && coverage.capped > 0 ? ` — the other ${coverage.capped} are mapped-only (Phase-2 cap), reviewed at map depth but not deep-assessed` : ''}. Open the report's coverage section with exactly this fact.
@@ -652,7 +826,7 @@ Reply one line: features covered, findings by confirmation status + severity, to
 
 // ── main ──────────────────────────────────────────────────────────────────────
 async function runCodeReview(dispatch, deps) {
-  const { spawnAgent, trackCosts, updateProgress, log, logActivity, _isTaskCancelled, onFindingsReady, emitCandidate, startStreamingTriage, getQuotaHealth } = deps
+  const { spawnAgent, trackCosts, updateProgress, log, logActivity, _isTaskCancelled, onFindingsReady, emitCandidate, startStreamingTriage, getQuotaHealth, runJudgeForTask } = deps
   const { taskId, projectId, squad } = dispatch
   const meta = dispatch.meta || {}
   const sourceDir = meta.sourceDir
@@ -673,6 +847,9 @@ async function runCodeReview(dispatch, deps) {
   const outDir = meta.outputDir || `${__roots.INTEL_ROOT}/code-review/${taskId}`
   const deployUrl = meta.deployUrl || null
   const crMode = deployUrl ? 'white-box' : 'static' // S3: stamped on every streamed candidate (parity §7)
+  // Step 4 (SPEC §2): holistic review — one session per coherent workstream instead of the feature×class fan-out.
+  // Flag-gated (default off) + fail-soft fallback to the standard engine, so current behavior is preserved.
+  const HOLISTIC = String(process.env.ARCHON_HOLISTIC_REVIEW || '') === '1'
 
   // Phase 0 — validate
   updateProgress(4, 'Phase 0: sourceDir validation')
@@ -852,6 +1029,7 @@ async function runCodeReview(dispatch, deps) {
         _assessedFeatures.add(f.slug)
         const rs = candidatesByFeature[f.slug] ? 'candidate_found' : 'reviewed_no_issue'
         ledger = mappingLedger.setReview(ledger, f.slug, rs, { assigned_agent: agents, finished_at: _now, vulnerability_classes: vulnClasses })
+        if (_dispatchBridge) _dispatchBridge.onFeatureReviewed(taskId, f.slug, rs, agents, vulnClasses, crMode)
       } else {
         ledger = mappingLedger.setReview(ledger, f.slug, 'failed', { assigned_agent: agents, finished_at: _now, error: 'all Phase 2 specialists failed' })
         log(`⚠️ ${f.slug}: all Phase 2 jobs failed → review_status=failed (mapping preserved, not a coverage gap)`)
@@ -891,6 +1069,7 @@ async function runCodeReview(dispatch, deps) {
       else if (rateLimited) { ledger = mappingLedger.setFeature(ledger, f.slug, { status: 'deferred_rate_limit', cooldownUntil: (mr && mr.cooldownUntil) || null }); status = 'deferred_rate_limit' }
       else { ledger = mappingLedger.setFeature(ledger, f.slug, { status: 'blocked' }); status = 'blocked' }
       emitRuntimeEvent({ session_id: batch.id, owner: batch.owner, phase: 'mapping', feature: f.slug, status, mapped_count: ledger.features_mapped, assigned_total: batch.features.length, message: status === 'done' ? `mapped ${f.slug}` : status === 'deferred_rate_limit' ? `rate-limited on ${f.slug} — will resume` : `no map produced for ${f.slug}` })
+      if (_dispatchBridge) _dispatchBridge.onFeatureMapped(taskId, f.slug, status, batch.owner, crMode)
     }
     mappingLedger.save(outDir, ledger)
     trackCosts([mr].filter(Boolean))
@@ -919,7 +1098,54 @@ async function runCodeReview(dispatch, deps) {
     for (const f of left) ledger = mappingLedger.setFeature(ledger, f.slug, { status: 'blocked_coverage_gap', note: `rate-limit retries exhausted after ${DEFER_MAX_RETRIES} attempts` })
     if (left.length) { mappingLedger.save(outDir, ledger); log(`⚠️ ${left.length} feature(s) still rate-limited after ${DEFER_MAX_RETRIES} attempts → blocked_coverage_gap (coverage gap, reported)`) }
   }
-  if (runPhase('mapping') || runPhase('phase2')) {
+  // Step 4: HOLISTIC path — profile → coherent workstreams → one holistic session each (map + all-class review +
+  // authz/logic + freehand in one pass). Replaces the mapping + feature×class fan-out. Fail-soft: on any error we
+  // fall through to the standard engine below.
+  let _holisticDone = false
+  // Defensive: clear any stale authoritative-board sentinel so a prior aborted run can't wrongly suppress the writers.
+  try { fs.unlinkSync(`${__roots.INTEL_ROOT}/VALIDATED-AUTHORITATIVE-${taskId}.flag`) } catch {}
+  if (HOLISTIC && (runPhase('mapping') || runPhase('phase2')) && !cancelled()) {
+    const holistic = require('../runtime/holistic-review')
+    updateProgress(30, 'Holistic review: one session per coherent workstream')
+    const quotaNow = (typeof getQuotaHealth === 'function' ? getQuotaHealth() : 'healthy') || 'healthy'
+    // F1: ensure the ledger EXISTS before the run (was the null-ledger bug); execution ≠ bookkeeping.
+    if (!ledger) { try { ledger = mappingLedger.build(taskId, [{ id: 'holistic', domain: 'app', owner: null, features }]); mappingLedger.save(outDir, ledger) } catch (e) { log(`⚠️ holistic ledger init (non-fatal): ${e.message}`) } }
+    // F1: run the SECURITY ANALYSIS in its own try — a bookkeeping/UI failure must NEVER rerun it.
+    let hres
+    try { hres = await holistic.runHolistic({
+      spawnAgent, log, trackCosts, cancelled, runWaves,
+      emitFromFile: (file, ws, agent) => { try { return emitCandidatesFromFile(file, 'holistic', { slug: ws.id, name: ws.id }, agent, taskId, emitCandidate, log, sourceDir, crMode) } catch { return 0 } },
+    }, { taskId, sourceDir, features, vulnClasses, outDir, quota: quotaNow, mode: crMode }) }
+    catch (e) { hres = { status: 'failed_before_start', errors: [e.message], plan: null, coverage: [], candidateCount: 0 }; log(`⚠️ holistic errored before start: ${e.message}`) }
+
+    if (hres.status === 'completed' || hres.status === 'partial') {
+      _holisticDone = true // F1: completed/partial ⇒ NEVER run legacy mapping/deep-map/Phase 2
+      // F2: materialize per-feature coverage (candidate_found ONLY where candidates exist). Separate try — a
+      // bookkeeping failure here does NOT trigger a legacy security re-run.
+      try {
+        for (const cov of (hres.coverage || [])) {
+          ledger = mappingLedger.setFeature(ledger, cov.feature, { status: 'done', depth: cov.depth || 'holistic_complete' })
+          ledger = mappingLedger.setReview(ledger, cov.feature, cov.review_status, { candidate_count: cov.candidate_count, files_reviewed: cov.files_reviewed, vulnerability_classes: cov.classes_reviewed })
+          _assessedFeatures.add(cov.feature)
+        }
+        mappingLedger.save(outDir, ledger)
+        // §4: a candidate the matcher could not attribute to a canonical feature is a COVERAGE_ANOMALY — persist
+        // it for the UI/report; it stays a real candidate on the board and is NEVER silently reclassified.
+        if (hres.anomalies && hres.anomalies.length) {
+          try { fs.writeFileSync(`${outDir}/coverage-anomalies.json`, JSON.stringify({ taskId, count: hres.anomalies.length, anomalies: hres.anomalies }, null, 2)) } catch {}
+          log(`⚠️ ${hres.anomalies.length} coverage anomal(ies): candidate(s) not attributable to a canonical feature (see coverage-anomalies.json)`)
+        }
+      } catch (e) { log(`⚠️ holistic ledger materialize (non-fatal): ${e.message}`) }
+      if (_dispatchBridge && hres.plan) { try { _dispatchBridge.onSessionPlan(taskId, { session_count: hres.plan.session_count, active_concurrency: hres.plan.active_concurrency, strategy: hres.plan.strategy, reason: hres.plan.reason, features_total: features.length, mode: crMode }); _dispatchBridge.onCoverage(taskId) } catch {} }
+      const withFindings = (hres.coverage || []).filter((c) => c.review_status === 'candidate_found').length
+      log(`🧠 Holistic review ${hres.status}: ${hres.plan ? hres.plan.session_count : '?'} session(s), ${hres.candidateCount} candidate(s), ${withFindings}/${features.length} feature(s) with findings — feature×class fan-out skipped`)
+    } else {
+      // F1: failed_before_start — legacy fallback ONLY if explicitly enabled (default OFF after validation).
+      if (String(process.env.ARCHON_LEGACY_REVIEW_FALLBACK || '') === '1') { log(`⚠️ holistic ${hres.status} → legacy fallback (ARCHON_LEGACY_REVIEW_FALLBACK=1)`) }
+      else { _holisticDone = true; log(`⚠️ holistic ${hres.status}; legacy fallback OFF → no re-run (set ARCHON_LEGACY_REVIEW_FALLBACK=1 to allow)`) }
+    }
+  }
+  if (!_holisticDone && (runPhase('mapping') || runPhase('phase2'))) {
     // M3: Source Runtime Planner — decide how many persistent worker sessions map the queue, sharded by
     // domain/risk, adjusted for live quota health. Persisted for the UI + consumed by the M4 mapping workers.
     let runtimePlan = null
@@ -933,6 +1159,7 @@ async function runCodeReview(dispatch, deps) {
       log(`🧭 Source Runtime Planner: ${runtimePlan.features_total} feature(s) → ${runtimePlan.mapping_sessions} mapping session(s), ${runtimePlan.max_concurrent_sessions} concurrent (${runtimePlan.strategy}; quota ${quota})`)
       logActivity('CURATOR', `🧭 Source runtime plan: ${runtimePlan.mapping_sessions} session(s), ${runtimePlan.max_concurrent_sessions} concurrent — ${runtimePlan.reason}`, { taskId, squad, projectId: projectId || '' })
       emitRuntimeEvent({ phase: 'planning', status: 'planned', mapping_sessions: runtimePlan.mapping_sessions, max_concurrent_sessions: runtimePlan.max_concurrent_sessions, strategy: runtimePlan.strategy, quota, assigned_total: runtimePlan.features_total, message: runtimePlan.reason })
+      if (_dispatchBridge) _dispatchBridge.onSessionPlan(taskId, { session_count: runtimePlan.mapping_sessions, active_concurrency: runtimePlan.max_concurrent_sessions, strategy: runtimePlan.strategy, reason: runtimePlan.reason, quota_state: quota, features_total: runtimePlan.features_total, mode: crMode })
     } catch (e) { log(`⚠️ Source Runtime Planner (non-fatal): ${e.message}`) }
     // M4: the mapping UNITS are the planner's shards — FEW persistent worker sessions, each mapping a whole
     // shard of features in one long-running call (fewer, longer sessions = less rate-limit pressure). Each
@@ -991,7 +1218,7 @@ async function runCodeReview(dispatch, deps) {
   // (§9). Read the followups agents wrote, add genuinely-new features to the ledger + a feature-queue
   // delta, fast-map + assess them; bounded to MAX_FOLLOWUP_ROUNDS so it always terminates. Then the gate:
   // every feature must be terminal — a non-terminal one is a coverage gap marked 'blocked' (never silent, §13).
-  if (ledger && (runPhase('mapping') || runPhase('phase2'))) {
+  if (!_holisticDone && ledger && (runPhase('mapping') || runPhase('phase2'))) {
     const readJsonl = (file) => { try { return fs.readFileSync(file, 'utf8').split('\n').map(l => { try { return JSON.parse(l.trim()) } catch { return null } }).filter(Boolean) } catch { return [] } }
     for (let round = 1; round <= MAX_FOLLOWUP_ROUNDS && !cancelled(); round++) {
       const { newFeatures } = mappingLedger.reconcileFollowups(readJsonl(`${outDir}/phase1-maps/followup-features.jsonl`), ledger)
@@ -1037,7 +1264,7 @@ async function runCodeReview(dispatch, deps) {
   // NOW do we review — all mapped features × vulnClasses, in controlled waves — STREAMING each confirmed
   // candidate to TRIAGER so the board fills live during review. No feature is reviewed while another is still
   // unmapped; all mapping capacity went to mapping first, then review agents fan out over the completed maps.
-  if (ledger && runPhase('phase2') && !cancelled()) {
+  if (!_holisticDone && ledger && runPhase('phase2') && !cancelled()) {
     const mapped = Object.values(ledger.features)
       .filter(f => f.status === 'done' && fs.existsSync(`${outDir}/phase1-maps/features/${f.slug}.md`))
       .map(f => _featureBySlug.get(f.slug) || { slug: f.slug, name: f.name || f.slug })
@@ -1082,7 +1309,10 @@ async function runCodeReview(dispatch, deps) {
 
   // Phase 1c — consolidation (AFTER the per-batch pipeline; produces the coverage matrices for the report).
   if (cancelled()) return bail('Phase 1c consolidation')
-  if (runPhase('consolidate')) {
+  // §2: after holistic success the ledger + deterministic completion gate are already materialized, and the
+  // M5 block below builds the candidate index deterministically — the legacy CURATOR consolidation session
+  // would just re-derive coverage from feature×class maps that holistic never wrote. Skip it.
+  if (!_holisticDone && runPhase('consolidate')) {
     updateProgress(78, 'Phase 1c: CURATOR consolidation')
     const cRes = await safeSpawn(() => spawnAgent('curator', taskId, consolidationPrompt(taskId, outDir, allFeatures), `task-${taskId}-consolidate`, null), 'consolidation')
     trackCosts([cRes].filter(Boolean))
@@ -1091,6 +1321,7 @@ async function runCodeReview(dispatch, deps) {
   // so the final report can never drift from the ledger's truth (overwrites the CURATOR narrative version).
   if (ledger) {
     try { fs.mkdirSync(`${outDir}/phase1-maps/consolidated`, { recursive: true }); fs.writeFileSync(`${outDir}/phase1-maps/consolidated/phase1_completion_gate.md`, mappingLedger.renderGateMd(ledger)) } catch {}
+    if (_dispatchBridge) _dispatchBridge.onCoverage(taskId) // M8-M10/M13: coverage snapshot from the ledger (fail-soft)
   }
 
   // Phase 3 — freehand senior-pentester review (Autonomous OS Block D, flag-gated).
@@ -1099,7 +1330,9 @@ async function runCodeReview(dispatch, deps) {
   // only ⇒ NEEDS-LIVE, never CONFIRMED) with zero verifier/reporter edits. SHADOW ⇒
   // a non-globbed sibling that AUDITOR/SCRIBE never read (report byte-stable).
   if (cancelled()) return bail('Phase 3 freehand')
-  if (FH_MODE !== 'off' && runPhase('freehand')) {
+  // Holistic already reviews every feature freehand-style IN its single session (buildHolisticPrompt step 3),
+  // so the legacy per-feature freehand wave would re-review the whole app in N extra sessions — skip it.
+  if (!_holisticDone && FH_MODE !== 'off' && runPhase('freehand')) {
     const fhDir = FH_MODE === 'active' ? `${outDir}/phase2/freehand` : `${outDir}/phase3-freehand-shadow`
     fs.mkdirSync(fhDir, { recursive: true })
     const maxFreehand = meta.maxFreehand || maxPhase2
@@ -1163,8 +1396,48 @@ async function runCodeReview(dispatch, deps) {
       trackCosts([uRes].filter(Boolean))
     }
     updateProgress(86, 'Phase 2v: AUDITOR reverse-check')
-    const kRes = await safeSpawn(() => spawnAgent('auditor', taskId, auditorPrompt(taskId, outDir, p2Features, vulnClasses, deployUrl), `task-${taskId}-auditor`, null), 'AUDITOR reverse-check')
-    trackCosts([kRes].filter(Boolean))
+    if (_holisticDone) {
+      // §4: reverse-check the ACTUAL streamed candidates (bound by candidate_id + hypothesis), not phase2/*.md.
+      const _cands = (() => {
+        const byCid = new Map()
+        for (const c of readLiveFindings(taskId)) {
+          if (!c || !(c.type === 'candidate' || c.source === 'code-review')) continue
+          const cid = String(c.candidate_id || c.duplicate_key || c.id || ''); if (!cid || byCid.has(cid)) continue
+          byCid.set(cid, { ...c, candidate_id: cid })
+        }
+        return [...byCid.values()]
+      })()
+      const verdictsFile = `${outDir}/phase2/AUDITOR-VERDICTS.jsonl`
+      try { fs.mkdirSync(`${outDir}/phase2`, { recursive: true }); fs.unlinkSync(verdictsFile) } catch {}
+      if (_cands.length) {
+        const kRes = await safeSpawn(() => spawnAgent('auditor', taskId, holisticAuditorPrompt(taskId, outDir, _cands, deployUrl), `task-${taskId}-auditor`, null, { timeoutMs: 20 * 60 * 1000 }), 'AUDITOR reverse-check (holistic)')
+        trackCosts([kRes].filter(Boolean))
+        // §4: a candidate the auditor omitted is AUDIT_RETRYABLE — re-run the auditor for JUST the uncovered ones
+        // (one bounded pass) BEFORE reconcile quarantines them, so a flaky auditor never loses a real finding.
+        const _covered = () => { const s = new Set(); try { for (const l of fs.readFileSync(verdictsFile, 'utf8').split('\n')) { const t = l.trim(); if (!t) continue; let r; try { r = JSON.parse(t) } catch { r = null } if (r && r.candidate_id) s.add(String(r.candidate_id).trim().toLowerCase()) } } catch {} return s }
+        let missing = _cands.filter(c => !_covered().has(String(c.candidate_id).trim().toLowerCase()))
+        if (missing.length && !cancelled()) {
+          log(`↩️ AUDITOR retry: ${missing.length}/${_cands.length} candidate(s) had no verdict — re-checking just those`)
+          const retryFile = `${outDir}/phase2/AUDITOR-VERDICTS-retry.jsonl`
+          try { fs.unlinkSync(retryFile) } catch {}
+          const rRes = await safeSpawn(() => spawnAgent('auditor', taskId, holisticAuditorPrompt(taskId, outDir, missing, deployUrl, retryFile), `task-${taskId}-auditor-retry`, null, { timeoutMs: 15 * 60 * 1000 }), 'AUDITOR reverse-check retry')
+          trackCosts([rRes].filter(Boolean))
+          // merge the retry verdicts into the main file (append) so reconcile sees one combined set.
+          try { const extra = fs.readFileSync(retryFile, 'utf8'); if (extra.trim()) fs.appendFileSync(verdictsFile, (extra.endsWith('\n') ? extra : extra + '\n')) } catch {}
+          missing = _cands.filter(c => !_covered().has(String(c.candidate_id).trim().toLowerCase()))
+          if (missing.length) log(`⚠️ AUDITOR retry: ${missing.length} candidate(s) STILL unverified → will be AUDIT_QUARANTINED (fail-closed, kept out of the report)`)
+        }
+        // §2/§3/§5: rebuild the validated board ATOMICALLY from ALL candidates + the auditor verdicts (candidate_id
+        // join), with code-enforced runtime confirmation (deployUrl decides static vs white-box).
+        try { reconcileBoardFromVerdicts(taskId, verdictsFile, _cands, log, deployUrl || '') } catch (e) { log(`⚠️ board reconcile (non-fatal): ${e.message}`) }
+        // §5 bug#5: refresh coverage telemetry from durable state (deriveCoverage reads the VALIDATED count) so
+        // the UI counters reflect the reconciled board, not the pre-triage snapshot.
+        if (_dispatchBridge) { try { _dispatchBridge.onCoverage(taskId) } catch {} }
+      } else { log(`⚠️ Phase 2v: no candidates to reverse-check`) }
+    } else {
+      const kRes = await safeSpawn(() => spawnAgent('auditor', taskId, auditorPrompt(taskId, outDir, p2Features, vulnClasses, deployUrl), `task-${taskId}-auditor`, null), 'AUDITOR reverse-check')
+      trackCosts([kRes].filter(Boolean))
+    }
   }
 
   // Live-board parity with black-box: AUDITOR verdicts now exist, so surface findings on the board
@@ -1180,24 +1453,73 @@ async function runCodeReview(dispatch, deps) {
   const coverage = ledger
     ? { mapped: ledger.features_mapped, deeplyReviewed: p2Features.length, blocked: mappingLedger.blockers(ledger).length, deferred: ledger.features_deferred, capped: Math.max(0, ledger.features_total - p2Features.length) }
     : { mapped: features.length, deeplyReviewed: p2Features.length, capped: Math.max(0, features.length - p2Features.length) }
+  // ── §1/§3/§5: JUDGE (validated) → CLOSURE GATE → REPORT-ELIGIBILITY → SCRIBE (all BEFORE the report) ──────
+  const _VFpath = `${__roots.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
+  const _JFpath = `${__roots.INTEL_ROOT}/JUDGED-FINDINGS-${taskId}.jsonl`
+  const _reportableIds = () => { const s = new Set(); try { for (const l of fs.readFileSync(_VFpath, 'utf8').split('\n')) { const t = l.trim(); if (!t) continue; let r; try { r = JSON.parse(t) } catch { r = null } if (r && r.candidate_id) s.add(String(r.candidate_id).trim().toLowerCase()) } } catch {} return s }
+  const _judgedIds = () => { const s = new Set(); try { for (const l of fs.readFileSync(_JFpath, 'utf8').split('\n')) { const t = l.trim(); if (!t) continue; let r; try { r = JSON.parse(t) } catch { r = null } if (r && (r.candidate_id || r.id)) s.add(String(r.candidate_id || r.id).trim().toLowerCase()) } } catch {} return s }
+  // §1/§3: judge is VALID only when it ran AND its output covers every reportable candidate id (partial ≠ success).
+  const _judgeValid = () => { const want = _reportableIds(); if (!want.size) return true; const got = _judgedIds(); for (const id of want) if (!got.has(id)) return false; return true }
+
+  let _judgeOk = false
+  if (_holisticDone && typeof runJudgeForTask === 'function' && !cancelled()) {
+    updateProgress(92, 'Phase 3: Judge (before report)')
+    for (let attempt = 1; attempt <= 2 && !_judgeOk && !cancelled(); attempt++) {
+      try { const _jr = await runJudgeForTask(taskId, _VFpath, deployUrl || ''); _judgeOk = !!(_jr && _judgeValid()) }
+      catch (e) { log(`⚠️ judge attempt ${attempt} (non-fatal): ${e.message}`); _judgeOk = false }
+      if (!_judgeOk && attempt < 2) log(`↩️ Judge attempt ${attempt} failed/partial (did not cover all reportable findings) — retrying`)
+    }
+    log(_judgeOk ? `⚖️ Judge ran + covered all reportable findings — the report is Judge-gated` : `⛔ Judge failed/partial after retries — final report BLOCKED (not Judge-gated)`)
+  } else { _judgeOk = !_holisticDone }   // legacy path is judged by the daemon; not gated here
+
+  // §3/§5: CLOSURE GATE — computed BEFORE SCRIBE so report-eligibility can act on it. A run is COMPLETE only when
+  // every candidate is terminal, nothing quarantined, the judge validly covered the board, and no feature blocked.
+  let _completionGate = { status: 'COMPLETE', gaps: [] }
+  if (_holisticDone) {
+    try {
+      const _rd = (f) => { try { return fs.readFileSync(`${__roots.INTEL_ROOT}/${f}`, 'utf8').split('\n').map(l => { try { return JSON.parse(l.trim()) } catch { return null } }).filter(Boolean) } catch { return [] } }
+      const _ledgerRows = _rd(`candidate-ledger-${taskId}.jsonl`)
+      const _triageQ = _rd(`triage-quarantine-${taskId}.jsonl`).length
+      const _auditQ = _ledgerRows.filter(r => r.terminal_status === 'AUDIT_QUARANTINED').length
+      const _blocked = ledger ? mappingLedger.blockers(ledger).length : 0
+      const _reportable = _reportableIds().size, _judgedCov = [..._reportableIds()].filter(id => _judgedIds().has(id)).length
+      const gaps = []
+      if (!_judgeOk) gaps.push(`judge covered ${_judgedCov}/${_reportable} reportable finding(s) — report BLOCKED`)
+      if (_auditQ) gaps.push(`${_auditQ} candidate(s) AUDIT_QUARANTINED (no/ambiguous/invalid verdict)`)
+      if (_triageQ) gaps.push(`${_triageQ} candidate(s) TRIAGE_QUARANTINED`)
+      if (_blocked) gaps.push(`${_blocked} feature(s) blocked (coverage gap)`)
+      const status = !_judgeOk ? 'REPORT_BLOCKED' : (gaps.length ? 'COMPLETE_WITH_GAPS' : 'COMPLETE')
+      _completionGate = { status, gaps, candidate_ledger_total: _ledgerRows.length, audit_quarantined: _auditQ, triage_quarantined: _triageQ, judge_valid: _judgeOk, judged_coverage: `${_judgedCov}/${_reportable}` }
+      try { fs.writeFileSync(`${outDir}/completion-gate.json`, JSON.stringify({ taskId, ..._completionGate }, null, 2)) } catch {}
+      log(status === 'COMPLETE' ? `✅ Completion gate: COMPLETE — ${_ledgerRows.length} candidate(s) terminal, judge-covered, no gaps`
+        : status === 'REPORT_BLOCKED' ? `⛔ Completion gate: REPORT_BLOCKED — ${gaps.join('; ')}`
+        : `⚠️ Completion gate: COMPLETE_WITH_GAPS — ${gaps.join('; ')}`)
+    } catch (e) { log(`⚠️ completion gate (non-fatal): ${e.message}`) }
+  }
+
+  // §1/§2: report-eligibility. Holistic + judge invalid ⇒ do NOT publish a "final" report. White-box ⇒ this is a
+  // PRELIMINARY source report (live validation runs later), never the final white-box report.
+  const _reportBlocked = _holisticDone && !_judgeOk
+  const _preliminary = !!deployUrl   // white-box: source-only report pending live validation
   if (cancelled()) return bail('Phase 3 report')
-  if (runPhase('report')) {
-    updateProgress(94, 'Phase 3: SCRIBE final report')
-    const vRes = await safeSpawn(() => spawnAgent('scribe', taskId, scribePrompt(taskId, projectId, squad, sourceDir, outDir, p2Features, vulnClasses, deployUrl, coverage), `task-${taskId}-scribe`, null, { timeoutMs: 30 * 60 * 1000 }), 'SCRIBE report')
+  if (runPhase('report') && !_reportBlocked) {
+    updateProgress(94, _preliminary ? 'Phase 3: SCRIBE preliminary report' : 'Phase 3: SCRIBE final report')
+    const vRes = await safeSpawn(() => spawnAgent('scribe', taskId, scribePrompt(taskId, projectId, squad, sourceDir, outDir, p2Features, vulnClasses, deployUrl, coverage, _holisticDone, _preliminary), `task-${taskId}-scribe`, null, { timeoutMs: 30 * 60 * 1000 }), 'SCRIBE report')
     trackCosts([vRes].filter(Boolean))
+  } else if (_reportBlocked) {
+    log(`⛔ SCRIBE skipped — final report BLOCKED (judge did not validly cover the board). Fix/retry the judge before publishing.`)
   }
 
   // C2: run-completion invariant — no loose ends: every validated finding carries a valid confirmation
   // status + real evidence, and every ledger feature is terminal. Log violations (a clean run has none).
   try {
-    const _vf = `${__roots.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
-    const _validated = (() => { try { return fs.readFileSync(_vf, 'utf8').split('\n').map(l => { try { return JSON.parse(l.trim()) } catch { return null } }).filter(Boolean) } catch { return [] } })()
+    const _validated = (() => { try { return fs.readFileSync(_VFpath, 'utf8').split('\n').map(l => { try { return JSON.parse(l.trim()) } catch { return null } }).filter(Boolean) } catch { return [] } })()
     const _inv = require('../pipeline/completion-invariant').runCompletionInvariant({ findings: _validated, ledger, TERMINAL: mappingLedger.TERMINAL })
     if (_inv.ok) log(`✅ Completion invariant: clean — all findings validated + tiered, all features terminal`)
     else log(`⚠️ Completion invariant: ${_inv.violations.length} issue(s) — ${_inv.violations.slice(0, 5).map(v => `${v.id}:${v.kind}`).join(', ')}`)
   } catch (e) { log(`⚠️ completion invariant (non-fatal): ${e.message}`) }
 
-  updateProgress(100, 'Complete')
+  updateProgress(100, _completionGate.status === 'COMPLETE' ? 'Complete' : _completionGate.status === 'REPORT_BLOCKED' ? 'Complete (report blocked)' : 'Complete (with gaps)')
   return {
     stack, sourceDir, fileCount: p0.fileCount,
     features: allFeatures.map(f => f.slug),
@@ -1208,6 +1530,7 @@ async function runCodeReview(dispatch, deps) {
     phase2Features: p2Features.map(f => f.slug),
     vulnClasses,
     outputDir: outDir,
+    completionGate: _completionGate,   // §3: COMPLETE | COMPLETE_WITH_GAPS (+ gap list)
   }
 }
 
@@ -1245,6 +1568,7 @@ function validateSourceDir(sourceDir) {
 module.exports = {
   runCodeReview,
   validateSourceDir,
+  reconcileBoardFromVerdicts,
   // exported for tests/introspection
   detectStack,
   buildInventories,
@@ -1252,6 +1576,8 @@ module.exports = {
   toLiveCandidate,
   candidateConfirmation,
   candidateDedupeKey,
+  parseCandidateLine,
+  emitCandidatesFromFile,
   DEFAULT_CLASSES,
   CLASS,
   MAPPER_POOL,

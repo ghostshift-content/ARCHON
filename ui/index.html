@@ -51,6 +51,7 @@
       <button data-view="activity">
         <svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
         Activity</button>
+      <!-- Studio (custom personas & patterns) disabled -->
       <div class="sep"></div>
       <div class="foot" id="footMeta">intel: …</div>
     </nav>
@@ -184,6 +185,46 @@
       <section class="view" id="view-reports">
         <div class="view-head"><h1>Reports</h1><span class="sub">final published dossiers &amp; pentest reports</span></div>
         <div class="replist" id="reportList"></div>
+      </section>
+
+      <section class="view" id="view-studio">
+        <div class="view-head"><h1>Studio</h1><span class="sub">create custom personas &amp; vulnerability patterns — no code edit</span></div>
+        <div class="studio-grid">
+          <div class="card">
+            <h3 style="margin:0 0 10px">Personas</h3>
+            <div id="studioPersonaList" class="studio-list"><div class="hint">loading…</div></div>
+            <details style="margin-top:12px"><summary class="btn sm">+ Create persona</summary>
+              <div class="studio-form">
+                <label>ID <input id="pfId" placeholder="my-bounty-hunter"></label>
+                <label>Name <input id="pfName" placeholder="My Bounty Hunter"></label>
+                <label>Report style
+                  <select id="pfReport"><option>standard</option><option>bug_bounty</option><option>appsec</option><option>executive</option></select></label>
+                <label>Evidence strictness
+                  <select id="pfStrict"><option>medium</option><option>high</option><option>low</option></select></label>
+                <label>Scan depth
+                  <select id="pfDepth"><option>normal</option><option>deep</option><option>shallow</option></select></label>
+                <label>Preferred classes (comma-sep) <input id="pfPref" placeholder="xss, access-control, business-logic"></label>
+                <label>Description <textarea id="pfDesc" rows="2" placeholder="what this persona prioritizes"></textarea></label>
+                <button class="btn primary sm" id="pfSave">Create persona</button>
+                <span class="hint" id="pfMsg"></span>
+              </div></details>
+          </div>
+          <div class="card">
+            <h3 style="margin:0 0 10px">Custom patterns</h3>
+            <div id="studioPatternList" class="studio-list"><div class="hint">loading…</div></div>
+            <details style="margin-top:12px"><summary class="btn sm">+ Create pattern pack</summary>
+              <div class="studio-form">
+                <label>Class <input id="qfClass" placeholder="xss"></label>
+                <label>Pack name <input id="qfName" placeholder="dom-clobbering"></label>
+                <label>Mode <select id="qfMode"><option>append</option><option>override</option></select></label>
+                <label>Pattern id <input id="qfPid" placeholder="xss.custom.dom-clobbering"></label>
+                <label>Pattern name <input id="qfPname" placeholder="DOM clobbering via id/name"></label>
+                <label>Description <textarea id="qfPdesc" rows="2" placeholder="source → sink description"></textarea></label>
+                <button class="btn primary sm" id="qfSave">Create pattern pack</button>
+                <span class="hint" id="qfMsg"></span>
+              </div></details>
+          </div>
+        </div>
       </section>
 
       <section class="view" id="view-activity">

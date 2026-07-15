@@ -15,10 +15,10 @@ test('M8.1 — 20 features → 1 persistent mapping session', () => {
   assert.equal(P.planSourceRuntime({ features: mk(20) }).mapping_sessions, 1)
 })
 
-test('M8.2 — 75 features → 3 mapping sessions', () => {
+test('M8.2 — 75 features → 2 mapping sessions (unified §6 ladder)', () => {
   const p = P.planSourceRuntime({ features: [...mk(25, 'a'), ...mk(25, 'b'), ...mk(25, 'c')] })
-  assert.equal(p.mapping_sessions, 3)
-  assert.equal(p.max_concurrent_sessions, 3)
+  assert.equal(p.mapping_sessions, 2)
+  assert.equal(p.max_concurrent_sessions, 2)
 })
 
 test('M8.3 — 200 features → 4 shards, only 3 concurrent by default', () => {
@@ -58,8 +58,10 @@ test('M8.7 — white-box upgrades to RUNTIME_CONFIRMED ONLY with real captured r
   assert.equal(wb.finalizeSourceStatus({ confirmation_status: 'SOURCE_CONFIRMED' }, null).status, 'SOURCE_CONFIRMED')
 })
 
-test('M8.8 — quota-driven session sizing: cooling pauses to 1 session', () => {
-  const big = [...mk(50, 'a'), ...mk(50, 'b'), ...mk(50, 'c'), ...mk(50, 'd')]
-  assert.equal(P.planSourceRuntime({ features: big, quota: 'cooling' }).mapping_sessions, 1)
-  assert.equal(P.planSourceRuntime({ features: big, quota: 'constrained' }).mapping_sessions, 2)
+test('M8.8 — §6 quota control: reduces ACTIVE concurrency, session count unchanged', () => {
+  const big = [...mk(50, 'a'), ...mk(50, 'b'), ...mk(50, 'c'), ...mk(50, 'd')] // §6 → 4 sessions
+  const cooling = P.planSourceRuntime({ features: big, quota: 'cooling' })
+  assert.equal(cooling.mapping_sessions, 4, 'session count unchanged')
+  assert.equal(cooling.max_concurrent_sessions, 1, 'cooling → 1 active')
+  assert.equal(P.planSourceRuntime({ features: big, quota: 'constrained' }).max_concurrent_sessions, 1)
 })

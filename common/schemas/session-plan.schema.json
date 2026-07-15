@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "archon://schemas/session-plan",
+  "title": "ARCHON Session Plan",
+  "description": "Output of src/runtime/session-planner.js — how many controlled project sessions a mission needs and how many run concurrently now. Persisted at var/intel/session-plan-<taskId>.json. session_count is PLANNED capacity; active_concurrency is how many run now (quota-adjusted). Never spawn more sessions to solve rate limits.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["session_count", "active_concurrency", "strategy", "reason", "shards"],
+  "properties": {
+    "session_count": { "type": "integer", "minimum": 1, "maximum": 5, "description": "planned capacity (ladder by feature count, capped at 5)" },
+    "active_concurrency": { "type": "integer", "minimum": 1, "description": "how many sessions run concurrently now (quota-adjusted, <= session_count)" },
+    "strategy": { "type": "string", "description": "e.g. balanced_feature_shards | single_project_session | paused_rate_limit" },
+    "reason": { "type": "string", "description": "human-readable explanation of the chosen counts (required — the planner must explain itself)" },
+    "quota_state": { "type": ["string", "null"], "enum": ["healthy", "warm", "constrained", "cooling", null] },
+    "shards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["session_id", "features"],
+        "properties": {
+          "session_id": { "type": "string" },
+          "owner": { "type": ["string", "null"], "description": "assigned agent/persona" },
+          "features": { "type": "array", "items": { "type": "string" } },
+          "risk": { "type": ["string", "null"], "enum": ["low", "medium", "high", "mixed", null] }
+        }
+      }
+    }
+  }
+}

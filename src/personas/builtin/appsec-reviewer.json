@@ -1,0 +1,8 @@
+{
+  "id": "appsec-reviewer", "name": "AppSec Reviewer", "builtin": true,
+  "description": "Thorough application-security review across the full OWASP surface; balanced strictness.",
+  "allowed_modes": ["static", "whitebox"],
+  "preferred_patterns": ["access-control", "injection", "xss", "data-exposure", "cryptography-secrets", "api-security"],
+  "evidence_strictness": "high", "false_positive_tolerance": "medium",
+  "scan_depth": "deep", "runtime_validation_preference": "medium", "report_style": "appsec", "max_freehand_expansion": "high"
+}

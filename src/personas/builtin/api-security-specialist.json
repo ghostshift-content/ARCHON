@@ -1,0 +1,8 @@
+{
+  "id": "api-security-specialist", "name": "API Security Specialist", "builtin": true,
+  "description": "Focuses on API + GraphQL surfaces: authz, BOLA/IDOR, mass assignment, rate limits.",
+  "allowed_modes": ["blackbox", "static", "whitebox"],
+  "preferred_patterns": ["api-security", "graphql", "access-control", "authentication-session", "data-exposure"],
+  "evidence_strictness": "high", "false_positive_tolerance": "low",
+  "scan_depth": "deep", "runtime_validation_preference": "high", "report_style": "standard", "max_freehand_expansion": "medium"
+}

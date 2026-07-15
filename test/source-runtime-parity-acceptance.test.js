@@ -12,8 +12,8 @@ const wb = require('../src/dispatch/whitebox-correlation')
 
 const mk = (n, d = 'misc') => Array.from({ length: n }, (_, i) => ({ slug: `${d}-${i}`, domain: d }))
 
-test('§11: mapping plans for ANY feature count (spec ladder S1)', () => {
-  for (const [n, want] of [[1, 1], [30, 1], [31, 3], [90, 3], [200, 4], [500, 5], [2000, 6]]) {
+test('§11: mapping plans for ANY feature count (unified §6 ladder)', () => {
+  for (const [n, want] of [[1, 1], [25, 1], [26, 2], [75, 2], [76, 3], [200, 4], [500, 5], [2000, 5]]) {
     assert.equal(P.planSourceRuntime({ features: mk(n) }).mapping_sessions, want, `${n} → ${want}`)
   }
 })
@@ -22,7 +22,8 @@ test('§11: review + triage use controlled, capped persistent sessions (S1/S4)',
   const plan = P.planSourceRuntime({ features: mk(200) })
   assert.ok(plan.review.max_concurrent_sessions <= P.DEFAULT_MAX_CONCURRENT, 'review sessions capped')
   assert.equal(triageSessions(300), 4, 'triage caps at 4 sessions')
-  assert.equal(triageSessions(10), 1)
+  assert.equal(triageSessions(3), 1)   // F8 ladder: 1-4→1
+  assert.equal(triageSessions(10), 2)  // F8 ladder: 5-12→2
 })
 
 test('§11: a failed review never clobbers a done map (mapping/review split, S2/S6)', () => {

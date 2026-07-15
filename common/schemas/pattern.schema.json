@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "archon://schemas/pattern",
+  "title": "ARCHON Pattern (v2)",
+  "description": "A centralized vulnerability pattern (src/patterns/builtin/<class>/ or src/patterns/custom/). Richer than the legacy common/patterns/*.json — carries sources/sinks/static+runtime signals and per-mode evidence requirements. The legacy pattern_catalog.schema.json stays valid; the compat loader accepts both.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["id", "name", "category"],
+  "properties": {
+    "id": { "type": "string", "description": "dotted id, e.g. access-control.idor.object-id" },
+    "name": { "type": "string" },
+    "category": { "type": "string", "description": "vulnerability class, e.g. access-control" },
+    "modes": { "type": "array", "items": { "type": "string", "enum": ["blackbox", "static", "whitebox"] }, "default": ["blackbox", "static", "whitebox"] },
+    "description": { "type": "string" },
+    "sources": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "sinks": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "static_signals": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "runtime_signals": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "evidence_required": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "static": { "type": "array", "items": { "type": "string" } },
+        "runtime": { "type": "array", "items": { "type": "string" } },
+        "whitebox": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "default_confidence": { "type": "number", "minimum": 0, "maximum": 100, "default": 60 },
+    "requires_runtime_validation": { "type": "boolean", "default": true },
+    "enabled": { "type": "boolean", "default": true },
+    "author": { "type": ["string", "null"], "description": "provenance for custom packs" }
+  }
+}

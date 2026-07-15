@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "archon://schemas/decision-log",
+  "title": "ARCHON Decision Log entry",
+  "description": "Agentic decision trail (var/intel/decision-log-<taskId>.jsonl). One line per meaningful agent decision so every finding is traceable. Additive artifact.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["ts", "taskId", "agent", "decision"],
+  "properties": {
+    "ts": { "type": "string", "description": "ISO date" },
+    "taskId": { "type": "string" },
+    "agent": { "type": "string" },
+    "session_id": { "type": ["string", "null"] },
+    "decision": { "type": "string" },
+    "reason": { "type": ["string", "null"] },
+    "evidence_used": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "task_created": { "type": ["string", "null"], "description": "task-board id this decision spawned" },
+    "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+    "result": { "type": ["string", "null"] },
+    "next_recommendation": { "type": ["string", "null"] }
+  }
+}

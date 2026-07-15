@@ -14,12 +14,12 @@ function makeSourceDir() {
   return dir
 }
 
-test('M4: 45 features across 3 domains map in 3 persistent sessions, each mapping many features', async () => {
+test('M4: 90 features across 3 domains map in 3 persistent sessions, each mapping many features', async () => {
   const srcDir = makeSourceDir()
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'm4out-'))
   const domains = ['auth_identity', 'integrations_api', 'files_uploads']
   const features = []
-  for (const d of domains) for (let i = 0; i < 15; i++) features.push({ slug: `${d}-${i}`, name: `${d} ${i}`, domain: d, risk_hint: 'medium', keywords: d })
+  for (const d of domains) for (let i = 0; i < 30; i++) features.push({ slug: `${d}-${i}`, name: `${d} ${i}`, domain: d, risk_hint: 'medium', keywords: d })
 
   const mapCallSlugCounts = [] // slugs mapped per INITIAL worker session
   const deps = {
@@ -41,11 +41,11 @@ test('M4: 45 features across 3 domains map in 3 persistent sessions, each mappin
     meta: { sourceDir: srcDir, vulnClasses: ['access-control'], outputDir: outDir, features, deepMap: false } }, deps)
 
   const plan = JSON.parse(fs.readFileSync(path.join(outDir, 'source-runtime-plan.json'), 'utf8'))
-  assert.equal(plan.mapping_sessions, 3, '45 features → 3 sessions (spec ladder: 31-90 → 3)')
-  assert.equal(mapCallSlugCounts.length, 3, 'exactly 3 persistent worker sessions ran (not 45 one-per-feature spawns)')
+  assert.equal(plan.mapping_sessions, 3, '90 features → 3 sessions (unified §6 ladder: 76-150 → 3)')
+  assert.equal(mapCallSlugCounts.length, 3, 'exactly 3 persistent worker sessions ran (not 90 one-per-feature spawns)')
   assert.ok(mapCallSlugCounts.every((n) => n > 1), 'each worker session mapped MANY features, not one')
-  assert.equal(mapCallSlugCounts.reduce((a, b) => a + b, 0), 45, 'the three sessions cover all 45 features')
-  assert.equal(res.featuresMapped, 45)
+  assert.equal(mapCallSlugCounts.reduce((a, b) => a + b, 0), 90, 'the three sessions cover all 90 features')
+  assert.equal(res.featuresMapped, 90)
 
   fs.rmSync(srcDir, { recursive: true, force: true }); fs.rmSync(outDir, { recursive: true, force: true })
 })

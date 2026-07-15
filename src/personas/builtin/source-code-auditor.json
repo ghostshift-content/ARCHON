@@ -1,0 +1,8 @@
+{
+  "id": "source-code-auditor", "name": "Source Code Auditor", "builtin": true,
+  "description": "Deep white-box source review; exhaustive per-feature coverage, source-to-sink rigor.",
+  "allowed_modes": ["static", "whitebox"],
+  "preferred_patterns": ["access-control", "injection", "data-exposure", "cryptography-secrets", "business-logic", "path-traversal"],
+  "evidence_strictness": "high", "false_positive_tolerance": "medium",
+  "scan_depth": "deep", "runtime_validation_preference": "medium", "report_style": "appsec", "max_freehand_expansion": "high"
+}

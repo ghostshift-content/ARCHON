@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "archon://schemas/coverage",
+  "title": "ARCHON Coverage snapshot",
+  "description": "Feature + pattern coverage accounting (var/intel/coverage-<taskId>.json), feeding the UI Feature/Pattern Coverage cards. Additive; derived from the ledger + task board + candidates.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["taskId"],
+  "properties": {
+    "taskId": { "type": "string" },
+    "mode": { "type": ["string", "null"], "enum": ["blackbox", "static", "whitebox", null] },
+    "features": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "discovered": { "type": "integer", "default": 0 },
+        "mapped": { "type": "integer", "default": 0 },
+        "deep_mapped": { "type": "integer", "default": 0 },
+        "reviewed": { "type": "integer", "default": 0 },
+        "no_issue": { "type": "integer", "default": 0 },
+        "with_candidates": { "type": "integer", "default": 0 },
+        "blocked": { "type": "integer", "default": 0 },
+        "deferred": { "type": "integer", "default": 0 }
+      }
+    },
+    "patterns": {
+      "type": "object",
+      "description": "per vulnerability class: considered vs matched",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "considered": { "type": "integer", "default": 0 },
+          "matched": { "type": "integer", "default": 0 },
+          "reviewed_no_issue": { "type": "integer", "default": 0 },
+          "not_applicable": { "type": "integer", "default": 0 }
+        }
+      }
+    }
+  }
+}

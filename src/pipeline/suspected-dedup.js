@@ -26,6 +26,17 @@ function canonicalKey(f) {
   return `${agent}|${cls}|${title}`
 }
 
+// The IMMUTABLE queue/dedup/retry identity. A source-review candidate carries its own candidate_id /
+// duplicate_key — a mode-independent weakness identity (asset + location + class + invariant + sink) where two
+// DISTINCT weaknesses (read-IDOR vs update-IDOR on the same controller) have DISTINCT keys. Prefer it so
+// distinct candidates never collapse. Fall back to the fuzzy canonicalKey ONLY when neither exists (black-box
+// emits with no id — there the 270× digit-collapse is exactly what we want). This is the ONE identity used by
+// nextBatch (pickup dedup), the triage join, and the retry/quarantine counters — so they can never disagree.
+function identityKey(f) {
+  const cid = f && (f.candidate_id || f.duplicate_key)
+  return cid ? String(cid).trim().toLowerCase() : canonicalKey(f)
+}
+
 const SEV_RANK = { critical: 0, high: 1, medium: 2, low: 3, info: 4, none: 5 }
 function sevRank(f) { return SEV_RANK[String(f.severity || 'medium').toLowerCase()] ?? 2 }
 
@@ -79,7 +90,7 @@ function dedupeSuspected(records, { cap = 80 } = {}) {
   return { findings, total, distinct, capped }
 }
 
-module.exports = { dedupeSuspected, canonicalKey, isCandidate }
+module.exports = { dedupeSuspected, canonicalKey, identityKey, isCandidate }
 
 // self-check: the exact ee08 shape — 2737 raw with 270× repeats + progress noise → distinct.
 if (require.main === module) {
@@ -103,5 +114,14 @@ if (require.main === module) {
   assert.strictEqual(capped.findings.length, 10, 'cap enforced')
   assert.strictEqual(capped.findings[0].severity, 'Critical', 'cap keeps worst severity first')
   assert.ok(capped.capped > 0, 'capped count reported')
-  console.log('ok — suspected-dedup collapses raw emits + noise → distinct, worst-first, capped')
+  // identityKey: two DISTINCT source candidates on the same file/class must NOT collapse (the Gate-3 12→11 loss),
+  // while black-box emits with no id still fold via canonicalKey.
+  const readIdor = { candidate_id: 'user-accounts:access-control:users_controller.rb:show-idor', agent: 'marshal', cwe: 'CWE-639', details: 'IDOR in user-accounts' }
+  const updIdor = { candidate_id: 'user-accounts:access-control:users_controller.rb:update-ownership', agent: 'marshal', cwe: 'CWE-639', details: 'IDOR in user-accounts' }
+  assert.notStrictEqual(identityKey(readIdor), identityKey(updIdor), 'distinct candidate_ids stay distinct')
+  assert.strictEqual(canonicalKey(readIdor), canonicalKey(updIdor), '...even though the fuzzy canonicalKey WOULD have collapsed them')
+  const bbA = { agent: 'VAULT', cwe: 'CWE-200', details: 'FTP creds in PCAP 5' }
+  const bbB = { agent: 'VAULT', cwe: 'CWE-200', details: 'FTP creds in PCAP 6' }
+  assert.strictEqual(identityKey(bbA), identityKey(bbB), 'no id → canonicalKey still collapses black-box repeats')
+  console.log('ok — suspected-dedup collapses raw emits + noise → distinct, worst-first, capped; identityKey preserves distinct candidates')
 }

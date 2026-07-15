@@ -734,3 +734,13 @@ ol.fsteps li { font-size: 13px; line-height: 1.5; }
 .src-runtime .src-worker-ev { font-size: 10.5px; color: var(--fg-dim); margin-top: 3px; }
 .src-runtime .src-feed { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
 .src-runtime .src-feed .src-worker-ev { margin-top: 0; font-size: 11px; line-height: 1.5; }
+
+/* M12: Studio (custom personas & patterns) */
+.studio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.studio-list { display: flex; flex-direction: column; gap: 6px; }
+.studio-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--border, rgba(255,255,255,.08)); border-radius: 8px; font-size: 13px; }
+.studio-row .badge { font-size: 10px; padding: 1px 6px; border-radius: 6px; background: var(--fg-dim, #667); color: #fff; }
+.studio-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.studio-form label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--fg-dim); }
+.studio-form input, .studio-form select, .studio-form textarea { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,.12)); background: var(--bg, #0e0f13); color: var(--fg, #e6e6e6); font: inherit; }
+.mission-card .src-feed { max-height: 180px; overflow-y: auto; }

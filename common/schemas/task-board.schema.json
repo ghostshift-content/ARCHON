@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "archon://schemas/task-board",
+  "title": "ARCHON Task Board task",
+  "description": "One claimable unit of work on the shared task board (var/intel/task-board-<taskId>.jsonl). The source of operational truth. Additive artifact — does not replace existing JSONL outputs.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["id", "taskId", "mode", "phase", "status"],
+  "properties": {
+    "id": { "type": "string", "description": "board-local id, e.g. TASK-0001" },
+    "taskId": { "type": "string", "description": "the scan/mission id, e.g. t-xxx" },
+    "mode": { "type": "string", "enum": ["blackbox", "static", "whitebox"] },
+    "phase": { "type": "string", "description": "mapping | deep-map | review | freehand | triage | validation | …" },
+    "feature": { "type": ["string", "null"] },
+    "vulnerability_class": { "type": ["string", "null"] },
+    "pattern_id": { "type": ["string", "null"] },
+    "priority": { "type": "string", "enum": ["low", "normal", "high", "critical"], "default": "normal" },
+    "status": {
+      "type": "string",
+      "description": "Every task MUST end in a terminal state.",
+      "enum": ["queued", "claimed", "running", "completed", "candidate_found", "no_issue", "needs_followup", "blocked", "failed", "cancelled"]
+    },
+    "claimed_by": { "type": ["string", "null"], "description": "agent name; a task is worked by exactly one agent" },
+    "session_id": { "type": ["string", "null"] },
+    "created_by": { "type": ["string", "null"], "default": "CURATOR" },
+    "reason": { "type": ["string", "null"] },
+    "evidence_used": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "started_at": { "type": ["string", "null"] },
+    "finished_at": { "type": ["string", "null"] },
+    "result": { "type": ["string", "null"] },
+    "followups_created": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "error": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "terminalStatuses": ["completed", "candidate_found", "no_issue", "blocked", "failed", "cancelled"],
+    "activeStatuses": ["queued", "claimed", "running", "needs_followup"]
+  }
+}

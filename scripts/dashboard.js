@@ -117,12 +117,23 @@ function sourceRuntimeForTask(taskId) {
   // #5: prefer the REAL triage session count emitted by the triager (last triage_sessions event); fall back to
   // the candidate-count estimate only if the triager hasn't reported yet.
   const realTriage = events.filter(e => e.status === 'triage_sessions').slice(-1)[0]
+  // §6: terminal candidate accounting from the candidate-ledger + triage quarantine — proves N candidates =
+  // N terminal verdicts and surfaces the quarantine counters the pipeline card should show.
+  const _ledgerRows = (() => { try { return fs.readFileSync(path.join(INTEL, `candidate-ledger-${taskId}.jsonl`), 'utf-8').split('\n').map(l => { try { return JSON.parse(l.trim()) } catch { return null } }).filter(Boolean) } catch { return [] } })()
+  const _termCount = (v) => _ledgerRows.filter(r => String(r.terminal_status || '').toUpperCase() === v).length
   const pipeline = {
     candidates_emitted, in_triage: Math.max(0, candidates_emitted - validatedN), validated: validatedN, judged,
     needs_live: (validation && validation.needs_live) || 0, source_confirmed: (validation && validation.source_confirmed) || 0,
     runtime_confirmed: (validation && validation.runtime_confirmed) || 0, disproven: (validation && validation.disproven) || 0,
     triage_sessions: realTriage ? realTriage.session_count : (candidates_emitted ? triageLadder(candidates_emitted) : 0),
     triage_sessions_source: realTriage ? 'actual' : 'estimated',
+    // terminal accounting (holistic candidate-ledger)
+    candidate_ledger_total: _ledgerRows.length,
+    auditor_verdicts: _ledgerRows.filter(r => r.terminal_status && r.terminal_status !== 'AUDIT_QUARANTINED').length,
+    triaged: _ledgerRows.filter(r => r.triaged).length,
+    audit_quarantined: _termCount('AUDIT_QUARANTINED'),
+    triage_quarantined: jsonlCount(path.join(INTEL, `triage-quarantine-${taskId}.jsonl`)),
+    ledger_disproven: _termCount('DISPROVEN'),
   }
   // parity §9.4: planned (from the plan) vs actually-active mapping sessions, so the UI can explain quota
   // backoff (e.g. planned 4, active 3 because quota was constrained). A mapping session is "active" once it
@@ -938,6 +949,70 @@ function readBody(req) {
     req.on('end', () => { try { resolve(JSON.parse(d || '{}')) } catch { resolve({}) } })
   })
 }
+// ── M7 Mission Control + M12 persona/pattern studio (additive; observe-only reads + custom-config writes) ──
+const _tbBridge = require('../src/compatibility/task-board-bridge')
+const _taskBoard = require('../src/runtime/task-board')
+const _decisionLog = require('../src/runtime/decision-log')
+const _sessionPlanner = require('../src/runtime/session-planner')
+const _agentRegistry = require('../src/agents/registry')
+const _personaRegistry = require('../src/personas/registry')
+const _patternRegistry = require('../src/patterns/registry')
+
+function _atomicWrite(file, str) {
+  try { fs.mkdirSync(path.dirname(file), { recursive: true }); const t = file + '.tmp.' + process.pid; fs.writeFileSync(t, str); fs.renameSync(t, file); return true } catch { return false }
+}
+
+// M7: aggregate the observe-only artifacts into one "mission" view. Deriving the board writes the observe-only
+// task-board-<taskId>.jsonl (the spec's shared truth) from the current ledger — engine untouched. Fail-soft.
+function missionForTask(taskId) {
+  if (!taskId) return null
+  let coverage = {}, board = { tasks: [], counts: {} }, decisions = [], sessionPlan = null
+  // Finding 7 fix: NEVER destructively rebuild. If a live board exists (dispatch-bridge appended it during a
+  // run), READ it. Only when there's no live board (older/completed run) do we project from the ledger — and
+  // even then only in-memory (boardRows), no write from the read path.
+  try {
+    if (fs.existsSync(_taskBoard.boardPath(taskId))) board = _taskBoard.load(taskId)
+    else { const rows = _tbBridge.boardRows(taskId); board = { tasks: rows, counts: _taskBoard.recount(rows) } }
+  } catch {}
+  try { coverage = _tbBridge.deriveCoverage(taskId) } catch {}
+  try { decisions = _decisionLog.load(taskId).slice(-15) } catch {}
+  // session plan: read the real artifact if a run wrote one, else derive an observe-only estimate from coverage
+  try { sessionPlan = JSON.parse(fs.readFileSync(path.join(INTEL, `session-plan-${taskId}.json`), 'utf-8')) } catch {}
+  if (!sessionPlan) { const n = (coverage.features && coverage.features.discovered) || 0; if (n) try { sessionPlan = _sessionPlanner.planSessions({ features: Array.from({ length: n }, (_, i) => ({ slug: 'f' + i })) }) } catch {} }
+  // team activity: which roles are working (from claimed board tasks)
+  const activeAgents = [...new Set((board.tasks || []).filter(t => _taskBoard.ACTIVE.has(t.status) && t.claimed_by).map(t => t.claimed_by))]
+  const team = activeAgents.map(a => ({ agent: a, role: _agentRegistry.roleOf(a) }))
+  return { taskId, coverage, board: { counts: board.counts, tasks: (board.tasks || []).slice(0, 300) }, decisions, sessionPlan, team }
+}
+
+// M12: custom persona/pattern homes (committable repo folders)
+const _PERSONA_CUSTOM = path.join(AGENTS, 'src', 'personas', 'custom', 'user-created')
+const _PATTERN_CUSTOM = path.join(AGENTS, 'src', 'patterns', 'custom', 'user-created')
+function listPersonas() { try { return { builtin: _personaRegistry.builtin(), custom: _personaRegistry.custom() } } catch { return { builtin: [], custom: [] } } }
+function upsertPersona(body) {
+  const b = body || {}; const id = String(b.id || '').toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  if (!id || !b.name) return { error: 'id and name are required' }
+  if (_personaRegistry.isBuiltin(id)) return { error: `'${id}' is a built-in persona (read-only) — choose a different id` }
+  const rec = { ...b, id, builtin: false }
+  if (!_atomicWrite(path.join(_PERSONA_CUSTOM, `${id}.json`), JSON.stringify(rec, null, 2))) return { error: 'write failed' }
+  return { ok: true, persona: rec }
+}
+function deletePersona(id) {
+  id = String(id || '').toLowerCase()
+  if (_personaRegistry.isBuiltin(id)) return { error: 'built-in personas cannot be deleted' }
+  try { fs.unlinkSync(path.join(_PERSONA_CUSTOM, `${id}.json`)); return { ok: true } } catch { return { error: 'not found' } }
+}
+function listPatterns() { try { const classes = _patternRegistry.classes(); return { classes, custom: fs.existsSync(_PATTERN_CUSTOM) ? fs.readdirSync(_PATTERN_CUSTOM).filter(f => f.endsWith('.json')) : [] } } catch { return { classes: [], custom: [] } } }
+function upsertPattern(body) {
+  const b = body || {}; const cls = String(b.class || b.category || '').toLowerCase()
+  if (!cls || !Array.isArray(b.patterns) || !b.patterns.length) return { error: 'class and a non-empty patterns[] are required' }
+  for (const p of b.patterns) if (!p.id || !p.name) return { error: 'each pattern needs id and name' }
+  const name = String(b.name || cls).toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  const rec = { class: cls, mode: b.mode === 'override' ? 'override' : 'append', author: b.author || 'ui', patterns: b.patterns.map(p => ({ category: cls, ...p })) }
+  if (!_atomicWrite(path.join(_PATTERN_CUSTOM, `${cls}-${name}.json`), JSON.stringify(rec, null, 2))) return { error: 'write failed' }
+  return { ok: true, file: `${cls}-${name}.json` }
+}
+
 function json(res, code, obj) { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)) }
 
 const server = http.createServer(async (req, res) => {
@@ -1003,6 +1078,21 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && p === '/api/logs') {
       return json(res, 200, logsForTask(url.searchParams.get('taskId') || ''))
+    }
+    // M7: Mission Control (task board + coverage + session plan + team + decisions), observe-only
+    if (req.method === 'GET' && p === '/api/mission') {
+      return json(res, 200, missionForTask(url.searchParams.get('taskId') || '') || { taskId: null, board: { tasks: [], counts: {} }, coverage: {}, team: [], decisions: [] })
+    }
+    // M12: persona studio
+    if (req.method === 'GET' && p === '/api/personas') { return json(res, 200, listPersonas()) }
+    if (req.method === 'POST' && p === '/api/personas') {
+      try { const r = upsertPersona(await readBody(req)); return json(res, r.error ? 400 : 200, r) } catch (e) { return json(res, 400, { error: e.message }) }
+    }
+    if (req.method === 'DELETE' && p === '/api/personas') { return json(res, 200, deletePersona(url.searchParams.get('id') || '')) }
+    // M12: pattern studio
+    if (req.method === 'GET' && p === '/api/patterns') { return json(res, 200, listPatterns()) }
+    if (req.method === 'POST' && p === '/api/patterns') {
+      try { const r = upsertPattern(await readBody(req)); return json(res, r.error ? 400 : 200, r) } catch (e) { return json(res, 400, { error: e.message }) }
     }
     if (req.method === 'GET' && p === '/api/health') {
       return json(res, 200, readJSON('health.json', { ok: null, checks: [], note: 'supervisor has not run yet' }))

@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "archon://schemas/persona",
+  "title": "ARCHON Persona",
+  "description": "A testing persona (src/personas/builtin/ read-only, or src/personas/custom/ user-editable). Shapes planning, priority, evidence strictness, scan depth, runtime-validation preference, and report style. MUST NOT bypass scope or safety controls. No persona selected ⇒ current behavior unchanged.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["id", "name"],
+  "properties": {
+    "id": { "type": "string", "description": "lowercase unique id, e.g. bug-bounty-hunter" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "allowed_modes": { "type": "array", "items": { "type": "string", "enum": ["blackbox", "static", "whitebox"] }, "default": ["blackbox", "static", "whitebox"] },
+    "preferred_patterns": { "type": "array", "items": { "type": "string" }, "default": [], "description": "vuln classes or pattern ids to prioritize" },
+    "evidence_strictness": { "type": "string", "enum": ["low", "medium", "high"], "default": "medium" },
+    "false_positive_tolerance": { "type": "string", "enum": ["low", "medium", "high"], "default": "medium" },
+    "scan_depth": { "type": "string", "enum": ["shallow", "normal", "deep"], "default": "normal" },
+    "runtime_validation_preference": { "type": "string", "enum": ["low", "medium", "high"], "default": "medium" },
+    "report_style": { "type": "string", "default": "standard", "description": "e.g. standard | bug_bounty | appsec | executive" },
+    "max_freehand_expansion": { "type": "string", "enum": ["none", "low", "medium", "high"], "default": "medium" },
+    "builtin": { "type": "boolean", "default": false, "description": "true ⇒ read-only" }
+  }
+}

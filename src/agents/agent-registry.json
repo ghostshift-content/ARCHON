@@ -1,0 +1,39 @@
+{
+  "$comment": "Descriptive registry: maps EXISTING ARCHON agent names to clean roles/specialties/modes. Observe-only — old names remain valid and nothing here renames or removes an agent. The 11 core roles follow the architecture spec §4 verbatim; the remaining agents are filled from the live roster (ownership.json) + the CLASS→agent map. Consumed by the task board / session planner / UI to reason about responsibilities.",
+  "version": "1",
+  "agents": {
+    "CURATOR": { "role": "mission_lead", "description": "Plans mission, creates task board, coordinates agents", "modes": ["static", "whitebox"], "specialties": ["blueprint", "feature-mapping", "consolidation"] },
+    "ATLAS":   { "role": "mission_lead", "description": "Black-box mission lead: ranks the attack plan, coordinates specialists", "modes": ["blackbox"], "specialties": ["attack-planning", "strategy"] },
+
+    "MARSHAL": { "role": "specialist", "specialties": ["access-control", "api-security", "business-logic", "multi-tenant", "admin-privileged"], "modes": ["static", "whitebox"] },
+    "SIPHON":  { "role": "specialist", "specialties": ["authentication-session", "account-takeover", "cryptography-secrets", "tokens"], "modes": ["static", "whitebox"] },
+    "CIPHER":  { "role": "specialist", "specialties": ["xss", "data-exposure", "logging-audit", "data-flow"], "modes": ["static", "whitebox"] },
+    "QUILL":   { "role": "freehand_reviewer", "specialties": ["novel-vulnerabilities", "business-logic", "sqli", "injection", "deserialization"], "modes": ["static", "whitebox"] },
+    "BEACON":  { "role": "recon_mapper", "specialties": ["surface-discovery", "feature-mapping", "ssrf", "webhooks", "cloud-infra", "api-security", "graphql"], "modes": ["static", "whitebox"] },
+    "BREAKER": { "role": "specialist", "specialties": ["file-handling", "path-traversal", "race-conditions", "deserialization"], "modes": ["static", "whitebox"] },
+    "PROBER":  { "role": "runtime_validator", "specialties": ["runtime-validation", "source-to-runtime"], "modes": ["whitebox"] },
+
+    "SCOUT":   { "role": "recon_mapper", "specialties": ["surface-discovery", "web-recon"], "modes": ["blackbox"] },
+    "RANGER":  { "role": "recon_mapper", "specialties": ["endpoint-discovery", "crawl"], "modes": ["blackbox"] },
+    "TRACER":  { "role": "recon_mapper", "specialties": ["crawl", "endpoint-model"], "modes": ["blackbox"] },
+    "VIPER":   { "role": "specialist", "specialties": ["injection", "xss", "sqli"], "modes": ["blackbox"] },
+    "DRILL":   { "role": "specialist", "specialties": ["access-control", "idor"], "modes": ["blackbox"] },
+    "RELAY":   { "role": "specialist", "specialties": ["ssrf", "request-forgery"], "modes": ["blackbox"] },
+    "VAULT":   { "role": "specialist", "specialties": ["secrets", "ssrf", "cryptography"], "modes": ["blackbox"] },
+    "WARDEN":  { "role": "specialist", "specialties": ["authentication-session", "authorization"], "modes": ["blackbox"] },
+    "GATEWAY": { "role": "specialist", "specialties": ["api-security", "graphql"], "modes": ["blackbox"] },
+    "SENTRY":  { "role": "specialist", "specialties": ["security-headers", "config-hygiene"], "modes": ["blackbox"] },
+    "KEYRING": { "role": "specialist", "specialties": ["account-takeover", "auth"], "modes": ["blackbox"] },
+    "LEDGER":  { "role": "specialist", "specialties": ["business-logic", "data-integrity"], "modes": ["blackbox"] },
+    "FORGE":   { "role": "specialist", "specialties": ["deserialization", "rce"], "modes": ["blackbox"] },
+    "DECOY":   { "role": "specialist", "specialties": ["waf-evasion", "bypass"], "modes": ["blackbox"] },
+    "SPECTRE": { "role": "specialist", "specialties": ["stealth", "detection-evasion"], "modes": ["blackbox"] },
+
+    "TRIAGER": { "role": "triage", "specialties": ["candidate-validation", "board-writing", "dedup"], "modes": ["blackbox", "static", "whitebox"] },
+    "AUDITOR": { "role": "auditor", "specialties": ["evidence-review", "reverse-check"], "modes": ["blackbox", "static", "whitebox"] },
+    "ARBITER": { "role": "judge", "specialties": ["final-approval", "confidence-adjudication"], "modes": ["blackbox", "static", "whitebox"] },
+    "SCRIBE":  { "role": "reporter", "specialties": ["report-writing"], "modes": ["blackbox", "static", "whitebox"] },
+    "WRITER":  { "role": "reporter", "specialties": ["per-finding-writeup"], "modes": ["blackbox", "static", "whitebox"] },
+    "COMMAND": { "role": "coordination", "specialties": ["cross-squad-coordination"], "modes": ["blackbox", "static", "whitebox"] }
+  }
+}

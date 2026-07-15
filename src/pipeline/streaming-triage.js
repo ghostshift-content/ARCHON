@@ -8,7 +8,7 @@
 // and what I've already processed, what's new to triage now?" — so it's unit-testable. The
 // agent calls + file writes live in event-bus.js (startStreamingTriage), which calls this.
 
-const { canonicalKey, isCandidate } = require('./suspected-dedup')
+const { identityKey, isCandidate } = require('./suspected-dedup')
 
 /**
  * Which freshly-emitted findings still need triage.
@@ -20,7 +20,7 @@ function nextBatch(records, seen) {
   const fresh = []
   for (const r of (records || [])) {
     if (!isCandidate(r)) continue          // drop progress/status noise
-    const k = canonicalKey(r)              // digit-collapsed identity → 270 emits = 1
+    const k = identityKey(r)               // immutable candidate_id/duplicate_key (or digit-collapsed fallback)
     if (seen.has(k)) continue              // already triaged (or in flight)
     seen.add(k)
     fresh.push(r)
@@ -49,14 +49,14 @@ function triageWorkers(cap, step, backlog, base) {
   return Math.max(1, Math.min(c, b + Math.floor(bl / s)))
 }
 
-// S4 (parity §6): the source-review triage-session ladder — how many concurrent triage sessions for a given
-// candidate backlog. 1-20→1, 21-75→2, 76-200→3, 200+→4 (hard cap 4). Used for the code-review squad; black-box
+// F8: the source-review triage-session ladder — how many concurrent persistent triage sessions for a given
+// candidate backlog. 1-4→1, 5-12→2, 13-30→3, 31+→4 (hard cap 4). Used for the code-review squad; black-box
 // triage keeps triageWorkers(). Pure + deterministic.
 function triageSessions(backlog) {
   const n = Number(backlog) > 0 ? Number(backlog) : 0
-  if (n <= 20) return 1
-  if (n <= 75) return 2
-  if (n <= 200) return 3
+  if (n <= 4) return 1
+  if (n <= 12) return 2
+  if (n <= 30) return 3
   return 4
 }
 
@@ -90,10 +90,10 @@ if (require.main === module) {
   assert.strictEqual(triageWorkers(3, 20, 500), 3)
   assert.strictEqual(triageWorkers(1, 20, 500), 1)
   assert.strictEqual(triageWorkers(3, 20, 5, 1), 1)   // explicit base=1 restores the old 1→serial start
-  // triageSessions: source-review ladder 1-20→1, 21-75→2, 76-200→3, 200+→4 (cap 4)
-  assert.strictEqual(triageSessions(0), 1); assert.strictEqual(triageSessions(20), 1)
-  assert.strictEqual(triageSessions(21), 2); assert.strictEqual(triageSessions(75), 2)
-  assert.strictEqual(triageSessions(76), 3); assert.strictEqual(triageSessions(200), 3)
-  assert.strictEqual(triageSessions(201), 4); assert.strictEqual(triageSessions(5000), 4)
+  // triageSessions: F8 ladder 1-4→1, 5-12→2, 13-30→3, 31+→4 (cap 4)
+  assert.strictEqual(triageSessions(0), 1); assert.strictEqual(triageSessions(4), 1)
+  assert.strictEqual(triageSessions(5), 2); assert.strictEqual(triageSessions(12), 2)
+  assert.strictEqual(triageSessions(13), 3); assert.strictEqual(triageSessions(30), 3)
+  assert.strictEqual(triageSessions(31), 4); assert.strictEqual(triageSessions(5000), 4)
   console.log('ok — streaming-triage nextBatch tails + dedups; triageWorkers + triageSessions ladders')
 }

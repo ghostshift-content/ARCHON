@@ -1,0 +1,7 @@
+{
+  "id": "default", "name": "Default", "builtin": true,
+  "description": "Neutral baseline — reproduces ARCHON's current behavior. No persona selected ⇒ this.",
+  "allowed_modes": ["blackbox", "static", "whitebox"],
+  "preferred_patterns": [], "evidence_strictness": "medium", "false_positive_tolerance": "medium",
+  "scan_depth": "normal", "runtime_validation_preference": "medium", "report_style": "standard", "max_freehand_expansion": "medium"
+}

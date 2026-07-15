@@ -10,13 +10,13 @@ const { triageWorkers, triageSessions } = require('../src/pipeline/streaming-tri
 
 test('triageSessions: source-review candidate→session ladder (parity §6), cap 4', () => {
   assert.strictEqual(triageSessions(0), 1)
-  assert.strictEqual(triageSessions(20), 1)
-  assert.strictEqual(triageSessions(21), 2)
-  assert.strictEqual(triageSessions(75), 2)
-  assert.strictEqual(triageSessions(76), 3)
-  assert.strictEqual(triageSessions(200), 3)
-  assert.strictEqual(triageSessions(201), 4)
-  assert.strictEqual(triageSessions(9999), 4)   // hard cap 4 sessions
+  assert.strictEqual(triageSessions(4), 1)
+  assert.strictEqual(triageSessions(5), 2)
+  assert.strictEqual(triageSessions(12), 2)
+  assert.strictEqual(triageSessions(13), 3)
+  assert.strictEqual(triageSessions(30), 3)
+  assert.strictEqual(triageSessions(31), 4)
+  assert.strictEqual(triageSessions(9999), 4)   // hard cap 4 sessions (F8 ladder)
 })
 
 test('triageWorkers: two hands by default, a 3rd walks up at 20+, capped at 3', () => {

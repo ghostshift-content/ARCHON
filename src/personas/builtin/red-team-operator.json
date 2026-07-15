@@ -1,0 +1,8 @@
+{
+  "id": "red-team-operator", "name": "Red Team Operator", "builtin": true,
+  "description": "Chained, impact-driven black-box testing; favors runtime proof and privilege escalation paths.",
+  "allowed_modes": ["blackbox", "whitebox"],
+  "preferred_patterns": ["access-control", "ssrf", "injection", "account-takeover", "deserialization"],
+  "evidence_strictness": "high", "false_positive_tolerance": "low",
+  "scan_depth": "deep", "runtime_validation_preference": "high", "report_style": "standard", "max_freehand_expansion": "high"
+}

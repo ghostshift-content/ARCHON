@@ -1,0 +1,8 @@
+{
+  "id": "bug-bounty-hunter", "name": "Bug Bounty Hunter", "builtin": true,
+  "description": "Prioritizes exploitable, reportable vulnerabilities with low false-positive tolerance.",
+  "allowed_modes": ["blackbox", "static", "whitebox"],
+  "preferred_patterns": ["access-control", "authentication-session", "xss", "business-logic", "ssrf"],
+  "evidence_strictness": "high", "false_positive_tolerance": "low",
+  "scan_depth": "deep", "runtime_validation_preference": "high", "report_style": "bug_bounty", "max_freehand_expansion": "medium"
+}
