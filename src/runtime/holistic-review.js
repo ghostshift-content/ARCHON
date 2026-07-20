@@ -71,6 +71,32 @@ function listFiles(sourceDir) {
 const _now = () => { try { return new Date().toISOString() } catch { return null } }
 const _slug = (f) => (typeof f === 'string' ? f : (f && (f.slug || f.name)) || '')
 
+// §2: detect SHARED security-relevant files — cross-cutting code a feature session must not lose. Two signals:
+//  (a) known shared-security path patterns (base/application controllers, middleware, policies, serializers, auth);
+//  (b) reference-based — a file whose module is required/imported from files in ≥2 different top-level directories.
+// Bounded (caps files read + bytes/file) so it stays cheap even on a large repo. Returns a Set of relative paths.
+const _SHARED_PAT = /(application_?controller|base_?controller|app[\/\\]controllers[\/\\]concerns|middleware|(^|[\/\\])policy|policies|(^|[\/\\])abilit|serializer|authoriz|authentic|(^|[\/\\])guard|session_store|application_record|models[\/\\]concerns|(^|[\/\\])config[\/\\]|routes\.|urls\.py|security|_helper)/i
+function _detectSharedFiles(sourceDir, manifest) {
+  const shared = new Set()
+  for (const f of manifest) if (_SHARED_PAT.test(f.path)) shared.add(f.path)
+  const byBase = new Map()
+  for (const f of manifest) { const b = path.basename(f.path).replace(/\.[^.]+$/, '').toLowerCase(); if (!byBase.has(b)) byBase.set(b, f.path) }
+  const refDirs = new Map()   // target path → Set(referrer top-level dir)
+  let read = 0
+  for (const f of manifest) {
+    if (read >= 4000) break; read++
+    let txt; try { txt = fs.readFileSync(path.join(sourceDir, f.path), 'utf8').slice(0, 20000) } catch { continue }
+    const top = String(f.path).split(/[\/\\]/)[0]
+    for (const m of txt.matchAll(/(?:require(?:_relative)?|import|include|from|use)\s+['"]?([\w./\\-]+)['"]?/g)) {
+      const base = path.basename(String(m[1])).replace(/\.[^.]+$/, '').toLowerCase()
+      const target = byBase.get(base)
+      if (target && target !== f.path) { if (!refDirs.has(target)) refDirs.set(target, new Set()); refDirs.get(target).add(top) }
+    }
+  }
+  for (const [p, dirs] of refDirs) if (dirs.size >= 2) shared.add(p)
+  return shared
+}
+
 // F2-robust: the lead session names candidates freely (e.g. "files_uploads_path_traversal"), so the raw
 // `feature` string rarely equals a discovered slug ("file-uploads"). Map each candidate to the discovered
 // feature by TOKEN OVERLAP over the feature's slug+domain+name — deterministic, so coverage never depends on
@@ -109,17 +135,33 @@ async function runHolistic(deps, opts) {
   const { spawnAgent, log = () => {}, trackCosts = () => {}, emitFromFile, cancelled = () => false } = deps || {}
   const runWaves = deps.runWaves || (async (items, n, fn) => { const r = []; for (let i = 0; i < items.length; i += Math.max(1, n)) r.push(...await Promise.all(items.slice(i, i + Math.max(1, n)).map((it, j) => fn(it, i + j)))); return r })
   const errors = []
-  let profile, plan
+  let profile, plan, fileManifest = []
+  // §3: budget against the ACTUAL lead-model context (smallest among the leads), not a hardcoded 1M. The dispatcher
+  // resolves it (opts.model_context); if absent we fall back to 1M but say so, so an oversized plan is never silent.
+  const model_context = Number(opts.model_context) || 0
+  if (!model_context) log(`⚠️ holistic: no lead-model context supplied — budgeting at the 1M default (may over-fill a smaller model)`)
   try {
-    profile = profiler.profileSource(opts.sourceDir, { mode: opts.mode || 'static' })
-    plan = workstreamPlanner.planWorkstreams({ profile, features: opts.features || [], quota: opts.quota })
+    profile = profiler.profileSource(opts.sourceDir, { mode: opts.mode || 'static', model_context: model_context || undefined })
+    fileManifest = profiler.listSourceFiles(opts.sourceDir)   // §2: real files (path+bytes) for dependency-locality slicing
+    // §2: when the project will SHARD, detect shared security files (base controllers, middleware, policies, models
+    // referenced across the tree) so the planner REPLICATES them into every shard that needs them.
+    const sharedFiles = (profile.est_tokens > profile.usable_context) ? [..._detectSharedFiles(opts.sourceDir, fileManifest)] : []
+    plan = workstreamPlanner.planWorkstreams({ profile, features: opts.features || [], files: fileManifest, sharedFiles, quota: opts.quota })
   } catch (e) { return { status: 'failed_before_start', plan: null, results: [], coverage: [], candidateCount: 0, errors: [e.message] } }
   if (!plan.workstreams.length) return { status: 'failed_before_start', plan, results: [], coverage: [], candidateCount: 0, errors: ['no workstreams planned'] }
+  // §2: a multi-workstream plan whose shards have no explicit files[] would make every session read the whole repo —
+  // reject it rather than silently defeat context budgeting.
+  if (plan.session_count > 1 && plan.workstreams.some((w) => !(w.files && w.files.length))) {
+    return { status: 'failed_before_start', profile, plan, results: [], coverage: [], candidateCount: 0, errors: [`sharded plan (${plan.session_count} sessions) has a workstream with no file manifest — refusing to read the whole repo per shard`] }
+  }
 
   const _tokStr = profile.est_tokens >= 1000 ? `~${Math.round(profile.est_tokens / 1000)}k tok` : `${profile.est_tokens} tok`
   log(`🧠 Holistic review: ${profile.files} file(s), ${_tokStr} → ${plan.session_count} session(s) (${plan.strategy}); ${plan.reason}`)
-  const allFiles = listFiles(opts.sourceDir)
+  const allFiles = fileManifest.length ? fileManifest.map((f) => f.path) : listFiles(opts.sourceDir)
   const leads = opts.leadAgents && opts.leadAgents.length ? opts.leadAgents : ['marshal', 'cipher', 'quill', 'siphon', 'breaker']
+  // §1/§8: map every feature to the workstream that owns it (for failed-session attribution + assigned-file coverage).
+  const wsOfFeature = {}
+  for (const w of plan.workstreams) for (const s of (w.features || [])) wsOfFeature[_slug(s)] = w
   const candByFeature = {}                                  // canonical slug → { count, classes:Set, files:Set }
   const anomalies = []                                     // §4: unmatched candidates — never folded to a feature
   const featureIndex = _featureIndex(opts.features)         // F2-robust: candidate feature name → discovered slug
@@ -128,6 +170,10 @@ async function runHolistic(deps, opts) {
     if (cancelled()) return null
     const started_at = _now()
     const agent = leads[i % leads.length]
+    // §1: an OVERSIZED workstream cannot fit its assigned source in one context — do NOT spawn a session that
+    // would review only a truncated slice and mislead. It is an explicit coverage BLOCKER (surfaced by
+    // workstream_coverage as non-terminal); its features become blocked_coverage_gap.
+    if (ws.oversized) { errors.push({ workstream: ws.id, error: 'oversized — exceeds a single lead context; not reviewed' }); log(`⛔ ${ws.id} OVERSIZED (~${Math.round((ws.est_tokens || 0) / 1000)}k tok > budget) — skipped (coverage blocker), not spawned`); return { workstream: ws.id, agent, candidates: 0, oversized: true, skipped: true, error: 'oversized', started_at, finished_at: _now() } }
     const outFile = path.join(opts.outDir, 'holistic', `${ws.id}.candidates.jsonl`)
     // F4: each workstream reviews ITS OWN files when the planner assigned them; a single-session project = all files.
     const files = (ws.files && ws.files.length) ? ws.files : allFiles
@@ -152,21 +198,51 @@ async function runHolistic(deps, opts) {
   })
   const res = (results || []).filter(Boolean)
 
-  // F2: per-feature coverage — candidate_found ONLY where candidates exist, else reviewed_no_issue; failed on error.
-  const failedWs = new Set(res.filter((r) => r.error).map((r) => r.workstream))
+  // §3: WORKSTREAM-LEVEL coverage — independent of feature coverage. Every PLANNED workstream must reach a terminal
+  // state; a shard with no feature, a cancelled-before-start shard (null result), and an oversized shard are all
+  // tracked here so a large-repo run can never look complete while a whole slice went unreviewed.
+  const resByWs = new Map(res.map((r) => [r.workstream, r]))
+  const workstream_coverage = plan.workstreams.map((w, i) => {
+    const r = resByWs.get(w.id)
+    let status
+    if (!r) status = (results && results[i] === null && cancelled()) ? 'cancelled' : 'not_started'   // null result = never produced
+    else if (r.oversized || r.skipped) status = 'oversized_blocked'                                    // §1: skipped, not reviewed
+    else if (r.error) status = 'failed'
+    else status = 'completed'
+    return { workstream: w.id, status, terminal: status === 'completed', features: w.features || [], file_count: (w.files || []).length, oversized: !!w.oversized, error: (r && r.error) || undefined }
+  })
+  const incompleteWs = workstream_coverage.filter((w) => !w.terminal)
+
+  // §1/§8: per-feature coverage. A feature whose workstream FAILED is NEVER reviewed_no_issue — it is a coverage
+  // gap (its session never produced a verdict). Evidence of review = the ASSIGNED file manifest + the FULL lens list
+  // the session was tasked with (recorded when the session ran), NOT just the files/classes that produced candidates.
+  const failedWs = new Set(workstream_coverage.filter((w) => !w.terminal).map((w) => w.workstream))
+  const lensList = (opts.lenses || DEFAULT_LENSES).map((c) => String(c).split(' ')[0])   // the classes every session reviews
   const coverage = (opts.features || []).map((f) => {
     const slug = _slug(f); const c = candByFeature[slug]
+    const ws = wsOfFeature[slug]
+    const assignedFiles = (ws && ws.files && ws.files.length) ? ws.files : allFiles
+    if (ws && failedWs.has(ws.id)) {
+      return { feature: slug, mapping_status: 'failed', depth: 'holistic_incomplete', review_status: 'blocked_coverage_gap',
+        reason: `holistic session ${ws.id} failed — feature not reviewed`, candidate_count: c ? c.count : 0,
+        files_reviewed: [], classes_reviewed: [], assigned_files: assignedFiles }
+    }
     return { feature: slug, mapping_status: 'done', depth: 'holistic_complete',
       review_status: c && c.count ? 'candidate_found' : 'reviewed_no_issue',
-      candidate_count: c ? c.count : 0, files_reviewed: c ? [...c.files] : [], classes_reviewed: c ? [...c.classes] : [] }
+      candidate_count: c ? c.count : 0,
+      // §8: reviewed evidence = what the session was tasked with, independent of whether it found anything.
+      files_reviewed: assignedFiles, classes_reviewed: lensList,
+      candidate_files: c ? [...c.files] : [], candidate_classes: c ? [...c.classes] : [] }
   })
   const candidateCount = res.reduce((s, r) => s + (r.candidates || 0), 0)
   const ran = res.filter((r) => !r.error).length
-  const status = ran === 0 ? 'failed_before_start' : (errors.length ? 'partial' : 'completed')
-  return { status, profile, plan, results: res, coverage, anomalies, candidateCount, errors }
+  // §3: 'completed' requires EVERY planned workstream terminal — an unreviewed/failed/oversized shard ⇒ 'partial'.
+  const status = ran === 0 ? 'failed_before_start' : ((errors.length || incompleteWs.length) ? 'partial' : 'completed')
+  if (incompleteWs.length) log(`⚠️ Holistic: ${incompleteWs.length}/${plan.workstreams.length} workstream(s) did not complete cleanly — ${incompleteWs.map((w) => `${w.workstream}:${w.status}`).join(', ')}`)
+  return { status, profile, plan, results: res, coverage, workstream_coverage, anomalies, candidateCount, errors }
 }
 
-module.exports = { buildHolisticPrompt, listFiles, runHolistic, DEFAULT_LENSES, _matchFeature, _featureIndex }
+module.exports = { buildHolisticPrompt, listFiles, runHolistic, DEFAULT_LENSES, _matchFeature, _featureIndex, _detectSharedFiles }
 
 // self-check: the free-form → discovered-slug fold (the F2 coverage-attribution guard).
 if (require.main === module) {

@@ -988,28 +988,40 @@ function missionForTask(taskId) {
 // M12: custom persona/pattern homes (committable repo folders)
 const _PERSONA_CUSTOM = path.join(AGENTS, 'src', 'personas', 'custom', 'user-created')
 const _PATTERN_CUSTOM = path.join(AGENTS, 'src', 'patterns', 'custom', 'user-created')
+// §12: strict slug for any user id used in a filename — strips path separators + dots, so `../` can never survive.
+const _safeSlug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
+// Resolve `<name>.json` under baseDir and confirm it stays INSIDE baseDir (defense-in-depth vs traversal).
+function _safeChildPath(baseDir, name) {
+  const base = path.resolve(baseDir)
+  const p = path.resolve(base, `${name}.json`)
+  return (p === base || p.startsWith(base + path.sep)) ? p : null
+}
 function listPersonas() { try { return { builtin: _personaRegistry.builtin(), custom: _personaRegistry.custom() } } catch { return { builtin: [], custom: [] } } }
 function upsertPersona(body) {
-  const b = body || {}; const id = String(b.id || '').toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  const b = body || {}; const id = _safeSlug(b.id)
   if (!id || !b.name) return { error: 'id and name are required' }
   if (_personaRegistry.isBuiltin(id)) return { error: `'${id}' is a built-in persona (read-only) — choose a different id` }
+  const dest = _safeChildPath(_PERSONA_CUSTOM, id); if (!dest) return { error: 'invalid id' }
   const rec = { ...b, id, builtin: false }
-  if (!_atomicWrite(path.join(_PERSONA_CUSTOM, `${id}.json`), JSON.stringify(rec, null, 2))) return { error: 'write failed' }
+  if (!_atomicWrite(dest, JSON.stringify(rec, null, 2))) return { error: 'write failed' }
   return { ok: true, persona: rec }
 }
 function deletePersona(id) {
-  id = String(id || '').toLowerCase()
+  id = _safeSlug(id)                                          // §12: same strict slug on delete as on create
+  if (!id) return { error: 'invalid id' }
   if (_personaRegistry.isBuiltin(id)) return { error: 'built-in personas cannot be deleted' }
-  try { fs.unlinkSync(path.join(_PERSONA_CUSTOM, `${id}.json`)); return { ok: true } } catch { return { error: 'not found' } }
+  const dest = _safeChildPath(_PERSONA_CUSTOM, id); if (!dest) return { error: 'invalid id' }
+  try { fs.unlinkSync(dest); return { ok: true } } catch { return { error: 'not found' } }
 }
 function listPatterns() { try { const classes = _patternRegistry.classes(); return { classes, custom: fs.existsSync(_PATTERN_CUSTOM) ? fs.readdirSync(_PATTERN_CUSTOM).filter(f => f.endsWith('.json')) : [] } } catch { return { classes: [], custom: [] } } }
 function upsertPattern(body) {
-  const b = body || {}; const cls = String(b.class || b.category || '').toLowerCase()
+  const b = body || {}; const cls = _safeSlug(b.class || b.category)
   if (!cls || !Array.isArray(b.patterns) || !b.patterns.length) return { error: 'class and a non-empty patterns[] are required' }
   for (const p of b.patterns) if (!p.id || !p.name) return { error: 'each pattern needs id and name' }
-  const name = String(b.name || cls).toLowerCase().replace(/[^a-z0-9-]/g, '-')
+  const name = _safeSlug(b.name || cls)
+  const dest = _safeChildPath(_PATTERN_CUSTOM, `${cls}-${name}`); if (!dest) return { error: 'invalid class/name' }
   const rec = { class: cls, mode: b.mode === 'override' ? 'override' : 'append', author: b.author || 'ui', patterns: b.patterns.map(p => ({ category: cls, ...p })) }
-  if (!_atomicWrite(path.join(_PATTERN_CUSTOM, `${cls}-${name}.json`), JSON.stringify(rec, null, 2))) return { error: 'write failed' }
+  if (!_atomicWrite(dest, JSON.stringify(rec, null, 2))) return { error: 'write failed' }
   return { ok: true, file: `${cls}-${name}.json` }
 }
 

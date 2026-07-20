@@ -8740,7 +8740,22 @@ async function generateReportForTask(taskId) {
     const fileList = iters.map(it => {
       const wb = it.kind === 'whitebox'
       const tag = wb ? 'WHITE-BOX (source review)' : 'BLACK-BOX (live pentest)'
-      const extra = wb ? ` + white-box markdown evidence under code-review/${it.taskId}/phase2/**/*.md and code-review/${it.taskId}/FINAL-REPORT-${it.taskId}.md (file:line traces, CVSS, fixes)` : ''
+      // §6: resolve the ACTUAL report artifact — a white-box iteration may have produced a PRELIMINARY source
+      // report (SOURCE-REVIEW-PRELIMINARY-*) rather than a FINAL-REPORT-*. Prefer final; flag preliminary as NOT final.
+      let extra = ''
+      if (wb) {
+        const _base = `${agentPaths.INTEL_ROOT}/code-review/${it.taskId}`
+        // §4: resolve the ACTUAL report artifact — FINAL, PARTIAL-COVERAGE, or PRELIMINARY (in that preference) —
+        // and flag non-final variants so the combined report never presents partial/preliminary as complete.
+        let _rep = null
+        for (const [n, note] of [
+          [`FINAL-REPORT-${it.taskId}.md`, ''],
+          [`PARTIAL-COVERAGE-REPORT-${it.taskId}.md`, ' (⚠️ PARTIAL-COVERAGE — some source slices were NOT reviewed; do NOT present as complete coverage)'],
+          [`SOURCE-REVIEW-PRELIMINARY-${it.taskId}.md`, ' (⚠️ PRELIMINARY source review — NOT the final correlated white-box report; treat NEEDS_LIVE findings as unconfirmed)'],
+        ]) { try { if (fs.existsSync(`${_base}/${n}`)) { _rep = { n, note }; break } } catch {} }
+        if (_rep) extra = ` + white-box markdown evidence under code-review/${it.taskId}/phase2/**/*.md and code-review/${it.taskId}/${_rep.n}${_rep.note} (file:line traces, CVSS, fixes)`
+        else extra = ` + white-box markdown evidence under code-review/${it.taskId}/phase2/**/*.md (file:line traces, CVSS, fixes)`
+      }
       return `  - [${tag}] iteration "${it.label || it.taskId}": VALIDATED-FINDINGS-${it.taskId}.jsonl + triage-${it.taskId}.json + findings-detail-${it.taskId}.json${extra}`
     }).join('\n')
     prompt += `\n\n## ENGAGEMENT — ${iters.length} ITERATIONS (AUTHORITATIVE)\nThis engagement ran ${iters.length} independent iterations; aggregate them into ONE report. For EACH iteration read its files under ${agentPaths.INTEL_ROOT}/:\n${fileList}\nRules for EVERY iteration: INCLUDE ONLY findings whose triage verdict is "confirmed"; OMIT every "rejected"; apply each finding's operator severity / cvss / cvssVector override verbatim; weave operator notes into that finding's writeup; use findings-detail for description/impact/remediation/raw_request/poc. If an iteration has no triage file, include its CONFIRMED VALIDATED-FINDINGS.`
@@ -9654,7 +9669,13 @@ async function dispatchToAgent(dispatch) {
       try {
         const _jf = `${agentPaths.INTEL_ROOT}/JUDGED-FINDINGS-${taskId}.jsonl`
         const _alreadyJudged = (() => { try { return fs.existsSync(_jf) && fs.readFileSync(_jf, 'utf8').trim().length > 0 } catch { return false } })()
-        if (_alreadyJudged) {
+        // §10: a holistic run OWNS judge+closure+report in the dispatcher (single owner). Do NOT run a SECOND,
+        // independent judge here — it would produce JUDGED without re-running the closure gate or SCRIBE, silently
+        // diverging from the (possibly BLOCKED) report decision. A blocked report stays blocked + surfaced via
+        // completionStatus for a human/retry, rather than being half-"fixed" by an un-published second judge.
+        if (crResult && crResult.completionGate) {
+          log(`⚖️ Holistic run owns judge+report (completionStatus=${crResult.completionGate.status}) — skipping the end-of-run judge (single owner)`)
+        } else if (_alreadyJudged) {
           log(`⚖️ Judge already ran before SCRIBE (Judge-gated report) — skipping the end-of-run judge`)
         } else if (fs.existsSync(_vf) && fs.readFileSync(_vf, 'utf8').trim()) {
           const { runJudge, callRealLLM } = freshRequire('./scripts/run-judge-verifier')
@@ -9693,14 +9714,17 @@ async function dispatchToAgent(dispatch) {
         const task = tasks.find(t => String(t.id) === String(taskId))
         // never clobber a terminal state (cancelled/failed) back to 'done' (last-write race guard)
         if (task && !['cancelled', 'failed'].includes(String(task.status || '').toLowerCase())) {
-          // §4: propagate the dispatcher's completion gate to a VISIBLE task status — a run with quarantined
-          // candidates or a blocked report must NOT read as a clean 'done'.
+          // §4: the task's lifecycle status stays 'done' (the ONLY terminal state recovery/supervisor/lifecycle
+          // recognize) so a completed run is never re-dispatched or shown as stuck. The gate outcome rides on a
+          // SEPARATE completionStatus field + statusMessage — visible, but not a lifecycle state nobody consumes.
           const _cg = crResult && crResult.completionGate
-          if (_cg && _cg.status === 'REPORT_BLOCKED') { task.status = 'blocked-validation'; task.statusMessage = `Report blocked: ${(_cg.gaps || []).join('; ')}`.slice(0, 300) }
-          else if (_cg && _cg.status === 'COMPLETE_WITH_GAPS') { task.status = 'complete-with-gaps'; task.statusMessage = `Completed with gaps: ${(_cg.gaps || []).join('; ')}`.slice(0, 300) }
-          else { task.status = 'done'; task.statusMessage = task.statusMessage || 'Complete' }
-          task.completionGate = _cg || { status: 'COMPLETE' }
+          task.status = 'done'
           task.progress = 100
+          task.completionStatus = (_cg && _cg.status) || 'COMPLETE'
+          if (_cg && _cg.status === 'REPORT_BLOCKED') task.statusMessage = `Report blocked: ${(_cg.gaps || []).join('; ')}`.slice(0, 300)
+          else if (_cg && _cg.status === 'COMPLETE_WITH_GAPS') task.statusMessage = `Completed with gaps: ${(_cg.gaps || []).join('; ')}`.slice(0, 300)
+          else task.statusMessage = task.statusMessage || 'Complete'
+          task.completionGate = _cg || { status: 'COMPLETE' }
           task.totalCost = Math.round(totalCostLocal * 10000) / 10000
           task.costs = allCostsLocal
           task.lastUpdate = new Date().toISOString()

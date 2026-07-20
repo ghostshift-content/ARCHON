@@ -65,6 +65,24 @@ function readLiveFindings(taskId) {
 }
 
 const _KNOWN_AUDIT_STATUS = new Set(['SOURCE_CONFIRMED', 'NEEDS_LIVE_VALIDATION', 'RUNTIME_CONFIRMED', 'DISPROVEN'])
+// §5/§1: the COMPLETE judge-verdict contract (agents/judge-verifier.js). A judged row MUST carry one of these — a
+// copied validation_status ('CONFIRMED'/'NEEDS-LIVE') is NOT a judge verdict. Two families:
+//  - INDEPENDENTLY JUDGED: confirmed / downgraded / indeterminate (the judge actually evaluated the finding)
+//  - INTENTIONAL PASS-THROUGH: not-judged / not-judged-cap-exceeded (below severity filter or past the promotion
+//    cap in promotionMode — a VALID, deliberate outcome, NOT malformed; it must NOT block the report).
+const _JUDGE_PASSTHROUGH = new Set(['not-judged', 'not-judged-cap-exceeded'])
+const _JUDGE_VERDICTS = new Set(['confirmed', 'downgraded', 'indeterminate', 'not-judged', 'not-judged-cap-exceeded'])
+// A judged row is schema-valid iff it carries identity + a genuine judge_verdict (full enum incl. pass-through) +
+// a severity. Pure so the Judge coverage contract is unit-testable. Returns { ok, id, passthrough }.
+function _validateJudgedRow(r) {
+  const id = r && (r.candidate_id || r.id) ? String(r.candidate_id || r.id).trim().toLowerCase() : null
+  // MUST be the explicit judge_verdict field — a generic `verdict` (or validation_status) does NOT count as a
+  // genuine Judge output, so a non-Judge record cannot satisfy the gate by carrying verdict:"confirmed".
+  const verdict = r ? String(r.judge_verdict || '').toLowerCase() : ''
+  const hasVerdict = _JUDGE_VERDICTS.has(verdict)
+  const hasSeverity = !!(r && (r.severity || typeof r.cvss_score === 'number'))
+  return { ok: !!(id && hasVerdict && hasSeverity), id, passthrough: _JUDGE_PASSTHROUGH.has(verdict) }
+}
 
 // §2/§3/§4/§5: THE single authoritative board writer, run once after the AUDITOR. It REBUILDS VALIDATED-FINDINGS
 // from ALL original candidates (not just the triage subset) so a candidate triage omitted is never permanently
@@ -790,11 +808,16 @@ For EACH candidate append ONE JSON line to ${outFile} (mkdir -p first; APPEND wi
 Echo the candidate_id VERBATIM so each verdict binds to the right candidate. EXACTLY one line per candidate_id — do not omit any, do not merge two candidates. Also write a human table to ${outDir}/phase2/AUDITOR-VERDICTS.md. Reply one line: source-confirmed/needs-live/disproven counts.`
 }
 
-function scribePrompt(taskId, projectId, squad, sourceDir, outDir, features, classes, deployUrl, coverage, holistic, preliminary) {
-  // §2: white-box source report is PRELIMINARY — live validation of NEEDS_LIVE candidates runs AFTER this, and the
-  // final white-box report is produced once runtime evidence is correlated. Never present this as the final report.
+function scribePrompt(taskId, projectId, squad, sourceDir, outDir, features, classes, deployUrl, coverage, holistic, reportKind, reportBase, wsGaps) {
+  reportKind = reportKind || 'final'
+  const preliminary = reportKind === 'preliminary'
+  const partial = reportKind === 'partial'
+  // §2: a report is FINAL only when a live target correlated (white-box) AND every source slice was reviewed.
+  // Preliminary (white-box, pre-live) and partial-coverage (some source slice unreviewed) are NOT final reports.
   const prelimBanner = preliminary
-    ? `\n\n**⚠️ THIS IS A PRELIMINARY SOURCE REVIEW REPORT** — a live target is configured (${deployUrl}) but runtime validation of NEEDS_LIVE_VALIDATION candidates has NOT yet run. Title the report "PRELIMINARY WHITE-BOX REPORT". Do NOT present NEEDS_LIVE findings as runtime-confirmed; the FINAL white-box report follows once source↔runtime evidence is correlated.\n`
+    ? `\n\n**⚠️ THIS IS A PRELIMINARY SOURCE REVIEW REPORT** — a live target is configured (${deployUrl}) but runtime validation of NEEDS_LIVE_VALIDATION candidates has NOT yet run. Title it "PRELIMINARY WHITE-BOX REPORT". Do NOT present NEEDS_LIVE findings as runtime-confirmed; the FINAL white-box report follows once source↔runtime evidence is correlated.\n`
+    : partial
+    ? `\n\n**⚠️ THIS IS A PARTIAL-COVERAGE REPORT** — ${wsGaps || 'some source slices were not reviewed'} (a workstream failed / was cancelled / exceeded the context budget). Title it "PARTIAL-COVERAGE CODE REVIEW". State the unreviewed slices explicitly in the coverage section; do NOT present this as complete coverage of the codebase.${deployUrl ? ` Additionally, a live target is configured (${deployUrl}) but runtime validation has NOT run — treat NEEDS_LIVE findings as unconfirmed; this is NOT the final white-box report.` : ''}\n`
     : ''
   // §1: in holistic mode there are no phase2/*.md reports — the Judge-gated board IS the finding set. SCRIBE reads
   // the JUDGED findings (post-downgrade/rejection) so the report can never contradict the judge.
@@ -806,7 +829,7 @@ function scribePrompt(taskId, projectId, squad, sourceDir, outDir, features, cla
     : `- ${outDir}/phase1-maps/consolidated/phase1_completion_gate.md and phase2_review_queue.md
 - ${outDir}/phase2/**/*.md  (per-feature reports, classes: ${classes.join(', ')})
 - ${outDir}/phase2/AUDITOR-VERDICTS.md  (report RUNTIME_CONFIRMED / SOURCE_CONFIRMED / NEEDS_LIVE_VALIDATION findings; note DISPROVEN separately)`
-  return `You are SCRIBE, the reporter. Merge the reviewed findings into ONE ${preliminary ? 'PRELIMINARY' : 'final'} code-review report.${prelimBanner}
+  return `You are SCRIBE, the reporter. Merge the reviewed findings into ONE ${preliminary ? 'PRELIMINARY' : partial ? 'PARTIAL-COVERAGE' : 'final'} code-review report.${prelimBanner}
 
 Inputs (read all):
 ${inputs}
@@ -820,7 +843,7 @@ file:line trace, impact, and fix. Be explicit that SOURCE_CONFIRMED means "prove
 running app"${deployUrl ? '' : ' (this was a source-only review — nothing is RUNTIME_CONFIRMED)'} — never present a source finding as if it were live-proven. Add a recurring-pattern
 section (same-functionality classes) and honest gaps. Do NOT include orchestration logs. Keep per-feature structure traceable.
 
-Write the report to ${outDir}/FINAL-REPORT-${taskId}.md AND to ${__roots.INTEL_ROOT}/code-review/FINAL-REPORT-${taskId}.md.
+Write the report to ${outDir}/${reportBase}.md AND to ${__roots.INTEL_ROOT}/code-review/${reportBase}.md.
 Reply one line: features covered, findings by confirmation status + severity, top risk.`
 }
 
@@ -858,6 +881,24 @@ async function runCodeReview(dispatch, deps) {
     log(`🚫 Phase 0 failed: ${p0.reason}`)
     logActivity('NEXUS', `🚫 Phase 0 failed: ${p0.reason}`, { taskId, squad, projectId: projectId || '' })
     return { error: p0.reason, phase: 0 }
+  }
+  // §3: a phasesOnly continuation (e.g. verify/report-only) DELIBERATELY reuses prior artifacts — do NOT archive
+  // them or it would delete the evidence it needs. Only a full (fresh) run resets.
+  const _isContinuation = Array.isArray(meta.phasesOnly) && meta.phasesOnly.length > 0
+  // §4/§6: RESET a prior attempt's artifacts NOW — immediately after source validation, BEFORE any reader/writer
+  // (streaming triage, emitCandidate) starts — so a resumed run can never re-triage stale candidates or inherit old
+  // quarantines. Archive by rename; if rename fails, COPY (never delete evidence), and if even copy fails, FAIL the
+  // attempt rather than run on stale data. (attempt_id = the stamp; artifacts stay keyed by taskId for the readers.)
+  if (!_isContinuation) {
+    const _stamp = Date.now(); const _archiveFailed = []
+    for (const [base, ext] of [['live-findings', 'jsonl'], ['VALIDATED-FINDINGS', 'jsonl'], ['JUDGED-FINDINGS', 'jsonl'], ['candidate-ledger', 'jsonl'], ['findings-detail', 'json'], ['triage-quarantine', 'jsonl'], ['rejected-candidates', 'jsonl'], ['VALIDATED-AUTHORITATIVE', 'flag']]) {
+      const p = `${__roots.INTEL_ROOT}/${base}-${taskId}.${ext}`
+      if (!fs.existsSync(p)) continue
+      const dest = `${p}.attempt-${_stamp}`
+      try { fs.renameSync(p, dest) }
+      catch { try { fs.copyFileSync(p, dest); fs.unlinkSync(p) } catch { _archiveFailed.push(p) } }  // NEVER unlink without a verified copy
+    }
+    if (_archiveFailed.length) { log(`🚫 Phase 0: could not archive prior-attempt artifacts (${_archiveFailed.length}) — refusing to run on stale data`); return { error: `could not archive prior attempt artifacts: ${_archiveFailed.join(', ')}`, phase: 0 } }
   }
   const stack = detectStack(sourceDir) // informational label only — behaviour is stack-agnostic
   // Classes: explicit meta.vulnClasses wins; ['all'] = every catalog; otherwise a
@@ -1102,12 +1143,20 @@ async function runCodeReview(dispatch, deps) {
   // authz/logic + freehand in one pass). Replaces the mapping + feature×class fan-out. Fail-soft: on any error we
   // fall through to the standard engine below.
   let _holisticDone = false
+  let _holisticWsIncomplete = []   // §3: planned workstreams that did not reach a terminal 'completed' state
   // Defensive: clear any stale authoritative-board sentinel so a prior aborted run can't wrongly suppress the writers.
   try { fs.unlinkSync(`${__roots.INTEL_ROOT}/VALIDATED-AUTHORITATIVE-${taskId}.flag`) } catch {}
   if (HOLISTIC && (runPhase('mapping') || runPhase('phase2')) && !cancelled()) {
     const holistic = require('../runtime/holistic-review')
     updateProgress(30, 'Holistic review: one session per coherent workstream')
     const quotaNow = (typeof getQuotaHealth === 'function' ? getQuotaHealth() : 'healthy') || 'healthy'
+    // §3: budget against the SMALLEST context window among the lead agents (resolve their real models), not 1M.
+    let _leadCtx = 0
+    try {
+      const modelRouter = require('../routing/model-router'); const { modelContext } = require('../runtime/profiler')
+      const leadPool = ['marshal', 'cipher', 'quill', 'siphon', 'breaker']
+      _leadCtx = Math.min(...leadPool.map((a) => { try { return modelContext((modelRouter.getModelForAgent(a) || {}).model) } catch { return 200_000 } }))
+    } catch { _leadCtx = 0 }
     // F1: ensure the ledger EXISTS before the run (was the null-ledger bug); execution ≠ bookkeeping.
     if (!ledger) { try { ledger = mappingLedger.build(taskId, [{ id: 'holistic', domain: 'app', owner: null, features }]); mappingLedger.save(outDir, ledger) } catch (e) { log(`⚠️ holistic ledger init (non-fatal): ${e.message}`) } }
     // F1: run the SECURITY ANALYSIS in its own try — a bookkeeping/UI failure must NEVER rerun it.
@@ -1115,18 +1164,23 @@ async function runCodeReview(dispatch, deps) {
     try { hres = await holistic.runHolistic({
       spawnAgent, log, trackCosts, cancelled, runWaves,
       emitFromFile: (file, ws, agent) => { try { return emitCandidatesFromFile(file, 'holistic', { slug: ws.id, name: ws.id }, agent, taskId, emitCandidate, log, sourceDir, crMode) } catch { return 0 } },
-    }, { taskId, sourceDir, features, vulnClasses, outDir, quota: quotaNow, mode: crMode }) }
+    }, { taskId, sourceDir, features, vulnClasses, outDir, quota: quotaNow, mode: crMode, model_context: _leadCtx || undefined }) }
     catch (e) { hres = { status: 'failed_before_start', errors: [e.message], plan: null, coverage: [], candidateCount: 0 }; log(`⚠️ holistic errored before start: ${e.message}`) }
 
     if (hres.status === 'completed' || hres.status === 'partial') {
       _holisticDone = true // F1: completed/partial ⇒ NEVER run legacy mapping/deep-map/Phase 2
+      // §3: record every planned workstream's terminal state; a non-terminal shard is a completion gap.
+      _holisticWsIncomplete = (hres.workstream_coverage || []).filter((w) => !w.terminal)
+      try { fs.writeFileSync(`${outDir}/workstream-coverage.json`, JSON.stringify({ taskId, workstreams: hres.workstream_coverage || [], oversized: (hres.plan && hres.plan.oversized_workstreams) || [] }, null, 2)) } catch {}
       // F2: materialize per-feature coverage (candidate_found ONLY where candidates exist). Separate try — a
       // bookkeeping failure here does NOT trigger a legacy security re-run.
       try {
         for (const cov of (hres.coverage || [])) {
-          ledger = mappingLedger.setFeature(ledger, cov.feature, { status: 'done', depth: cov.depth || 'holistic_complete' })
+          // §1: a feature whose holistic session FAILED is a coverage gap → 'blocked', never a clean 'done'.
+          const _failed = cov.mapping_status === 'failed' || cov.review_status === 'blocked_coverage_gap'
+          ledger = mappingLedger.setFeature(ledger, cov.feature, { status: _failed ? 'blocked' : 'done', depth: cov.depth || 'holistic_complete', note: _failed ? (cov.reason || 'holistic session failed') : undefined })
           ledger = mappingLedger.setReview(ledger, cov.feature, cov.review_status, { candidate_count: cov.candidate_count, files_reviewed: cov.files_reviewed, vulnerability_classes: cov.classes_reviewed })
-          _assessedFeatures.add(cov.feature)
+          if (!_failed) _assessedFeatures.add(cov.feature)
         }
         mappingLedger.save(outDir, ledger)
         // §4: a candidate the matcher could not attribute to a canonical feature is a COVERAGE_ANOMALY — persist
@@ -1136,7 +1190,17 @@ async function runCodeReview(dispatch, deps) {
           log(`⚠️ ${hres.anomalies.length} coverage anomal(ies): candidate(s) not attributable to a canonical feature (see coverage-anomalies.json)`)
         }
       } catch (e) { log(`⚠️ holistic ledger materialize (non-fatal): ${e.message}`) }
-      if (_dispatchBridge && hres.plan) { try { _dispatchBridge.onSessionPlan(taskId, { session_count: hres.plan.session_count, active_concurrency: hres.plan.active_concurrency, strategy: hres.plan.strategy, reason: hres.plan.reason, features_total: features.length, mode: crMode }); _dispatchBridge.onCoverage(taskId) } catch {} }
+      // §8: persist the COMPLETE planner output — resolved model + context budget + every workstream's file
+      // manifest + token estimate — so the UI/audit artifact reflects what was actually planned, not just counts.
+      if (_dispatchBridge && hres.plan) { try { _dispatchBridge.onSessionPlan(taskId, {
+        session_count: hres.plan.session_count, active_concurrency: hres.plan.active_concurrency, strategy: hres.plan.strategy,
+        reason: hres.plan.reason, features_total: features.length, mode: crMode,
+        lead_model: (() => { try { return (require('../routing/model-router').getModelForAgent('marshal') || {}).model } catch { return '' } })(),
+        model_context: _leadCtx || (hres.profile && hres.profile.model_context) || null,
+        usable_context: hres.plan.usable_context || (hres.profile && hres.profile.usable_context) || null,
+        est_tokens: hres.profile && hres.profile.est_tokens, files_total: hres.profile && hres.profile.files,
+        workstreams: (hres.plan.workstreams || []).map((w) => ({ id: w.id, features: w.features, files: w.files || [], est_tokens: w.est_tokens, risk: w.risk })),
+      }); _dispatchBridge.onCoverage(taskId) } catch {} }
       const withFindings = (hres.coverage || []).filter((c) => c.review_status === 'candidate_found').length
       log(`🧠 Holistic review ${hres.status}: ${hres.plan ? hres.plan.session_count : '?'} session(s), ${hres.candidateCount} candidate(s), ${withFindings}/${features.length} feature(s) with findings — feature×class fan-out skipped`)
     } else {
@@ -1457,19 +1521,45 @@ async function runCodeReview(dispatch, deps) {
   const _VFpath = `${__roots.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
   const _JFpath = `${__roots.INTEL_ROOT}/JUDGED-FINDINGS-${taskId}.jsonl`
   const _reportableIds = () => { const s = new Set(); try { for (const l of fs.readFileSync(_VFpath, 'utf8').split('\n')) { const t = l.trim(); if (!t) continue; let r; try { r = JSON.parse(t) } catch { r = null } if (r && r.candidate_id) s.add(String(r.candidate_id).trim().toLowerCase()) } } catch {} return s }
-  const _judgedIds = () => { const s = new Set(); try { for (const l of fs.readFileSync(_JFpath, 'utf8').split('\n')) { const t = l.trim(); if (!t) continue; let r; try { r = JSON.parse(t) } catch { r = null } if (r && (r.candidate_id || r.id)) s.add(String(r.candidate_id || r.id).trim().toLowerCase()) } } catch {} return s }
-  // §1/§3: judge is VALID only when it ran AND its output covers every reportable candidate id (partial ≠ success).
-  const _judgeValid = () => { const want = _reportableIds(); if (!want.size) return true; const got = _judgedIds(); for (const id of want) if (!got.has(id)) return false; return true }
+  // §11: judge output is VALID only on EXACT set equality — every reportable id judged exactly once, with NO
+  // foreign ids, NO duplicate verdicts, and NO malformed rows. Anything else is a partial/corrupt judge → BLOCK.
+  const _judgeCoverage = () => {
+    const want = _reportableIds()
+    if (!want.size) return { ok: true, empty: true, want: 0, matched: 0, dup: 0, foreign: 0, malformed: 0 }
+    const seen = new Set(); let dup = 0, foreign = 0, malformed = 0, passthrough = 0
+    try {
+      for (const l of fs.readFileSync(_JFpath, 'utf8').split('\n')) {
+        const t = l.trim(); if (!t) continue
+        let r; try { r = JSON.parse(t) } catch { r = null }
+        // §1/§5/§7: identity + genuine judge_verdict (COMPLETE enum incl. intentional pass-through) + severity.
+        const v = _validateJudgedRow(r)
+        if (!v.ok) { malformed++; continue }
+        if (!want.has(v.id)) { foreign++; continue }
+        if (seen.has(v.id)) { dup++; continue }
+        seen.add(v.id); if (v.passthrough) passthrough++
+      }
+    } catch { /* no judged file → matched 0 */ }
+    const matched = seen.size
+    return { ok: matched === want.size && dup === 0 && foreign === 0 && malformed === 0, empty: false, want: want.size, matched, passthrough, dup, foreign, malformed }
+  }
 
-  let _judgeOk = false
+  let _judgeOk = false, _judgeCov = { want: 0, matched: 0 }
   if (_holisticDone && typeof runJudgeForTask === 'function' && !cancelled()) {
     updateProgress(92, 'Phase 3: Judge (before report)')
-    for (let attempt = 1; attempt <= 2 && !_judgeOk && !cancelled(); attempt++) {
-      try { const _jr = await runJudgeForTask(taskId, _VFpath, deployUrl || ''); _judgeOk = !!(_jr && _judgeValid()) }
-      catch (e) { log(`⚠️ judge attempt ${attempt} (non-fatal): ${e.message}`); _judgeOk = false }
-      if (!_judgeOk && attempt < 2) log(`↩️ Judge attempt ${attempt} failed/partial (did not cover all reportable findings) — retrying`)
+    if (!_reportableIds().size) {
+      // §5: a clean, zero-finding review is a successful NO_FINDINGS_TO_JUDGE no-op — never block its report.
+      _judgeOk = true; _judgeCov = { want: 0, matched: 0, empty: true }
+      try { fs.writeFileSync(`${__roots.INTEL_ROOT}/JUDGED-FINDINGS-${taskId}.jsonl`, '') } catch {}
+      try { fs.writeFileSync(`${outDir}/judge-decision.json`, JSON.stringify({ taskId, decision: 'NO_FINDINGS_TO_JUDGE', reportable: 0 }, null, 2)) } catch {}
+      log(`⚖️ No reportable findings — clean review; judge is a NO_FINDINGS_TO_JUDGE no-op (report not blocked)`)
+    } else {
+      for (let attempt = 1; attempt <= 2 && !_judgeOk && !cancelled(); attempt++) {
+        try { await runJudgeForTask(taskId, _VFpath, deployUrl || ''); _judgeCov = _judgeCoverage(); _judgeOk = _judgeCov.ok }
+        catch (e) { log(`⚠️ judge attempt ${attempt} (non-fatal): ${e.message}`); _judgeOk = false }
+        if (!_judgeOk && attempt < 2) log(`↩️ Judge attempt ${attempt} invalid (matched ${_judgeCov.matched}/${_judgeCov.want}, ${_judgeCov.dup} dup, ${_judgeCov.foreign} foreign, ${_judgeCov.malformed} malformed) — retrying`)
+      }
+      log(_judgeOk ? `⚖️ Judge ran + exactly covered all ${_judgeCov.want} reportable findings — the report is Judge-gated` : `⛔ Judge invalid after retries (matched ${_judgeCov.matched}/${_judgeCov.want}, ${_judgeCov.dup} dup, ${_judgeCov.foreign} foreign) — final report BLOCKED`)
     }
-    log(_judgeOk ? `⚖️ Judge ran + covered all reportable findings — the report is Judge-gated` : `⛔ Judge failed/partial after retries — final report BLOCKED (not Judge-gated)`)
   } else { _judgeOk = !_holisticDone }   // legacy path is judged by the daemon; not gated here
 
   // §3/§5: CLOSURE GATE — computed BEFORE SCRIBE so report-eligibility can act on it. A run is COMPLETE only when
@@ -1482,12 +1572,15 @@ async function runCodeReview(dispatch, deps) {
       const _triageQ = _rd(`triage-quarantine-${taskId}.jsonl`).length
       const _auditQ = _ledgerRows.filter(r => r.terminal_status === 'AUDIT_QUARANTINED').length
       const _blocked = ledger ? mappingLedger.blockers(ledger).length : 0
-      const _reportable = _reportableIds().size, _judgedCov = [..._reportableIds()].filter(id => _judgedIds().has(id)).length
+      const _reportable = _judgeCov.want, _judgedCov = _judgeCov.matched
       const gaps = []
-      if (!_judgeOk) gaps.push(`judge covered ${_judgedCov}/${_reportable} reportable finding(s) — report BLOCKED`)
+      if (!_judgeOk) gaps.push(`judge covered ${_judgedCov}/${_reportable} reportable finding(s)${_judgeCov.dup ? `, ${_judgeCov.dup} dup` : ''}${_judgeCov.foreign ? `, ${_judgeCov.foreign} foreign` : ''} — report BLOCKED`)
       if (_auditQ) gaps.push(`${_auditQ} candidate(s) AUDIT_QUARANTINED (no/ambiguous/invalid verdict)`)
       if (_triageQ) gaps.push(`${_triageQ} candidate(s) TRIAGE_QUARANTINED`)
       if (_blocked) gaps.push(`${_blocked} feature(s) blocked (coverage gap)`)
+      // §3: a whole workstream (source slice) that failed/was-cancelled/oversized is a coverage gap even if it
+      // owned no ledger feature — completion requires ALL planned workstreams terminal.
+      if (_holisticWsIncomplete.length) gaps.push(`${_holisticWsIncomplete.length} workstream(s) not terminal (${_holisticWsIncomplete.map((w) => `${w.workstream}:${w.status}`).join(', ')})`)
       const status = !_judgeOk ? 'REPORT_BLOCKED' : (gaps.length ? 'COMPLETE_WITH_GAPS' : 'COMPLETE')
       _completionGate = { status, gaps, candidate_ledger_total: _ledgerRows.length, audit_quarantined: _auditQ, triage_quarantined: _triageQ, judge_valid: _judgeOk, judged_coverage: `${_judgedCov}/${_reportable}` }
       try { fs.writeFileSync(`${outDir}/completion-gate.json`, JSON.stringify({ taskId, ..._completionGate }, null, 2)) } catch {}
@@ -1500,14 +1593,46 @@ async function runCodeReview(dispatch, deps) {
   // §1/§2: report-eligibility. Holistic + judge invalid ⇒ do NOT publish a "final" report. White-box ⇒ this is a
   // PRELIMINARY source report (live validation runs later), never the final white-box report.
   const _reportBlocked = _holisticDone && !_judgeOk
-  const _preliminary = !!deployUrl   // white-box: source-only report pending live validation
+  // §3: report KIND — PARTIAL COVERAGE has the HIGHEST precedence (an incomplete review must carry the unreviewed-
+  // workstream warning even when a live target is configured). Then white-box (deployUrl) ⇒ preliminary; else final.
+  const _partialCoverage = _holisticDone && _holisticWsIncomplete.length > 0
+  const _reportKind = _partialCoverage ? 'partial' : (deployUrl ? 'preliminary' : 'final')
+  const _reportBase = _reportKind === 'preliminary' ? `SOURCE-REVIEW-PRELIMINARY-${taskId}` : _reportKind === 'partial' ? `PARTIAL-COVERAGE-REPORT-${taskId}` : `FINAL-REPORT-${taskId}`
+  const _reportPath = `${outDir}/${_reportBase}.md`
+  const _wsGapText = _holisticWsIncomplete.map((w) => `${w.workstream}:${w.status}`).join(', ')
   if (cancelled()) return bail('Phase 3 report')
+  // §2/§4: clear EVERY stale report variant for this taskId BEFORE evaluating report-eligibility — so a blocked
+  // report (SCRIBE skipped) never leaves a prior FINAL/preliminary/partial behind for another consumer to publish,
+  // and a produced report is provably from THIS attempt.
+  if (_holisticDone && runPhase('report')) {
+    for (const _v of [`FINAL-REPORT-${taskId}`, `SOURCE-REVIEW-PRELIMINARY-${taskId}`, `PARTIAL-COVERAGE-REPORT-${taskId}`]) {
+      try { fs.unlinkSync(`${outDir}/${_v}.md`) } catch {}
+      try { fs.unlinkSync(`${__roots.INTEL_ROOT}/code-review/${_v}.md`) } catch {}
+    }
+  }
   if (runPhase('report') && !_reportBlocked) {
-    updateProgress(94, _preliminary ? 'Phase 3: SCRIBE preliminary report' : 'Phase 3: SCRIBE final report')
-    const vRes = await safeSpawn(() => spawnAgent('scribe', taskId, scribePrompt(taskId, projectId, squad, sourceDir, outDir, p2Features, vulnClasses, deployUrl, coverage, _holisticDone, _preliminary), `task-${taskId}-scribe`, null, { timeoutMs: 30 * 60 * 1000 }), 'SCRIBE report')
+    updateProgress(94, `Phase 3: SCRIBE ${_reportKind} report`)
+    const vRes = await safeSpawn(() => spawnAgent('scribe', taskId, scribePrompt(taskId, projectId, squad, sourceDir, outDir, p2Features, vulnClasses, deployUrl, coverage, _holisticDone, _reportKind, _reportBase, _wsGapText), `task-${taskId}-scribe`, null, { timeoutMs: 30 * 60 * 1000 }), 'SCRIBE report')
     trackCosts([vRes].filter(Boolean))
+    // §5: SCRIBE can fail (safeSpawn → null) or write nothing. Verify the report EXISTS + is non-empty before
+    // calling the run complete; otherwise the completion gate becomes REPORT_BLOCKED (never a false COMPLETE).
+    if (_holisticDone) {
+      let _reportBytes = 0; try { _reportBytes = fs.statSync(_reportPath).size } catch {}
+      const _reportOk = !!vRes && _reportBytes > 200
+      _completionGate.report_kind = _reportKind
+      _completionGate.report_generated = _reportOk
+      _completionGate.report_path = _reportOk ? _reportPath : ''
+      try { if (_reportOk) _completionGate.report_digest = require('crypto').createHash('sha256').update(fs.readFileSync(_reportPath)).digest('hex').slice(0, 16) } catch {}
+      if (!_reportOk) {
+        _completionGate.status = 'REPORT_BLOCKED'
+        _completionGate.gaps = [...(_completionGate.gaps || []), `SCRIBE did not produce a valid report (${_reportBytes} bytes) — report BLOCKED`]
+        log(`⛔ Completion gate → REPORT_BLOCKED: SCRIBE produced no valid report at ${_reportPath}`)
+      }
+      try { fs.writeFileSync(`${outDir}/completion-gate.json`, JSON.stringify({ taskId, ..._completionGate }, null, 2)) } catch {}
+    }
   } else if (_reportBlocked) {
     log(`⛔ SCRIBE skipped — final report BLOCKED (judge did not validly cover the board). Fix/retry the judge before publishing.`)
+    _completionGate.report_generated = false
   }
 
   // C2: run-completion invariant — no loose ends: every validated finding carries a valid confirmation
@@ -1569,6 +1694,7 @@ module.exports = {
   runCodeReview,
   validateSourceDir,
   reconcileBoardFromVerdicts,
+  _validateJudgedRow,
   // exported for tests/introspection
   detectStack,
   buildInventories,

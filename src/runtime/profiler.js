@@ -10,6 +10,16 @@ const path = require('path')
 // ~4 chars/token is the standard rough estimate for code.
 function estimateTokens(bytes) { return Math.ceil((Number(bytes) || 0) / 4) }
 
+// §3: the usable context window (tokens) for a model id. Conservative — an UNKNOWN model defaults to 200k, not 1M,
+// so the planner never over-fills a model it doesn't recognize. Update as new models ship.
+function modelContext(model) {
+  const m = String(model || '').toLowerCase()
+  if (/haiku/.test(m)) return 200_000
+  if (/\[1m\]|-1m\b|opus-4-8|opus-4-7|sonnet-4-6|sonnet-5|fable-5|claude-5/.test(m)) return 1_000_000
+  if (/opus|sonnet/.test(m)) return 200_000
+  return 200_000
+}
+
 const DEFAULT_RESERVES = { instructions: 20_000, blueprint: 40_000, reasoning_reserve: 250_000, output_reserve: 120_000, safety_margin: 50_000 }
 function usableContext(opts = {}) {
   const model = Number(opts.model_context) || 1_000_000 // Opus 1M default
@@ -18,19 +28,53 @@ function usableContext(opts = {}) {
   return Math.max(50_000, model - used) // never below a sane floor
 }
 
-const CODE_EXT = new Set(['.rb', '.py', '.js', '.ts', '.jsx', '.tsx', '.go', '.java', '.php', '.cs', '.c', '.cc', '.cpp', '.h', '.hpp', '.rs', '.kt', '.swift', '.scala', '.ex', '.exs', '.erl', '.clj', '.groovy', '.pl', '.pm', '.sh', '.sql', '.graphql', '.gql', '.vue', '.svelte', '.html', '.erb', '.haml', '.yml', '.yaml', '.json', '.tf'])
+const CODE_EXT = new Set(['.rb', '.py', '.js', '.ts', '.jsx', '.tsx', '.go', '.java', '.php', '.cs', '.c', '.cc', '.cpp', '.h', '.hpp', '.rs', '.kt', '.swift', '.scala', '.ex', '.exs', '.erl', '.clj', '.groovy', '.pl', '.pm', '.sh', '.bash', '.sql', '.graphql', '.gql', '.vue', '.svelte', '.html', '.erb', '.haml', '.yml', '.yaml', '.json', '.tf',
+  // §9: security-relevant configuration + build/dependency manifests — often where the real risk lives.
+  '.conf', '.cnf', '.properties', '.ini', '.toml', '.cfg', '.env', '.xml', '.gradle', '.lock', '.tfvars', '.pp'])
+// §9: recognized config/build/dependency FILENAMES with no useful extension (matched by exact basename).
+const CODE_FILES = new Set(['gemfile', 'gemfile.lock', 'dockerfile', 'makefile', 'rakefile', 'procfile', 'requirements.txt', 'pom.xml', 'build.gradle',
+  'go.mod', 'go.sum', 'cargo.toml', 'cargo.lock', 'composer.json', 'composer.lock', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'gemfile.rb',
+  'nginx.conf', 'httpd.conf', 'docker-compose.yml', 'docker-compose.yaml', '.env', '.env.example', '.env.local', 'settings.py', 'web.config', 'wp-config.php'])
 const SKIP_DIR = new Set(['node_modules', '.git', 'vendor', 'dist', 'build', 'coverage', '.next', 'tmp', 'log', 'logs', '__pycache__'])
+
+// §9: filename PATTERNS for config/build variants that exact-name/extension rules miss — .env.production,
+// Dockerfile.prod, requirements-dev.txt, docker-compose.prod.yml, nginx.conf.d, *.conf.sample, etc.
+const CODE_FILE_PATTERNS = [
+  /^\.env(\.|$)/i, /^dockerfile(\.|$)/i, /^makefile(\.|$)/i, /^rakefile(\.|$)/i, /^procfile(\.|$)/i,
+  /^requirements[\w.-]*\.txt$/i, /^docker-compose[\w.-]*\.ya?ml$/i, /\.conf(\.[\w-]+)?$/i, /\.properties$/i,
+  /\.ini$/i, /(^|[.-])gemfile(\.|$)/i, /\.gradle(\.kts)?$/i, /(^|\.)npmrc$/i, /(^|\.)babelrc/i, /\.cnf$/i,
+]
+// Is this basename a source/config file we should profile + review?
+function isSourceFile(name) {
+  const lower = String(name || '').toLowerCase()
+  if (CODE_FILES.has(lower)) return true
+  const ext = path.extname(lower)
+  if (ext && CODE_EXT.has(ext)) return true
+  return CODE_FILE_PATTERNS.some((re) => re.test(lower))
+}
 
 // Walk a source tree (fail-soft). Returns { files, bytes, byLang:{ext:bytes}, skippedDirs }.
 function walkSource(dir, acc = { files: 0, bytes: 0, byLang: {}, skippedDirs: 0 }) {
   let entries; try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return acc }
   for (const e of entries) {
     if (e.isDirectory()) { if (SKIP_DIR.has(e.name)) { acc.skippedDirs++; continue } walkSource(path.join(dir, e.name), acc); continue }
-    const ext = path.extname(e.name).toLowerCase()
-    if (!CODE_EXT.has(ext)) continue
+    if (!isSourceFile(e.name)) continue
+    const ext = path.extname(e.name).toLowerCase() || path.basename(e.name).toLowerCase()
     try { const st = fs.statSync(path.join(dir, e.name)); acc.files++; acc.bytes += st.size; acc.byLang[ext] = (acc.byLang[ext] || 0) + st.size } catch {}
   }
   return acc
+}
+
+// §2: the actual file manifest (relative path + byte size) so the planner can slice by real source, not estimates.
+function listSourceFiles(sourceDir, base = sourceDir, out = []) {
+  let entries; try { entries = fs.readdirSync(sourceDir, { withFileTypes: true }) } catch { return out }
+  for (const e of entries) {
+    const full = path.join(sourceDir, e.name)
+    if (e.isDirectory()) { if (!SKIP_DIR.has(e.name)) listSourceFiles(full, base, out); continue }
+    if (!isSourceFile(e.name)) continue
+    try { out.push({ path: path.relative(base, full), bytes: fs.statSync(full).size }) } catch {}
+  }
+  return out
 }
 
 // Profile a source repository. opts.model_context / opts.reserves tune the budget.
@@ -47,7 +91,7 @@ function profileSource(sourceDir, opts = {}) {
   }
 }
 
-module.exports = { estimateTokens, usableContext, walkSource, profileSource, DEFAULT_RESERVES, CODE_EXT }
+module.exports = { estimateTokens, usableContext, modelContext, walkSource, profileSource, listSourceFiles, isSourceFile, DEFAULT_RESERVES, CODE_EXT, CODE_FILES }
 
 // self-check
 if (require.main === module) {

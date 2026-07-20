@@ -35,3 +35,66 @@ test('F4: maxSessions caps ACTIVE concurrency, never truncates workstreams', () 
   assert.equal(p.workstreams.length, p.session_count, 'no truncation')
   assert.ok(p.active_concurrency <= 2, 'maxSessions caps concurrency')
 })
+
+// §2: with a file manifest, a sharded plan gives every workstream an explicit NON-EMPTY files[] — never all-repo.
+test('§2: file-based slicing assigns an explicit file manifest to every shard', () => {
+  const files = []
+  // two localities, each ~600k tokens (2.4MB) → forces >1 shard against a 500k budget
+  for (let i = 0; i < 6; i++) files.push({ path: `app/auth/f${i}.rb`, bytes: 400_000 })
+  for (let i = 0; i < 6; i++) files.push({ path: `app/billing/f${i}.rb`, bytes: 400_000 })
+  const features = [{ slug: 'login', domain: 'auth' }, { slug: 'refund', domain: 'billing' }]
+  const p = W.planWorkstreams({ features, files, usable_context: 500_000 })
+  assert.ok(p.session_count >= 2, `sharded (${p.session_count})`)
+  assert.ok(p.workstreams.every(w => Array.isArray(w.files) && w.files.length > 0), 'every shard has a non-empty files[]')
+  assert.ok(p.workstreams.every(w => w.est_tokens <= 500_000), 'each shard within budget')
+  // every file placed in exactly one shard (no duplication, none dropped)
+  const all = p.workstreams.flatMap(w => w.files)
+  assert.equal(all.length, 12); assert.equal(new Set(all).size, 12)
+})
+
+// §2: a single-session plan (fits budget) still carries the full file list.
+test('§2: single holistic session carries the whole file manifest', () => {
+  const files = [{ path: 'a.rb', bytes: 1000 }, { path: 'b.rb', bytes: 1000 }]
+  const p = W.planWorkstreams({ features: [{ slug: 'x', domain: 'app' }], files, usable_context: 500_000 })
+  assert.equal(p.session_count, 1)
+  assert.deepEqual(p.workstreams[0].files.sort(), ['a.rb', 'b.rb'])
+})
+
+// §1: a single file larger than the budget → its OWN workstream, flagged oversized (a coverage blocker), and the
+// budget assertion holds for every non-oversized workstream.
+test('§1: oversized single file becomes its own oversized workstream; budget asserted otherwise', () => {
+  const files = [
+    { path: 'app/huge.rb', bytes: 4_000_000 },   // ~1M tok > 500k budget → oversized, cannot be split
+    { path: 'app/a.rb', bytes: 100_000 },
+    { path: 'app/b.rb', bytes: 100_000 },
+  ]
+  const p = W.planWorkstreams({ features: [{ slug: 'x', domain: 'app' }], files, usable_context: 500_000 })
+  const over = p.workstreams.filter(w => w.oversized)
+  assert.equal(over.length, 1, 'the huge file is isolated + flagged oversized')
+  assert.ok(over[0].files.includes('app/huge.rb'))
+  assert.deepEqual(p.oversized_workstreams, over.map(w => w.id))
+  // every NON-oversized workstream fits the budget (the post-planning assertion)
+  assert.ok(p.workstreams.filter(w => !w.oversized).every(w => w.est_tokens <= 500_000))
+})
+
+// §1: a single feature no longer forces one session regardless of size — an oversized single-feature repo shards.
+test('§1: single-feature oversized repo is NOT force-collapsed into one session', () => {
+  const files = Array.from({ length: 4 }, (_, i) => ({ path: `svc/f${i}.rb`, bytes: 700_000 }))
+  const p = W.planWorkstreams({ features: [{ slug: 'only', domain: 'svc' }], files, usable_context: 500_000 })
+  assert.ok(p.session_count >= 2, `single feature still sharded by size (${p.session_count})`)
+})
+
+// §2: shared security files are REPLICATED into every shard as shared_context_files, tracked apart from primary.
+test('§2: shared files replicate into every shard (primary vs shared tracked)', () => {
+  const files = [
+    { path: 'app/application_controller.rb', bytes: 40_000 },   // shared
+    ...Array.from({ length: 6 }, (_, i) => ({ path: `app/auth/a${i}.rb`, bytes: 300_000 })),
+    ...Array.from({ length: 6 }, (_, i) => ({ path: `app/billing/b${i}.rb`, bytes: 300_000 })),
+  ]
+  const shared = new Set(['app/application_controller.rb'])
+  const p = W.planWorkstreams({ features: [{ slug: 'login', domain: 'auth' }, { slug: 'refund', domain: 'billing' }], files, sharedFiles: shared, usable_context: 500_000 })
+  assert.ok(p.session_count >= 2)
+  assert.ok(p.workstreams.every(w => w.files.includes('app/application_controller.rb')), 'shared file in every shard')
+  assert.ok(p.workstreams.every(w => w.shared_context_files.includes('app/application_controller.rb')))
+  assert.ok(p.workstreams.every(w => !w.primary_files.includes('app/application_controller.rb')), 'shared file not counted as primary')
+})

@@ -143,3 +143,21 @@ test('reconcile enforces runtime status, rejects duplicate/foreign verdicts, and
     assert.equal(wl[0].terminal_status, 'NEEDS_LIVE_VALIDATION', 'white-box RUNTIME_CONFIRMED (no proof) → demoted to NEEDS_LIVE')
   } finally { cleanup() }
 })
+
+// §1/§5/§7: the Judge coverage contract accepts the COMPLETE judge enum — including intentional pass-through
+// (not-judged / not-judged-cap-exceeded, valid under promotionMode) — but rejects a copied validation_status.
+test('judged-row validation: full judge enum passes (incl. pass-through); validation_status is rejected', () => {
+  const ok = (r) => cr._validateJudgedRow(r).ok
+  for (const v of ['confirmed', 'downgraded', 'indeterminate', 'not-judged', 'not-judged-cap-exceeded']) {
+    assert.equal(ok({ candidate_id: 'c1', judge_verdict: v, severity: 'Low' }), true, `${v} is a valid judged row`)
+  }
+  assert.equal(cr._validateJudgedRow({ candidate_id: 'c1', judge_verdict: 'not-judged', severity: 'Info' }).passthrough, true, 'not-judged is pass-through')
+  assert.equal(cr._validateJudgedRow({ candidate_id: 'c1', judge_verdict: 'confirmed', severity: 'High' }).passthrough, false)
+  // a copied validated finding (validation_status, no judge_verdict) is NOT a judge verdict → invalid
+  assert.equal(ok({ candidate_id: 'c1', validation_status: 'CONFIRMED', severity: 'High' }), false, 'validation_status ≠ judge verdict')
+  // a generic `verdict` field is NOT the explicit judge_verdict → invalid (no fallback)
+  assert.equal(ok({ candidate_id: 'c1', verdict: 'confirmed', severity: 'High' }), false, 'generic verdict ≠ judge_verdict')
+  assert.equal(ok({ candidate_id: 'c1', severity: 'High' }), false, 'no verdict → invalid')
+  assert.equal(ok({ judge_verdict: 'confirmed', severity: 'High' }), false, 'no identity → invalid')
+  assert.equal(ok({ candidate_id: 'c1', judge_verdict: 'confirmed' }), false, 'no severity → invalid')
+})
