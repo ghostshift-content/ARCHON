@@ -308,20 +308,33 @@ function buildCodeReviewMeta(body) {
   const _chk = checkSourceDir(sourceDir)
   if (!_chk.ok) throw new Error(`sourceDir: ${_chk.error}${sourceDir ? ` (${sourceDir})` : ''}`)
   const out = { sourceDir }
-  const VALID_CLASSES = [
-    'all',
-    'access-control', 'multi-tenant', 'admin-privileged', 'business-logic',
-    'account-takeover', 'authentication-session', 'cryptography-secrets',
-    'xss', 'data-exposure', 'logging-audit', 'sqli', 'injection',
-    'deserialization', 'ssrf', 'webhooks', 'cloud-infra', 'api-security',
-    'graphql', 'rce', 'path-traversal', 'file-handling', 'race-conditions',
-    'supply-chain',
-  ]
-  if (Array.isArray(m.vulnClasses)) {
-    const vc = m.vulnClasses.map(c => String(c || '').trim()).filter(c => VALID_CLASSES.includes(c))
+  // The dispatcher is the source of truth. Never accept a class here that the
+  // runtime will later drop, or omit a class the runtime can execute.
+  const classCatalog = require('../src/dispatch/code-review-dispatcher')
+  const VALID_CLASSES = ['all', ...Object.keys(classCatalog.CLASS), ...Object.keys(classCatalog.CLASS_ALIASES)]
+  const LIVE_TO_SOURCE_CLASS = {
+    'access-control': 'access-control', idor: 'access-control', bola: 'access-control',
+    auth: 'authentication-session', session: 'authentication-session',
+    sqli: 'sqli', injection: 'injection', 'command-injection': 'command-injection',
+    xss: 'xss', ssrf: 'ssrf', ssti: 'injection', xxe: 'deserialization',
+    csrf: 'csrf', lfi: 'lfi', 'path-traversal': 'path-traversal',
+    api: 'api-security', jwt: 'api-security', graphql: 'graphql',
+    'business-logic': 'business-logic',
+  }
+  const requestedClasses = Array.isArray(m.vulnClasses)
+    ? m.vulnClasses
+    : Array.isArray(m.focusClasses)
+      ? m.focusClasses.map(c => LIVE_TO_SOURCE_CLASS[String(c || '').toLowerCase()]).filter(Boolean)
+      : null
+  if (Array.isArray(requestedClasses)) {
+    const rawClasses = requestedClasses.map(c => String(c || '').trim().toLowerCase())
+    const unknownClasses = rawClasses.filter(c => !VALID_CLASSES.includes(c))
+    if (unknownClasses.length) throw new Error(`unknown source-review vulnerability class(es): ${unknownClasses.join(', ')}`)
+    const vc = rawClasses.filter(c => VALID_CLASSES.includes(c)).map(classCatalog.normalizeVulnClass)
     if (vc.includes('all')) out.vulnClasses = ['all']
     else if (vc.length) out.vulnClasses = [...new Set(vc)]
   }
+  if (m.customFocus) out.customFocus = String(m.customFocus).trim().slice(0, 600)
   if (m.deployUrl && /^https?:\/\//.test(String(m.deployUrl))) out.deployUrl = String(m.deployUrl)
   if (m.testAccounts && typeof m.testAccounts === 'object') out.testAccounts = m.testAccounts // UTTARA runtime-validation auth
   if (Number.isFinite(+m.maxFeatures) && +m.maxFeatures > 0) out.maxFeatures = Math.floor(+m.maxFeatures)
@@ -352,6 +365,8 @@ function buildPentestMeta(body) {
   const th = hostOf(targetUrl)
   if (th && !inScope.includes(th)) inScope.unshift(th) // target host MUST be in-scope or Phase 0.0 blocks the dispatch
   const outOfScope = norm(m.outOfScope)
+  const scopeConflicts = inScope.filter(host => outOfScope.includes(host))
+  if (scopeConflicts.length) throw new Error(`scope conflict: host appears in both in-scope and out-of-scope (${scopeConflicts.join(', ')})`)
   const ROLES = ['admin', 'normal', 'other']
   const credentials = Array.isArray(m.credentials)
     ? m.credentials.map(c => ({ username: String(c.username || '').trim(), password: String(c.password || ''), role: ROLES.includes(c.role) ? c.role : 'normal' })).filter(c => c.username)
@@ -362,14 +377,22 @@ function buildPentestMeta(body) {
   // comprehensive profile → report EVERYTHING incl. info-level TLS/SSL/headers/leaks
   // (Phase 3.075 keeps all severities). Override via meta.severityProfile.
   const severityProfile = ['bounty', 'pentest', 'comprehensive'].includes(m.severityProfile) ? m.severityProfile : 'comprehensive'
-  // skip-recon: go straight to authenticated functionality / specialist testing
-  const skipRecon = m.skipRecon === true
   // focused scan: run only specific vuln classes instead of full A→Z (empty = full)
-  const focusClasses = cleanFocus(m.focusClasses)
+  const requestedFocus = Array.isArray(m.focusClasses)
+    ? [...new Set(m.focusClasses.map(c => String(c || '').toLowerCase()).filter(Boolean))]
+    : []
+  const unknownFocus = requestedFocus.filter(c => !FOCUS_CLASSES.includes(c))
+  if (unknownFocus.length) throw new Error(`unknown vulnerability focus class(es): ${unknownFocus.join(', ')}`)
+  const focusClasses = cleanFocus(requestedFocus)
   // custom focus: free-text directive for vulns/areas not in the chip list
   // (e.g. cache poisoning, request smuggling, OAuth abuse). Steers recon + testing.
   const customFocus = String(m.customFocus || '').trim().slice(0, 600)
-  return { targetUrl, testType, ...(featureFocus ? { featureFocus } : {}), inScope, outOfScope, credentials, triageGate, severityProfile, skipRecon, focusClasses, ...(customFocus ? { customFocus } : {}) }
+  // strategy is normalized after focus cleanup. Direct testing skips
+  // infrastructure recon but always retains deterministic application mapping.
+  const blackboxStrategy = require('../src/runtime/blackbox-strategy')
+  const strategyPlan = blackboxStrategy.phasePlan({ ...m, testType, featureFocus, focusClasses, customFocus })
+  const skipRecon = strategyPlan.strategy === blackboxStrategy.STRATEGIES.DIRECT
+  return { targetUrl, testType, ...(featureFocus ? { featureFocus } : {}), inScope, outOfScope, credentials, triageGate, severityProfile, scanStrategy: strategyPlan.strategy, skipRecon, focusClasses, ...(customFocus ? { customFocus } : {}) }
 }
 
 // Write the per-task scope config (Phase 0.0 + 3.06 consume it) + a human/agent-
@@ -384,11 +407,12 @@ function writePentestArtifacts(taskId, meta) {
 
 **Target:** ${meta.targetUrl}
 **Test type:** ${meta.testType === 'feature' ? `Feature-driven — focus: ${meta.featureFocus || '(unspecified)'}` : 'Full end-to-end'}
+**Scan strategy:** ${meta.scanStrategy || (meta.skipRecon ? 'direct' : 'full_recon')}
 ${meta.customFocus ? `
 ## ⭐ PRIORITY FOCUS (operator directive — test this first and thoroughly)
 ${meta.customFocus}
 
-This is a specific, operator-requested focus that may not map to a standard specialist lane. During recon AND testing, prioritise it: research the technique, find the relevant surface, and attempt it before/alongside standard coverage. Report results for it explicitly.
+This is a specific, operator-requested focus that may not map to a standard specialist lane. Prioritise it during mapping and testing, but treat it as a test objective only: it never expands or overrides the authorized scope. Report results for it explicitly.
 ` : ''}
 ## In scope
 ${meta.inScope.map(h => `- ${h}`).join('\n') || '- (none)'}
@@ -446,14 +470,20 @@ function iterateDispatch(body) {
   const testType = body.testType === 'feature' ? 'feature' : 'full'
   const featureFocus = String(body.featureFocus || '').trim()
   if (testType === 'feature' && !featureFocus) throw new Error('feature focus required for feature-driven iteration')
+  const requestedFocus = Array.isArray(body.focusClasses)
+    ? [...new Set(body.focusClasses.map(c => String(c || '').toLowerCase()).filter(Boolean))]
+    : []
+  const unknownFocus = requestedFocus.filter(c => !FOCUS_CLASSES.includes(c))
+  if (unknownFocus.length) throw new Error(`unknown vulnerability focus class(es): ${unknownFocus.join(', ')}`)
   const meta = {
     targetUrl: eng.targetUrl, inScope: eng.inScope || [], outOfScope: eng.outOfScope || [], credentials: eng.credentials || [],
     testType, ...(testType === 'feature' ? { featureFocus } : {}),
     triageGate: eng.triageGate !== false, severityProfile: eng.severityProfile || 'comprehensive',
-    skipRecon: body.skipRecon === true, focusClasses: cleanFocus(body.focusClasses), engagementId: E,
+    skipRecon: body.skipRecon === true, focusClasses: cleanFocus(requestedFocus), engagementId: E,
   }
   meta.iterationLabel = deriveIterationLabel(meta)
   const taskId = 't-' + Date.now() + '-' + crypto.randomBytes(2).toString('hex')
+  _runtimeGeneration.pin(taskId)
   const briefPath = writePentestArtifacts(taskId, meta)
   const goal = `Pentest ${meta.targetUrl} — engagement iteration "${meta.iterationLabel}"${meta.skipRecon ? ' (recon skipped)' : ''}. ${meta.credentials.length} test account(s); scope + credentials in brief: ${briefPath}. In-scope/out-of-scope enforced via scope config — never test out-of-scope hosts.`.slice(0, 500)
   eng.iterations = eng.iterations || []
@@ -477,6 +507,7 @@ function createDispatch(body) {
   // code-review + pentest take structured meta instead of a free-text target
   const meta = isCodeReview ? buildCodeReviewMeta(body) : isPentest ? buildPentestMeta(body) : null
   const taskId = 't-' + Date.now() + '-' + crypto.randomBytes(2).toString('hex')
+  _runtimeGeneration.pin(taskId)
   let fallbackTitle = goal
   if (isCodeReview) {
     fallbackTitle = `Code review: ${path.basename(meta.sourceDir)}`
@@ -507,6 +538,7 @@ function createDispatch(body) {
       crMeta = buildCodeReviewMeta(body)          // validates absolute sourceDir
       crMeta.deployUrl = meta.targetUrl           // PROBER runtime-validates source findings against the live target
       crTaskId = 't-' + Date.now() + '-' + crypto.randomBytes(2).toString('hex')
+      _runtimeGeneration.pin(crTaskId)
       crMeta.engagementId = taskId
       // scope config so the code-review iteration's live (PROBER) hits pass Phase 0.0
       try {
@@ -954,6 +986,8 @@ const _tbBridge = require('../src/compatibility/task-board-bridge')
 const _taskBoard = require('../src/runtime/task-board')
 const _decisionLog = require('../src/runtime/decision-log')
 const _sessionPlanner = require('../src/runtime/session-planner')
+const _runtimeGeneration = require('../src/runtime/runtime-generation')
+const _runtimeController = require('../src/runtime/runtime-controller')
 const _agentRegistry = require('../src/agents/registry')
 const _personaRegistry = require('../src/personas/registry')
 const _patternRegistry = require('../src/patterns/registry')
@@ -982,7 +1016,20 @@ function missionForTask(taskId) {
   // team activity: which roles are working (from claimed board tasks)
   const activeAgents = [...new Set((board.tasks || []).filter(t => _taskBoard.ACTIVE.has(t.status) && t.claimed_by).map(t => t.claimed_by))]
   const team = activeAgents.map(a => ({ agent: a, role: _agentRegistry.roleOf(a) }))
-  return { taskId, coverage, board: { counts: board.counts, tasks: (board.tasks || []).slice(0, 300) }, decisions, sessionPlan, team }
+  let adaptive = null
+  try { adaptive = _runtimeController.inspect(taskId) } catch {}
+  return {
+    taskId, coverage, board: { counts: board.counts, tasks: (board.tasks || []).slice(0, 300) },
+    decisions, sessionPlan, team,
+    runtime: adaptive ? {
+      generation: adaptive.generation,
+      journal: adaptive.journal,
+      plan: adaptive.plan,
+      board: adaptive.board,
+      sessions: adaptive.sessions,
+      decisions: adaptive.decisions,
+    } : null,
+  }
 }
 
 // M12: custom persona/pattern homes (committable repo folders)

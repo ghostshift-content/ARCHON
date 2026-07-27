@@ -68,6 +68,31 @@ test('prompt references the product + WAF for stack-specific guidance', () => {
   assert.match(p, /JSON array/)
 })
 
+test('focused plan has no A-Z instruction and deterministically drops unrelated hypotheses', () => {
+  const prompt = buildAttackPlanPrompt({
+    targetUrl: 'https://x.test',
+    focusClasses: ['xss', 'access-control'],
+  })
+  assert.match(prompt, /REVIEW ONLY THE SELECTED CLASSES/)
+  assert.doesNotMatch(prompt, /WALK THIS WSTG COVERAGE MAP/)
+  const plan = normalizePlan([
+    { vuln_class: 'xss', hypothesis: 'reflected q', priority: 4 },
+    { vuln_class: 'idor', hypothesis: 'cross-account object', priority: 5 },
+    { vuln_class: 'sqli', hypothesis: 'inject id', priority: 5 },
+  ], { focusClasses: ['xss', 'access-control'] })
+  assert.deepStrictEqual(plan.map(h => h.vuln_class), ['idor', 'xss'])
+})
+
+test('custom-only plan is focused and does not request A-Z coverage', () => {
+  const prompt = buildAttackPlanPrompt({
+    targetUrl: 'https://example.test',
+    customFocus: 'abuse invitation acceptance across tenant boundaries',
+  })
+  assert.match(prompt, /custom objective: abuse invitation acceptance/)
+  assert.match(prompt, /Do not create A-Z hypotheses/)
+  assert.doesNotMatch(prompt, /WALK THIS WSTG COVERAGE MAP/)
+})
+
 test('planSummary is empty for empty plan', () => {
   assert.strictEqual(planSummary([]), '')
   assert.match(planSummary(normalizePlan([{ vuln_class: 'sqli', hypothesis: 'x', priority: 5 }])), /1 hypotheses/)

@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "archon://schemas/agent-session",
+  "title": "ARCHON agent session state",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["ts", "task_id", "session_id", "role", "status"],
+  "properties": {
+    "ts": { "type": "string" },
+    "task_id": { "type": "string" },
+    "session_id": { "type": "string" },
+    "role": { "type": "string" },
+    "status": { "enum": ["queued", "running", "completed", "failed", "cancelled", "blocked"] },
+    "current_task_id": { "type": ["string", "null"] },
+    "workstream_id": { "type": ["string", "null"] },
+    "model": { "type": ["string", "null"] },
+    "context_size": { "type": "integer", "minimum": 0 },
+    "budget": { "type": ["object", "null"] },
+    "heartbeat_at": { "type": ["string", "null"] },
+    "child_count": { "type": "integer", "minimum": 0 },
+    "terminal_reason": { "type": ["string", "null"] }
+  }
+}

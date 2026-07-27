@@ -595,25 +595,44 @@ function renderTaskOverview(force) {
   const cc = $('#tdCancel'); if (cc) cc.onclick = async () => { cc.disabled = true; const r = await api('POST', '/api/cancel', { taskId: t.id }); toast(r && !r.error ? 'Cancel sent' : 'Cancel failed', t.id, r && !r.error ? 'ok' : 'err') }
   // M5: static/white-box runs get a Source Runtime card (planner decision, honest mapping counts, per-worker
   // progress). The API returns null for non-source tasks, so this is a no-op for pentest.
-  if (/code-review/.test(String(t.squad || '')) || t.mode === 'white-box' || t.mode === 'static') { injectSourceRuntimeCard(t); injectMissionCard(t) }
+  injectMissionCard(t)
+  if (/code-review/.test(String(t.squad || '')) || t.mode === 'white-box' || t.mode === 'static') injectSourceRuntimeCard(t)
 }
 // M7: Mission Control — the team operation live (task board + session plan + coverage + team + decisions).
 // Reads /api/mission (observe-only; derived from existing artifacts). All values esc()'d.
 async function injectMissionCard(t) {
   let d = null
   try { d = await api('GET', '/api/mission?taskId=' + encodeURIComponent(t.id)) } catch {}
-  if (!d || !d.board || !(d.board.counts && d.board.counts.total)) return
+  const hasLegacyBoard = d && d.board && d.board.counts && d.board.counts.total
+  const hasRuntimeBoard = d && d.runtime && d.runtime.board && d.runtime.board.counts && d.runtime.board.counts.total
+  if (!d || (!hasLegacyBoard && !hasRuntimeBoard)) return
   const host = $('#td-overview'); if (!host || String(tdTaskId) !== String(t.id)) return
-  const c = d.board.counts || {}, sp = d.sessionPlan
+  const c = hasRuntimeBoard ? d.runtime.board.counts : (d.board.counts || {}), sp = d.sessionPlan
+  const rt = d.runtime || null
+  const rtBoard = rt && rt.board && rt.board.counts ? rt.board.counts : null
+  const rtSessions = rt && Array.isArray(rt.sessions) ? rt.sessions : []
   const stat = (label, val, color) => `<div class="src-stat"><span class="src-stat-v"${color ? ` style="color:${color}"` : ''}>${esc(String(val))}</span><span class="src-stat-l">${esc(label)}</span></div>`
-  const team = (d.team || []).map(m => `<span class="rchip">${esc(m.agent)}<span style="opacity:.6"> · ${esc(m.role || '?')}</span></span>`).join('') || '<span class="hint">no active teammates</span>'
-  const feed = (d.decisions || []).slice(-8).reverse().map(e => `<div class="src-worker-ev"><span style="color:var(--fg-dim)">${esc(String(e.ts || '').slice(11, 19))}</span> ${esc(e.agent || '')}: ${esc(e.decision || '')}</div>`).join('')
+  const runtimeTeam = rtSessions.map(s => ({
+    agent: s.session_id, role: s.role, status: s.status,
+    task: s.current_task_id, heartbeat: s.heartbeat_at,
+  }))
+  const teamRows = runtimeTeam.length ? runtimeTeam : (d.team || [])
+  const team = teamRows.map(m => `<span class="rchip" title="${esc([m.task, m.heartbeat].filter(Boolean).join(' · '))}">${esc(m.agent)}<span style="opacity:.6"> · ${esc(m.role || '?')}${m.status ? ` · ${esc(m.status)}` : ''}</span></span>`).join('') || '<span class="hint">no active teammates</span>'
+  const feedRows = rt && Array.isArray(rt.decisions) && rt.decisions.length ? rt.decisions : (d.decisions || [])
+  const feed = feedRows.slice(-8).reverse().map(e => `<div class="src-worker-ev"><span style="color:var(--fg-dim)">${esc(String(e.ts || '').slice(11, 19))}</span> ${esc(e.agent || '')}: ${esc(e.decision || '')}</div>`).join('')
+  const completion = rt && rt.journal && rt.journal.completion_gate
+  const phaseRows = rt && rt.journal && rt.journal.phases
+    ? Object.entries(rt.journal.phases).map(([phase, status]) => `<span class="rchip">${esc(phase)} · ${esc(status)}</span>`).join('')
+    : ''
   const html = `
     <div class="card mission-card" style="margin-bottom:16px">
-      <h3 style="margin:0 0 2px">Mission Control <span style="font-weight:400;color:var(--fg-dim);font-size:12px">· team operation (observe-only)</span></h3>
+      <h3 style="margin:0 0 2px">Mission Control <span style="font-weight:400;color:var(--fg-dim);font-size:12px">· adaptive team${rt ? ` · ${esc(rt.generation)}` : ' · legacy'}</span></h3>
       ${sp ? `<div class="hint" style="margin:4px 0 12px">Session plan: <b>${esc(String(sp.session_count))}</b> planned · <b>${esc(String(sp.active_concurrency))}</b> active · ${esc(sp.strategy || '')}${sp.reason ? ` — ${esc(sp.reason)}` : ''}</div>` : ''}
+      ${rt && rt.journal ? `<div class="hint" style="margin:4px 0 12px">Mission: <b>${esc(rt.journal.status || 'created')}</b> · ${esc(String(rt.journal.events || 0))} events · ${esc(String(rt.journal.replans || 0))} replans${rtBoard ? ` · ${esc(String(rtBoard.active || 0))} adaptive tasks active` : ''}</div>` : ''}
+      ${completion ? `<div class="hint" style="margin:4px 0 12px">Completion gate: <b>${esc(completion.completion_status || 'REPORT_BLOCKED')}</b> · ${esc(completion.reason || '')}</div>` : ''}
       <div class="src-stats">
         ${stat('Board tasks', c.total || 0)}
+        ${stat('Queued', (c.queued || 0) + (c.needs_followup || 0))}
         ${stat('Completed', c.completed || 0, 'var(--emerald)')}
         ${stat('Candidates', c.candidate_found || 0, (c.candidate_found ? 'var(--accent-2, #8b9dff)' : ''))}
         ${stat('No issue', c.no_issue || 0)}
@@ -624,6 +643,7 @@ async function injectMissionCard(t) {
         <div style="font-weight:600;font-size:13px;margin-bottom:6px">Team activity</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">${team}</div>
       </div>
+      ${phaseRows ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border, rgba(255,255,255,.08))"><div style="font-weight:600;font-size:13px;margin-bottom:6px">Phase state</div><div style="display:flex;flex-wrap:wrap;gap:6px">${phaseRows}</div></div>` : ''}
       ${feed ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border, rgba(255,255,255,.08))"><div style="font-weight:600;font-size:13px;margin-bottom:6px">Decision log</div><div class="src-feed">${feed}</div></div>` : ''}
     </div>`
   const existing = host.querySelector('.mission-card')
@@ -1132,8 +1152,8 @@ function updateDispatchInfo() {
     : pt
     ? `**Web pentest** of the target URL.\n\n`
       + `On dispatch the console writes a **scope config** (\`scope-<taskId>.json\`) and an **engagement brief** (target, scope, focus, the test-account table).\n\n`
-      + `1. **Phase 0** scope hard-block (out-of-scope hosts rejected)\n2. **Recon** (SCOUT, RANGER) — auth/WAF/surface\n3. **Specialists** — per vuln class, authenticating with your test accounts\n4. **AUDITOR** verify → **ARBITER** judge → **SCRIBE** report\n\n`
-      + `> **Full** tests the whole app; **Feature-driven** focuses on what you name. Each role is tested for cross-role authz (IDOR / priv-esc). Out-of-scope hosts are never touched.`
+      + `1. **Phase 0** scope hard-block (out-of-scope hosts rejected)\n2. **Application mapping** — TRACER maps the website/API in every strategy\n3. **Recon strategy** — full runs Nmap + SCOUT/RANGER; direct skips them\n4. **Specialists** — applicable security and abuse-driven testing with your test accounts\n5. **AUDITOR** verify → **ARBITER** judge → **SCRIBE** report\n\n`
+      + `> **Direct application test** skips infrastructure recon, not website mapping. Each role is tested for cross-role authz (IDOR / priv-esc). Custom objectives never expand scope.`
     : `Dispatching to **${sq.id}** queues a task for **${sq.leader}**.\n\nThe daemon picks it up within seconds and runs the pipeline:\n\n`
       + sq.phases.map((p, i) => `${i + 1}. **${p}**`).join('\n')
       + `\n\nLive status, per-agent cost and model routing appear under **Tasks**. The final report lands under **Reports**.\n\n> Dispatch & cancel flow through the daemon's inbox — the console never writes core state directly.`)
@@ -1155,7 +1175,7 @@ function applyPtMode(mode) {
   const stat = mode === 'static', wb = mode === 'whitebox', bb = mode === 'blackbox'
   $('#ptSourceGroup').style.display = (stat || wb) ? 'block' : 'none'   // source needed for static + white-box
   $('#ptBlackGroup').style.display = (bb || wb) ? 'block' : 'none'      // live scope for black-box + white-box
-  // Vulnerability-focus picker is disabled — never re-show #ptStrategyField (stays hidden; every scan is full A→Z).
+  $('#ptStrategyField').style.display = (bb || wb) ? 'block' : 'none'
   $('#ptUrlReq').style.display = stat ? 'none' : 'inline'              // URL optional only in Static Analysis
   $('#ptUrlLabel').firstChild.nodeValue = stat ? 'Deployed URL ' : 'Web application URL '
   $('#ptUrlHint').textContent = stat
@@ -1203,8 +1223,16 @@ $('#fSubmit').onclick = async () => {
       const featureFocus = $('#ptFocus').value.trim()
       if (testType === 'feature' && !featureFocus) { toast('Focus required', 'Name the features to focus on', 'err'); $('#ptFocus').focus(); return }
       const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean)
-      // Vulnerability-focus picker disabled — always run the full A→Z scan (no class narrowing).
-      const meta = { targetUrl, testType, inScope: lines('#ptInScope'), outOfScope: lines('#ptOutScope'), credentials, skipRecon: false, focusClasses: [] }
+      const skipRecon = $('#ptSkipRecon').checked
+      const focusClasses = $$('#ptFocusClasses button.on').filter(b => !b.dataset.custom).map(b => b.dataset.cls)
+      const customSelected = $('#ptCustomChip').classList.contains('on')
+      const customFocus = customSelected ? $('#ptCustomFocus').value.trim() : ''
+      if (customSelected && !customFocus) { toast('Custom test case required', 'Describe the abuse-driven scenario to test', 'err'); $('#ptCustomFocus').focus(); return }
+      const meta = {
+        targetUrl, testType, inScope: lines('#ptInScope'), outOfScope: lines('#ptOutScope'), credentials,
+        scanStrategy: skipRecon ? 'direct' : undefined, skipRecon, focusClasses,
+      }
+      if (customFocus) meta.customFocus = customFocus
       if (testType === 'feature') meta.featureFocus = featureFocus
       if (mode === 'whitebox') {
         if (!sourceDir) { toast('Source directory required', 'White-box needs a live URL and a source directory', 'err'); $('#ptSourceDir').focus(); return }
@@ -1220,7 +1248,7 @@ $('#fSubmit').onclick = async () => {
   $('#fSubmit').disabled = true
   const r = await api('POST', '/api/dispatch', body)
   $('#fSubmit').disabled = false
-  if (r && !r.error) { toast('Dispatched ✓', `${r.assignee} · ${r.taskId}`, 'ok'); $('#fGoal').value = ''; $('#fTitle').value = ''; $('#crSourceDir').value = ''; $('#ptSourceDir').value = ''; $('#ptCustomFocus').value = ''; const cc = $('#ptCustomChip'); if (cc) cc.classList.remove('on'); $('#ptCustomFocusWrap').style.display = 'none'; $$('#ptMode button').forEach(x => x.classList.toggle('on', x.dataset.v === 'blackbox')); applyPtMode('blackbox'); show('tasks'); tick() }
+  if (r && !r.error) { toast('Dispatched ✓', `${r.assignee} · ${r.taskId}`, 'ok'); $('#fGoal').value = ''; $('#fTitle').value = ''; $('#crSourceDir').value = ''; $('#ptSourceDir').value = ''; $('#ptCustomFocus').value = ''; $('#ptSkipRecon').checked = false; $$('#ptFocusClasses button').forEach(x => x.classList.remove('on')); const cc = $('#ptCustomChip'); if (cc) cc.classList.remove('on'); $('#ptCustomFocusWrap').style.display = 'none'; $$('#ptMode button').forEach(x => x.classList.toggle('on', x.dataset.v === 'blackbox')); applyPtMode('blackbox'); show('tasks'); tick() }
   else toast('Dispatch failed', r && r.error, 'err')
 }
 

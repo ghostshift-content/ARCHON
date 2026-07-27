@@ -177,6 +177,16 @@ function sourceReviewMode() {
   return 'active'
 }
 
+// Canonical five-agent runtime rollout. The selected generation is pinned per
+// mission, so changing this setting never changes an in-flight mission.
+function runtimeV2Mode() {
+  const raw = String(process.env.ARCHON_RUNTIME_V2 || '').trim().toLowerCase()
+  if (['active', 'on', '1', 'true', 'enabled'].includes(raw)) return 'active'
+  if (['canary', 'trial'].includes(raw)) return 'canary'
+  if (['shadow', 'observe', 'observed'].includes(raw)) return 'shadow'
+  return 'off'
+}
+
 // Per-engagement shadow sink root. Never read by the legacy pipeline/dashboard/SCRIBE,
 // so shadow output can never affect a real report.
 function shadowDir(engagementId) {
@@ -197,6 +207,7 @@ module.exports = {
   flagMode,
   flagEnabled,
   sourceReviewMode,
+  runtimeV2Mode,
   shadowDir,
   _config: config, // exposed for gates/tests
 }

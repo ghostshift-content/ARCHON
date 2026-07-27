@@ -6,6 +6,7 @@
 const fs = require('fs')
 const path = require('path')
 const { chromium } = require('playwright')
+const { launchOptions } = require('./helpers/chromium')
 const INTEL = process.env.KURU_INTEL_ROOT || path.join(__dirname, '..', 'var', 'intel')
 
 let passed = 0, failed = 0
@@ -21,7 +22,7 @@ function cleanup() {
 
 ;(async () => {
   console.log('UI white-box + black-box combined dispatch e2e:')
-  const b = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] })
+  const b = await chromium.launch(launchOptions(chromium))
   const p = await b.newPage({ viewport: { width: 1440, height: 1000 } })
   const errs = []; p.on('pageerror', e => errs.push(e.message))
   try {
@@ -50,12 +51,18 @@ function cleanup() {
       ok('black-box iteration is pentest root', bb && bb.squad === 'pentest' && bb.taskId === rootId)
       ok('white-box iteration is code-review', !!(wb && wb.squad === 'code-review')); crId = wb && wb.taskId
       ok('engagement records the source dir', eng.sourceDir === SRC)
-      // two NEW inbox dispatches: pentest + code-review(sourceDir, deployUrl)
+      // Source review is queued first. The live pentest is persisted on the
+      // engagement and launched later with source-guided validation targets.
       const fresh = fs.readdirSync(F('inbox/task-actions')).filter(f => !before.has(f))
         .map(f => JSON.parse(fs.readFileSync(F('inbox/task-actions/' + f), 'utf8')))
       const ptD = fresh.find(j => j.squad === 'pentest-squad' && j.taskId === rootId)
       const crD = fresh.find(j => j.squad === 'code-review-squad' && j.taskId === crId)
-      ok('pentest (black-box) dispatch queued', !!ptD)
+      ok('pentest dispatch is deferred until source guidance exists', !ptD && !!eng.deferredPentestDispatch)
+      ok('deferred pentest is source-guided and targets the live URL',
+        eng.deferredPentestDispatch?.meta?.sourceGuided === true
+        && eng.deferredPentestDispatch?.meta?.engagementMode === 'whitebox'
+        && eng.deferredPentestDispatch?.meta?.targetUrl === 'http://wb.e2e/')
+      ok('black-box iteration records pending source guidance', bb?.status === 'pending-source-guidance')
       ok('code-review (white-box) dispatch queued with source + deployUrl', !!crD && crD.meta.sourceDir === SRC && crD.meta.deployUrl === 'http://wb.e2e/')
     }
     ok('no page errors', errs.length === 0, errs.join(' | '))

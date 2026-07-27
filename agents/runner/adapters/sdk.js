@@ -123,6 +123,29 @@ async function _productionSafetyHook(input) {
   return {}
 }
 
+function _denied(result) {
+  return result && result.hookSpecificOutput &&
+    result.hookSpecificOutput.permissionDecision === 'deny'
+}
+
+function _combinedPreToolHook(preToolUse) {
+  return async function combinedPreToolHook(input, toolUseId, context) {
+    const safety = await _productionSafetyHook(input)
+    if (_denied(safety) || typeof preToolUse !== 'function') return safety
+    try {
+      return await preToolUse(input, toolUseId, context) || {}
+    } catch (error) {
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: `ARCHON runtime scope guard failed closed: ${error.message}`,
+        },
+      }
+    }
+  }
+}
+
 // Lazily-imported SDK `query` (ESM-only package → dynamic import from CJS).
 let _queryPromise = null
 function _loadQuery() {
@@ -215,6 +238,9 @@ function _extractModel(resultMsg, initModel) {
  *                                        → no thinking param (effort governs reasoning depth). The
  *                                        legacy budget_tokens form is never sent (400s on current models).
  * @param {Function} [spec.onProgress]  - liveness callback invoked once per stream message
+ * @param {Function} [spec.preToolUse]  - additional fail-closed PreToolUse policy
+ * @param {string[]} [spec.allowedTools] - SDK tool allowlist for this agent
+ * @param {string[]} [spec.disallowedTools] - SDK tool denylist for this agent
  * @param {Function} [spec._query]      - DI for tests: (params)=>async-iterable of SDK messages
  * @returns {Promise<{ text: string, usage: object, model: string, raw: object }>}
  */
@@ -235,6 +261,9 @@ async function run(spec) {
     cacheOptimize = true,  // default on — stabilises system prompt for cache hits
     thinking: thinkingSpec,
     onProgress,
+    preToolUse,
+    allowedTools,
+    disallowedTools,
     abortController: externalAbortController,
     _query,
   } = spec
@@ -272,7 +301,13 @@ async function run(spec) {
     pathToClaudeCodeExecutable: CLAUDE_BIN, // use the daemon's known CLI, not a bundled guess
   }
   // Hard local-command guard — denies destructive shell commands even under bypassPermissions.
-  options.hooks = { PreToolUse: [{ hooks: [_productionSafetyHook] }] }
+  options.hooks = { PreToolUse: [{ hooks: [_combinedPreToolHook(preToolUse)] }] }
+  if (Array.isArray(allowedTools) && allowedTools.length) {
+    options.allowedTools = [...new Set(allowedTools.filter(Boolean))]
+  }
+  if (Array.isArray(disallowedTools) && disallowedTools.length) {
+    options.disallowedTools = [...new Set(disallowedTools.filter(Boolean))]
+  }
   if (model) options.model = model
   if (systemPrompt) {
     // Faithful to cli.js --append-system-prompt: append to the default preset.

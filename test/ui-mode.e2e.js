@@ -6,6 +6,7 @@
 const fs = require('fs')
 const path = require('path')
 const { chromium } = require('playwright')
+const { launchOptions } = require('./helpers/chromium')
 const INTEL = process.env.KURU_INTEL_ROOT || path.join(__dirname, '..', 'var', 'intel')
 const SRC = path.resolve(__dirname, '..')
 const inboxDir = path.join(INTEL, 'inbox', 'task-actions')
@@ -26,7 +27,7 @@ function cleanup() {
 
 ;(async () => {
   console.log('UI test-type mode selector e2e:')
-  const b = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] })
+  const b = await chromium.launch(launchOptions(chromium))
   const p = await b.newPage({ viewport: { width: 1440, height: 1000 } })
   const errs = []; p.on('pageerror', e => errs.push(e.message))
   const setMode = async (m) => { await p.$eval(`#ptMode button[data-v="${m}"]`, el => el.click()); await p.waitForTimeout(200) }
@@ -75,19 +76,27 @@ function cleanup() {
     ok('black-box → pentest dispatch', !!bb)
     ok('black-box → no sourceDir in meta', bb && !bb.meta.sourceDir)
 
-    // ── routing: WHITE-BOX → combined engagement (pentest + code-review iterations) ──
+    // ── routing: WHITE-BOX → source review first, then source-guided live validation ──
     await p.click('button[data-view="dispatch"]'); await p.waitForTimeout(300)
     await setMode('whitebox')
     await p.fill('#ptUrl', 'https://bothx.test'); await p.fill('#ptSourceDir', SRC); await p.fill('#ptInScope', 'bothx.test')
     await p.$eval('#fSubmit', el => el.click()); await p.waitForTimeout(800)
     d = freshDispatches()
-    const root = d.find(j => j.squad === 'pentest-squad' && j.meta.targetUrl === 'https://bothx.test')
     const child = d.find(j => j.squad === 'code-review-squad' && j.meta.deployUrl === 'https://bothx.test')
-    ok('white-box → pentest (live) dispatch on the URL', !!root && root.meta.engagementId === root.taskId)
+    const engagements = fs.readdirSync(INTEL).filter(f => /^engagement-.*\.json$/.test(f))
+      .map(f => JSON.parse(fs.readFileSync(path.join(INTEL, f), 'utf8')))
+    const engagement = engagements.find(e => e.targetUrl === 'https://bothx.test')
+    ok('white-box → live pentest is deferred',
+      !d.some(j => j.squad === 'pentest-squad' && j.meta?.targetUrl === 'https://bothx.test')
+      && !!engagement?.deferredPentestDispatch)
     ok('white-box → paired code-review (source) dispatch with source', !!child && child.meta.sourceDir === SRC)
-    // the engagement sidecar ties them together as one combined run
-    const engFile = fs.existsSync(path.join(INTEL, `engagement-${root && root.taskId}.json`))
-    ok('white-box → engagement sidecar links the two iterations', engFile)
+    ok('white-box → deferred pentest carries source-guided metadata',
+      engagement?.deferredPentestDispatch?.meta?.sourceGuided === true
+      && engagement?.deferredPentestDispatch?.meta?.targetUrl === 'https://bothx.test')
+    ok('white-box → engagement sidecar links the two iterations',
+      engagement?.iterations?.length === 2
+      && engagement.iterations.some(i => i.kind === 'whitebox' && i.taskId === child?.taskId)
+      && engagement.iterations.some(i => i.kind === 'blackbox' && i.status === 'pending-source-guidance'))
 
     ok('no page errors', errs.length === 0, errs.join(' | '))
   } catch (e) {

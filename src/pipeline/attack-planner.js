@@ -30,11 +30,25 @@ function _sourceGuidanceBlock(sg) {
 }
 
 // Focused engagement: constrain ATLAS's plan to the operator-selected classes only.
-function _focusBlock(focusClasses) {
-  if (!Array.isArray(focusClasses) || !focusClasses.length) return ''
-  return `\n\n⭐ FOCUSED ENGAGEMENT — the operator selected ONLY these vulnerability classes: ${focusClasses.join(', ')}.\nProduce hypotheses ONLY for these classes and SKIP the rest of the WSTG walk below — the other areas are OUT OF SCOPE for this run.`
+function _focusBlock(focusClasses, customFocus) {
+  const selected = Array.isArray(focusClasses) ? focusClasses : []
+  const custom = String(customFocus || '').trim()
+  if (!selected.length && !custom) return ''
+  const objectives = [
+    selected.length ? `classes: ${selected.join(', ')}` : '',
+    custom ? `custom objective: ${custom}` : '',
+  ].filter(Boolean).join('; ')
+  return `\n\nFOCUSED ENGAGEMENT — the operator selected ONLY these objectives: ${objectives}.\nProduce hypotheses ONLY for these objectives. Other vulnerability classes are outside this run's testing objective.`
 }
-function buildAttackPlanPrompt({ targetUrl, fingerprint, reconDump, endpointData, sourceGuidance, focusClasses } = {}) {
+function _coverageBlock(focusClasses, customFocus) {
+  if ((Array.isArray(focusClasses) && focusClasses.length) || String(customFocus || '').trim()) {
+    return `REVIEW ONLY THE SELECTED CLASSES against every applicable mapped endpoint and role. Do not create A-Z hypotheses or pad the plan with unrelated classes.`
+  }
+  return `WALK THIS WSTG COVERAGE MAP (the A-Z checklist) against the target — make sure every applicable area has
+at least one hypothesis where the evidence supports it; note any area the surface makes irrelevant:
+${wstgChecklist()}`
+}
+function buildAttackPlanPrompt({ targetUrl, fingerprint, reconDump, endpointData, sourceGuidance, focusClasses, customFocus } = {}) {
   const fp = fingerprint || {}
   const fpLine = [
     fp.product ? `Product: ${fp.product}${fp.version ? ' ' + fp.version : ''}` : '',
@@ -50,11 +64,9 @@ stack — if the product is Adobe AEM, propose AEM-specific attacks (dispatcher 
 AEM CVEs); if WordPress, WP-specific; etc. Be specific and evidence-driven, not generic.
 
 Target: ${targetUrl || '(unknown)'}
-Environment fingerprint: ${fpLine}${_focusBlock(focusClasses)}
+Environment fingerprint: ${fpLine}${_focusBlock(focusClasses, customFocus)}
 
-WALK THIS WSTG COVERAGE MAP (the A-Z checklist) against the target — make sure every applicable area has
-at least one hypothesis where the evidence supports it; note any area the surface makes irrelevant:
-${wstgChecklist()}
+${_coverageBlock(focusClasses, customFocus)}
 
 RECON / FINDINGS SO FAR:
 ${(reconDump || '(none)').slice(0, 6000)}
@@ -86,15 +98,22 @@ function _clampPriority(p) {
 }
 
 // Normalize raw LLM output (string or array) → ranked, capped hypothesis list.
-function normalizePlan(raw) {
+function normalizePlan(raw, { focusClasses } = {}) {
   const arr = Array.isArray(raw) ? raw : _extractJsonArray(raw)
   if (!arr) return []
+  const focus = new Set((Array.isArray(focusClasses) ? focusClasses : []).map(c => String(c || '').toLowerCase()))
+  if (focus.has('access-control')) { focus.add('idor'); focus.add('bola') }
+  if (focus.has('api')) { focus.add('jwt'); focus.add('graphql') }
+  if (focus.has('auth')) focus.add('session')
+  if (focus.has('injection')) { focus.add('sqli'); focus.add('command-injection') }
+  if (focus.has('lfi')) focus.add('path-traversal')
   const out = []
   for (const r of arr) {
     if (!r || typeof r !== 'object') continue
     const vc = String(r.vuln_class || '').toLowerCase().trim()
     const hypothesis = String(r.hypothesis || '').trim()
     if (!hypothesis) continue // a hypothesis with no hypothesis is noise
+    if (focus.size && !focus.has(vc)) continue
     out.push({
       endpoint: String(r.endpoint || '').trim(),
       params: Array.isArray(r.params) ? r.params.map(x => String(x || '').trim()).filter(Boolean).slice(0, 10) : [],

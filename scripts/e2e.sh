@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.." || exit 1
 echo "▸ stopping daemon for e2e (state seeding + inbox actions)…"
 for pid in $(ps -eo pid,args | awk '/[n]ode [e]vent-bus/ {print $1}'); do kill -9 "$pid" 2>/dev/null; done
 sleep 1
-if ! ss -ltn 2>/dev/null | grep -q ':4000'; then
+if ! curl -fsS --max-time 1 http://127.0.0.1:4000/api/health >/dev/null 2>&1; then
   echo "▸ starting dashboard…"; nohup node scripts/dashboard.js >/tmp/kuru-dashboard.log 2>&1 & sleep 2
 fi
 

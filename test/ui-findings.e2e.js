@@ -6,6 +6,7 @@
 const fs = require('fs')
 const path = require('path')
 const { chromium } = require('playwright')
+const { launchOptions } = require('./helpers/chromium')
 const INTEL = process.env.KURU_INTEL_ROOT || path.join(__dirname, '..', 'var', 'intel')
 
 const TID = 'e2e-ui-' + process.pid
@@ -37,7 +38,7 @@ function cleanup() {
 ;(async () => {
   console.log('UI findings/triage e2e:')
   seed()
-  const b = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] })
+  const b = await chromium.launch(launchOptions(chromium))
   const p = await b.newPage({ viewport: { width: 1440, height: 1000 } })
   const pageErrors = []
   p.on('pageerror', e => pageErrors.push(e.message))

@@ -205,21 +205,24 @@ function _buildBoardRecord(c, tr, confirmation, v, taskId) {
 // modules; account-takeover's catalog also backs the authentication-session class.
 const CLASS = {
   'access-control':        { agent: 'marshal', module: 'phase2_access_control_idor_v1.md', catalog: 'access_control_40_pattern_catalog.md' },
-  'multi-tenant':          { agent: 'marshal', module: null, catalog: null },
+  'multi-tenant-isolation':{ agent: 'marshal', module: null, catalog: null },
   'admin-privileged':      { agent: 'marshal', module: null, catalog: null },
   'business-logic':        { agent: 'marshal', module: null, catalog: null },
+  'csrf':                  { agent: 'marshal', module: null, catalog: null },
   'account-takeover':      { agent: 'siphon',  module: 'phase2_account_takeover_v1.md', catalog: 'account_takeover_pattern_catalog.md' },
   'authentication-session':{ agent: 'siphon',  module: null, catalog: 'account_takeover_pattern_catalog.md' },
-  'cryptography-secrets':  { agent: 'siphon',  module: null, catalog: null },
+  'secrets-cryptography':  { agent: 'siphon',  module: null, catalog: null },
   'xss':                   { agent: 'cipher',  module: 'phase2_xss_html_injection_v1.md', catalog: 'xss_50_pattern_catalog.md' },
   'data-exposure':         { agent: 'cipher',  module: null, catalog: null },
   'logging-audit':         { agent: 'cipher',  module: null, catalog: null },
   'sqli':                  { agent: 'quill',   module: null, catalog: null },
+  'nosql-injection':       { agent: 'quill',   module: null, catalog: null },
+  'command-injection':     { agent: 'quill',   module: null, catalog: null },
   'injection':             { agent: 'quill',   module: null, catalog: null },
   'deserialization':       { agent: 'quill',   module: null, catalog: null },
   'ssrf':                  { agent: 'beacon',  module: null, catalog: null },
-  'webhooks':              { agent: 'beacon',  module: null, catalog: null },
-  'cloud-infra':           { agent: 'beacon',  module: null, catalog: null },
+  'webhook-security':      { agent: 'beacon',  module: null, catalog: null },
+  'cloud-infrastructure':  { agent: 'beacon',  module: null, catalog: null },
   'api-security':          { agent: 'beacon',  module: null, catalog: null },
   'graphql':               { agent: 'beacon',  module: null, catalog: null },
   'rce':                   { agent: 'breaker', module: null, catalog: null },
@@ -227,6 +230,17 @@ const CLASS = {
   'file-handling':         { agent: 'breaker', module: null, catalog: null },
   'race-conditions':       { agent: 'breaker', module: null, catalog: null },
   'supply-chain':          { agent: 'breaker', module: null, catalog: null },
+}
+const CLASS_ALIASES = Object.freeze({
+  'multi-tenant': 'multi-tenant-isolation',
+  'cryptography-secrets': 'secrets-cryptography',
+  webhooks: 'webhook-security',
+  'cloud-infra': 'cloud-infrastructure',
+  lfi: 'path-traversal',
+})
+function normalizeVulnClass(value) {
+  const cls = String(value || '').trim().toLowerCase()
+  return CLASS_ALIASES[cls] || cls
 }
 // Broad default floor when classes aren't explicitly set AND inventories are
 // skipped (was just access-control+xss — too thin). With inventories present,
@@ -733,7 +747,7 @@ Then reply one line: jobs reviewed, findings by severity, residual gaps.`
 // Phase 3 — freehand senior-pentester review (Autonomous OS Block D). Open-ended
 // reasoning to surface novel / business-logic vulns that the pattern pass misses.
 // fhDir = phase2/freehand (active, AUDITOR-globbed) or a non-globbed sibling (shadow).
-function freehandPrompt(agent, feature, taskId, sourceDir, outDir, fhDir) {
+function freehandPrompt(agent, feature, taskId, sourceDir, outDir, fhDir, classes) {
   const mapFile = `${outDir}/phase1-maps/features/${feature.slug}.md`
   const outFile = `${fhDir}/${feature.slug}.md`
   return `You are ${agent.toUpperCase()}, Phase-3 FREEHAND security reviewer on the code-review squad — a senior pentester, NOT a pattern matcher.
@@ -748,6 +762,8 @@ flaws, trust-boundary mistakes, state/race issues, abuse of intended functionali
 chains, and anything that "feels wrong" when you read the code as an attacker. Ask the
 methodology's senior-pentester questions of THIS feature; reason about how a real attacker would
 abuse it, not which signature matches.
+
+${Array.isArray(classes) && classes.length ? `OPERATOR FOCUS: this dispatch selected ONLY ${classes.join(', ')}. Apply freehand reasoning within those classes only. Do not emit candidates for another vulnerability class.` : ''}
 
 Each candidate MUST follow the template, including the **Required black-box proof** field — a
 source-only novel candidate is a HYPOTHESIS (NEEDS-LIVE), never CONFIRMED. Cite file:line for every claim.
@@ -904,8 +920,9 @@ async function runCodeReview(dispatch, deps) {
   // Classes: explicit meta.vulnClasses wins; ['all'] = every catalog; otherwise a
   // broad default floor here, refined from the discovered surface after inventories.
   const explicitClasses = Array.isArray(meta.vulnClasses) && meta.vulnClasses.length > 0
+  const normalizedExplicitClasses = explicitClasses ? meta.vulnClasses.map(normalizeVulnClass) : []
   let vulnClasses = (explicitClasses
-    ? (meta.vulnClasses.length === 1 && meta.vulnClasses[0] === 'all' ? Object.keys(CLASS) : meta.vulnClasses)
+    ? (normalizedExplicitClasses.length === 1 && normalizedExplicitClasses[0] === 'all' ? Object.keys(CLASS) : normalizedExplicitClasses)
     : DEFAULT_CLASSES).filter(c => CLASS[c])
   // NO cap by default — a code review maps EVERY security-relevant feature the source has (real source
   // can be any size / any number of files). An operator may still bound it explicitly via meta.maxFeatures.
@@ -1406,7 +1423,7 @@ async function runCodeReview(dispatch, deps) {
     const fhCandidateCounts = {} // slug → # freehand candidates (applied to the ledger after the waves)
     const results = await runWaves(fhFeatures, WAVE, async (feature, idx) => {
       const agent = MAPPER_POOL[idx % MAPPER_POOL.length]
-      const r = await spawnAgent(agent, taskId, freehandPrompt(agent, feature, taskId, sourceDir, outDir, fhDir), `task-${taskId}-fh-${feature.slug}`, null)
+      const r = await spawnAgent(agent, taskId, freehandPrompt(agent, feature, taskId, sourceDir, outDir, fhDir, vulnClasses), `task-${taskId}-fh-${feature.slug}`, null)
       // Freehand candidates stream to the live board too (M2), through the same sink as Phase 2.
       if (typeof emitCandidate === 'function') {
         try { const n = emitCandidatesFromFile(`${fhDir}/${feature.slug}.candidates.jsonl`, 'freehand', feature, agent, taskId, emitCandidate, log, sourceDir, crMode); if (n) fhCandidateCounts[feature.slug] = (fhCandidateCounts[feature.slug] || 0) + n } catch (e) { log(`  ⚠️ freehand candidate emit [${feature.slug}]: ${e.message}`) }
@@ -1706,6 +1723,8 @@ module.exports = {
   emitCandidatesFromFile,
   DEFAULT_CLASSES,
   CLASS,
+  CLASS_ALIASES,
+  normalizeVulnClass,
   MAPPER_POOL,
   PHASES,
   phase2Prompt,

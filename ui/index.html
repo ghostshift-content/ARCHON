@@ -140,8 +140,11 @@
                 <div id="ptCreds"></div>
                 <button type="button" class="btn sm ghost" id="ptAddCred" style="margin-top:8px">＋ Add user</button>
                 <div class="hint">Each row: username · password · role. Agents authenticate as each role and test cross-role authorization (IDOR / privilege escalation).</div></div>
-              <!-- Vulnerability-focus picker disabled: every scan runs the full A→Z deep dive. -->
-              <div class="field" id="ptStrategyField" hidden><label>Scan strategy</label>
+              <div class="field" id="ptStrategyField"><label>Testing strategy</label>
+                <label class="chip" style="display:flex;align-items:flex-start;gap:9px;margin:4px 0 12px;padding:10px 12px">
+                  <input type="checkbox" id="ptSkipRecon" style="margin-top:2px">
+                  <span><b>Direct application test</b><br><span class="hint">Skip Nmap and infrastructure recon. Website/API mapping still runs before security testing.</span></span>
+                </label>
                 <div class="hint" style="margin:2px 0 7px">Vulnerability focus — pick classes to run a <b>focused</b> scan (none selected = full A→Z deep dive)</div>
                 <div class="focus-pick" id="ptFocusClasses">
                   <button type="button" data-cls="access-control">Access control / IDOR</button>
@@ -161,7 +164,7 @@
                 <div id="ptCustomFocusWrap" style="display:none">
                   <div class="hint" style="margin:14px 0 6px">Custom / abuse-driven test cases <span style="color:var(--fg-dim)">(free text — anything not in the chips above)</span></div>
                   <textarea class="textarea" id="ptCustomFocus" placeholder="e.g. web cache poisoning / deception · HTTP request smuggling · OAuth/SSO flow abuse · password-reset token reuse · GraphQL batching · race conditions on checkout"></textarea>
-                  <div class="hint">The squad prioritises this in recon + testing. Combine with chips, or use it alone for a single bespoke focus.</div>
+                  <div class="hint">The squad prioritises this during mapping and testing. It never expands the authorized in-scope assets.</div>
                 </div></div>
             </div>
 

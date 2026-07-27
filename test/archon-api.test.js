@@ -108,13 +108,28 @@ const cleanup = () => {
   const srcRoot = path.resolve(__dirname, '..')
   const crm = d.buildCodeReviewMeta({ meta: {
     sourceDir: srcRoot,
-    vulnClasses: ['all', 'sqli', 'bogus-class'],
+    vulnClasses: ['all', 'sqli'],
     maxFeatures: 125,
     maxPhase2: 125,
   } })
   ok('code-review meta: all classes accepted', JSON.stringify(crm.vulnClasses) === JSON.stringify(['all']), JSON.stringify(crm.vulnClasses))
+  ok('code-review meta: unknown class fails closed', (() => {
+    try {
+      d.buildCodeReviewMeta({ meta: { sourceDir: srcRoot, vulnClasses: ['xss', 'bogus-class'] } })
+      return false
+    } catch (e) {
+      return /unknown source-review vulnerability class/.test(String(e.message))
+    }
+  })())
   ok('code-review meta: maxFeatures not capped at 50', crm.maxFeatures === 125, String(crm.maxFeatures))
   ok('code-review meta: maxPhase2 not capped at 50', crm.maxPhase2 === 125, String(crm.maxPhase2))
+  const whiteboxFocus = d.buildCodeReviewMeta({ meta: {
+    sourceDir: srcRoot,
+    focusClasses: ['xss', 'access-control'],
+  } })
+  ok('white-box focus maps live classes onto source-review classes',
+    JSON.stringify(whiteboxFocus.vulnClasses) === JSON.stringify(['xss', 'access-control']),
+    JSON.stringify(whiteboxFocus.vulnClasses))
 
   // ── buildPentestMeta: comprehensive profile + triage gate + scope host normalization ──
   const pm = d.buildPentestMeta({ meta: { targetUrl: 'http://localhost:4000/', inScope: ['localhost:4000', 'https://api.example.com/x'], credentials: [{ username: 'admin', password: 'p', role: 'admin' }] } })
@@ -125,10 +140,12 @@ const cleanup = () => {
   ok('pentest meta: credentials carried', Array.isArray(pm.credentials) && pm.credentials.length === 1)
   ok('pentest meta: rejects missing url', (() => { try { d.buildPentestMeta({ meta: {} }); return false } catch { return true } })())
   // skip-recon + focused scan
-  const pmFocus = d.buildPentestMeta({ meta: { targetUrl: 'https://app.example.com', skipRecon: true, focusClasses: ['access-control', 'API', 'bogus-class', 'xss'] } })
+  const pmFocus = d.buildPentestMeta({ meta: { targetUrl: 'https://app.example.com', skipRecon: true, focusClasses: ['access-control', 'API', 'xss'] } })
   ok('pentest meta: skipRecon carried', pmFocus.skipRecon === true)
-  ok('pentest meta: focusClasses validated+lowercased (bogus dropped)', JSON.stringify(pmFocus.focusClasses) === JSON.stringify(['access-control', 'api', 'xss']), JSON.stringify(pmFocus.focusClasses))
-  ok('pentest meta: defaults skipRecon=false, focus=[]', (() => { const x = d.buildPentestMeta({ meta: { targetUrl: 'https://x.test' } }); return x.skipRecon === false && Array.isArray(x.focusClasses) && x.focusClasses.length === 0 })())
+  ok('pentest meta: skipRecon normalizes to direct strategy', pmFocus.scanStrategy === 'direct')
+  ok('pentest meta: focusClasses validated+lowercased', JSON.stringify(pmFocus.focusClasses) === JSON.stringify(['access-control', 'api', 'xss']), JSON.stringify(pmFocus.focusClasses))
+  ok('pentest meta: unknown focus fails closed', (() => { try { d.buildPentestMeta({ meta: { targetUrl: 'https://x.test', focusClasses: ['bogus-class'] } }); return false } catch { return true } })())
+  ok('pentest meta: defaults full-recon, skipRecon=false, focus=[]', (() => { const x = d.buildPentestMeta({ meta: { targetUrl: 'https://x.test' } }); return x.scanStrategy === 'full_recon' && x.skipRecon === false && Array.isArray(x.focusClasses) && x.focusClasses.length === 0 })())
   ok('pentest meta: rejects non-http url', (() => { try { d.buildPentestMeta({ meta: { targetUrl: 'ftp://x' } }); return false } catch { return true } })())
 
   cleanup()

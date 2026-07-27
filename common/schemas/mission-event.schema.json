@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "archon://schemas/mission-event",
+  "title": "ARCHON append-only mission event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "seq", "ts", "task_id", "type", "payload"],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 },
+    "seq": { "type": "integer", "minimum": 1 },
+    "ts": { "type": "string" },
+    "task_id": { "type": "string", "minLength": 1 },
+    "type": { "type": "string", "minLength": 1 },
+    "idempotency_key": { "type": ["string", "null"] },
+    "payload": { "type": "object" }
+  }
+}

@@ -12,6 +12,7 @@ const taskBoard = require('../runtime/task-board')
 const decisionLog = require('../runtime/decision-log')
 const mission = require('../runtime/mission-workspace')
 const bridge = require('./task-board-bridge')
+const agentTeamBridge = require('../runtime/agent-team-bridge')
 
 function enabled() { return process.env.ARCHON_TASK_BOARD !== '0' }
 function _try(fn) { try { if (enabled()) fn() } catch { /* telemetry must never break a scan */ } }
@@ -22,6 +23,7 @@ function onSessionPlan(taskId, plan) {
     fs.writeFileSync(path.join(agentPaths.INTEL_ROOT, `session-plan-${taskId}.json`), JSON.stringify({ taskId, ...plan }, null, 2))
     mission.ensureMission(taskId, { mode: plan.mode || 'static', featureCount: plan.features_total, plan })
     mission.mirror(taskId)
+    agentTeamBridge.onLegacySessionPlan(taskId, plan)
   })
 }
 

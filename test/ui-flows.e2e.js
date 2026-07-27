@@ -6,6 +6,7 @@
 const fs = require('fs')
 const path = require('path')
 const { chromium } = require('playwright')
+const { launchOptions } = require('./helpers/chromium')
 const INTEL = process.env.KURU_INTEL_ROOT || path.join(__dirname, '..', 'var', 'intel')
 
 const TID = 'e2e-flow-' + process.pid
@@ -36,7 +37,7 @@ function cleanup() {
 ;(async () => {
   console.log('UI flows e2e (tabs / report / amend / generate / nav / polling):')
   seed()
-  const b = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] })
+  const b = await chromium.launch(launchOptions(chromium))
   const p = await b.newPage({ viewport: { width: 1440, height: 1000 } })
   const errs = []; p.on('pageerror', e => errs.push(e.message))
   const openTask = async () => { await p.click('button[data-view="tasks"]'); await p.waitForTimeout(900); await p.$eval(`[data-taskopen="${TID}"]`, el => el.click()); await p.waitForTimeout(700) }

@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1040" viewBox="0 0 1600 1040" role="img" aria-labelledby="title desc">
+  <title id="title">ARCHON agentic mission architecture</title>
+  <desc id="desc">A diagram showing how black-box, static, and white-box security missions share one adaptive agent runtime, evidence pipeline, and validation gate.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#070a0d" flood-opacity=".28"/>
+    </filter>
+    <style>
+      .bg{fill:#101416}.panel{fill:#181d20;stroke:#343b3f;stroke-width:1.5}.node{fill:#20262a;stroke:#465057;stroke-width:1.5;filter:url(#shadow)}
+      .operator{fill:#f0e8d8;stroke:#f0e8d8}.control{fill:#3b2422;stroke:#e66b55}.mode{fill:#163137;stroke:#52b8bd}.agent{fill:#263322;stroke:#9eb66f}
+      .validation{fill:#392f1d;stroke:#dfad4e}.store{fill:#262331;stroke:#9b86c7}.report{fill:#e66b55;stroke:#e66b55}
+      .title{font:700 31px system-ui,sans-serif;fill:#f7f1e5}.subtitle{font:500 15px system-ui,sans-serif;fill:#aeb7ba}.section{font:700 12px system-ui,sans-serif;letter-spacing:2px;fill:#879297}
+      .label{font:700 16px system-ui,sans-serif;fill:#f7f1e5}.darklabel{font:700 16px system-ui,sans-serif;fill:#111719}.small{font:500 12px system-ui,sans-serif;fill:#b8c0c3}.darksmall{font:500 12px system-ui,sans-serif;fill:#3d474b}
+      .tiny{font:600 10px system-ui,sans-serif;letter-spacing:1px;fill:#91a0a5}.flow{fill:none;stroke:#6d7b81;stroke-width:2;marker-end:url(#arrow)}.mainflow{fill:none;stroke:#e66b55;stroke-width:3;marker-end:url(#arrow)}
+      .dataflow{fill:none;stroke:#9b86c7;stroke-width:2;stroke-dasharray:7 7;marker-end:url(#arrow)}.replan{fill:none;stroke:#52b8bd;stroke-width:2.5;stroke-dasharray:10 8;marker-end:url(#arrow)}
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1040"/>
+  <text class="title" x="70" y="62">ARCHON · one mission, one adaptive team</text>
+  <text class="subtitle" x="70" y="91">The mode changes the evidence source and eligible skills. The durable agent runtime and validation gates stay the same.</text>
+
+  <text class="section" x="70" y="142">INTAKE &amp; CONTROL</text>
+  <rect class="operator" x="70" y="165" rx="7" width="205" height="78"/>
+  <text class="darklabel" x="92" y="197">Operator dispatch</text>
+  <text class="darksmall" x="92" y="220">goal · focus · target · source</text>
+
+  <rect class="control node" x="340" y="165" rx="7" width="220" height="78"/>
+  <text class="label" x="362" y="197">Scope contract</text>
+  <text class="small" x="362" y="220">fail closed · tool enforced</text>
+
+  <rect class="control node" x="625" y="165" rx="7" width="250" height="78"/>
+  <text class="label" x="647" y="197">Mission director</text>
+  <text class="small" x="647" y="220">goal → strategy → obligations</text>
+
+  <rect class="control node" x="940" y="165" rx="7" width="250" height="78"/>
+  <text class="label" x="962" y="197">Adaptive planner</text>
+  <text class="small" x="962" y="220">DAG · EV ranking · context slices</text>
+
+  <rect class="control node" x="1255" y="165" rx="7" width="275" height="78"/>
+  <text class="label" x="1277" y="197">Governor + scheduler</text>
+  <text class="small" x="1277" y="220">leases · quota · retries · cancel</text>
+
+  <path class="mainflow" d="M275 204 H340"/>
+  <path class="mainflow" d="M560 204 H625"/>
+  <path class="mainflow" d="M875 204 H940"/>
+  <path class="mainflow" d="M1190 204 H1255"/>
+
+  <text class="section" x="70" y="300">MODE ADAPTERS · SAME RUNTIME, DIFFERENT WORK</text>
+  <rect class="mode node" x="70" y="325" rx="7" width="440" height="165"/>
+  <text class="tiny" x="94" y="354">BLACK-BOX · URL</text>
+  <text class="label" x="94" y="384">Map the live attack surface</text>
+  <text class="small" x="94" y="410">Recon or direct-test strategy → endpoints → hypotheses</text>
+  <rect class="agent" x="94" y="437" rx="5" width="116" height="34"/><text class="small" x="119" y="459">SCOUT</text>
+  <rect class="agent" x="222" y="437" rx="5" width="116" height="34"/><text class="small" x="253" y="459">TRACER</text>
+  <rect class="agent" x="350" y="437" rx="5" width="136" height="34"/><text class="small" x="369" y="459">SPECIALISTS</text>
+
+  <rect class="mode node" x="580" y="325" rx="7" width="440" height="165"/>
+  <text class="tiny" x="604" y="354">STATIC · SOURCE</text>
+  <text class="label" x="604" y="384">Review coherent source domains</text>
+  <text class="small" x="604" y="410">Inventory → context-sized slices → holistic security review</text>
+  <rect class="agent" x="604" y="437" rx="5" width="116" height="34"/><text class="small" x="630" y="459">CURATOR</text>
+  <rect class="agent" x="732" y="437" rx="5" width="116" height="34"/><text class="small" x="753" y="459">RESEARCH</text>
+  <rect class="agent" x="860" y="437" rx="5" width="136" height="34"/><text class="small" x="882" y="459">EXPLORE ≤ 2</text>
+
+  <rect class="mode node" x="1090" y="325" rx="7" width="440" height="165"/>
+  <text class="tiny" x="1114" y="354">WHITE-BOX · SOURCE + URL</text>
+  <text class="label" x="1114" y="384">Source-guided live validation</text>
+  <text class="small" x="1114" y="410">Static findings create linked runtime proof tasks</text>
+  <rect class="agent" x="1114" y="437" rx="5" width="116" height="34"/><text class="small" x="1138" y="459">SOURCE</text>
+  <rect class="agent" x="1242" y="437" rx="5" width="116" height="34"/><text class="small" x="1262" y="459">PROBER</text>
+  <rect class="agent" x="1370" y="437" rx="5" width="136" height="34"/><text class="small" x="1390" y="459">CORRELATE</text>
+
+  <path class="flow" d="M1392 243 V280 H290 V325"/>
+  <path class="flow" d="M1392 280 H800 V325"/>
+  <path class="flow" d="M1392 280 H1310 V325"/>
+
+  <text class="section" x="70" y="548">SHARED MISSION BLACKBOARD</text>
+  <rect class="store node" x="70" y="573" rx="7" width="270" height="88"/>
+  <text class="label" x="92" y="607">Knowledge graph</text>
+  <text class="small" x="92" y="632">assets · code · hypotheses · links</text>
+
+  <rect class="store node" x="380" y="573" rx="7" width="270" height="88"/>
+  <text class="label" x="402" y="607">Task board</text>
+  <text class="small" x="402" y="632">dependencies · claims · leases</text>
+
+  <rect class="store node" x="690" y="573" rx="7" width="270" height="88"/>
+  <text class="label" x="712" y="607">Evidence store</text>
+  <text class="small" x="712" y="632">source spans · requests · responses</text>
+
+  <rect class="store node" x="1000" y="573" rx="7" width="250" height="88"/>
+  <text class="label" x="1022" y="607">Mission journal</text>
+  <text class="small" x="1022" y="632">decisions · events · recovery</text>
+
+  <rect class="store node" x="1290" y="573" rx="7" width="240" height="88"/>
+  <text class="label" x="1312" y="607">Session registry</text>
+  <text class="small" x="1312" y="632">heartbeats · state · history</text>
+
+  <path class="dataflow" d="M290 490 V532 H205 V573"/>
+  <path class="dataflow" d="M800 490 V532 H825 V573"/>
+  <path class="dataflow" d="M1310 490 V532 H1410 V573"/>
+  <path class="dataflow" d="M1392 243 V540 H1125 V573"/>
+
+  <path class="replan" d="M205 573 V526 H1065 V243"/>
+  <text class="tiny" x="487" y="518">NEW EVIDENCE RE-OPENS THE PLAN</text>
+
+  <text class="section" x="70" y="718">STREAMING FINDING VALIDATION</text>
+  <rect class="validation node" x="70" y="745" rx="7" width="205" height="88"/>
+  <text class="label" x="92" y="779">Candidate stream</text>
+  <text class="small" x="92" y="804">dedupe key · evidence refs</text>
+
+  <rect class="validation node" x="325" y="745" rx="7" width="205" height="88"/>
+  <text class="label" x="347" y="779">TRIAGER</text>
+  <text class="small" x="347" y="804">merge · classify · enrich</text>
+
+  <rect class="validation node" x="580" y="725" rx="7" width="295" height="128"/>
+  <text class="label" x="602" y="757">Verifier panel</text>
+  <text class="small" x="602" y="782">REACHABILITY · IMPACT · DEFENSES</text>
+  <text class="small" x="602" y="809">exactly 3 independent lenses</text>
+  <text class="small" x="602" y="834">code admits only ≥ 2 TRUE_POSITIVE</text>
+
+  <rect class="validation node" x="925" y="745" rx="7" width="185" height="88"/>
+  <text class="label" x="947" y="779">AUDITOR</text>
+  <text class="small" x="947" y="804">evidence contract</text>
+
+  <rect class="validation node" x="1160" y="745" rx="7" width="165" height="88"/>
+  <text class="label" x="1182" y="779">JUDGE</text>
+  <text class="small" x="1182" y="804">publication verdict</text>
+
+  <rect class="report" x="1375" y="745" rx="7" width="155" height="88" filter="url(#shadow)"/>
+  <text class="darklabel" x="1397" y="779">SCRIBE</text>
+  <text class="darksmall" x="1397" y="804">validated report</text>
+
+  <path class="mainflow" d="M275 789 H325"/>
+  <path class="mainflow" d="M530 789 H580"/>
+  <path class="mainflow" d="M875 789 H925"/>
+  <path class="mainflow" d="M1110 789 H1160"/>
+  <path class="mainflow" d="M1325 789 H1375"/>
+  <path class="dataflow" d="M825 661 V698 H172 V745"/>
+
+  <rect class="panel" x="70" y="902" rx="7" width="1460" height="86"/>
+  <text class="label" x="94" y="936">Deterministic completion gate</text>
+  <text class="small" x="94" y="962">All required workstreams terminal · follow-ups resolved · triage drained · verifier panel complete · audit complete · judge complete · report eligible</text>
+  <path class="mainflow" d="M1452 833 V902"/>
+
+  <rect x="1175" y="925" rx="4" width="95" height="32" fill="#233427" stroke="#78a982"/>
+  <text class="small" x="1193" y="946">COMPLETE</text>
+  <rect x="1283" y="925" rx="4" width="132" height="32" fill="#3b321f" stroke="#dfad4e"/>
+  <text class="small" x="1298" y="946">WITH GAPS</text>
+  <rect x="1428" y="925" rx="4" width="78" height="32" fill="#3b2422" stroke="#e66b55"/>
+  <text class="small" x="1442" y="946">BLOCKED</text>
+</svg>

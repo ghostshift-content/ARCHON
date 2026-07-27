@@ -3,13 +3,14 @@
 // key interactions, asserting ZERO uncaught page errors. Catches runtime/state bugs
 // across the whole portal. Read-only (no dispatch submitted). Needs dashboard on :4000.
 const { chromium } = require('playwright')
+const { launchOptions } = require('./helpers/chromium')
 
 let passed = 0, failed = 0
 const ok = (label, cond, extra = '') => cond ? (console.log(`  ✓ ${label}`), passed++) : (console.log(`  ✗ ${label}${extra ? ' — ' + extra : ''}`), failed++)
 
 ;(async () => {
   console.log('UI smoke e2e (all views + dispatch forms):')
-  const b = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] })
+  const b = await chromium.launch(launchOptions(chromium))
   const p = await b.newPage({ viewport: { width: 1440, height: 1000 } })
   const errs = []
   p.on('pageerror', e => errs.push('pageerror: ' + e.message))

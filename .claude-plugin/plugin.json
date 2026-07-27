@@ -1,0 +1,8 @@
+{
+  "name": "archon",
+  "version": "1.2.0",
+  "description": "Mode-agnostic agentic security testing for authorized black-box, static, and white-box engagements.",
+  "author": {
+    "name": "ARCHON contributors"
+  }
+}

@@ -1073,10 +1073,50 @@ function buildPentestBatches() {
 
 // Vuln-class → specialist mapping + focus gating live in ONE shared module so the daemon and
 // the portal agree on "which specialists a focused scan runs" (src/pipeline/focus-map.js).
-const { PENTEST_FOCUS_MAP, focusAllows, focusedSpecialists: _focusedSpecialists } = require('./src/pipeline/focus-map')
-// Thin wrapper: feed the pure module fn the live specialist roster. Empty/unknown focus → null
-// (caller runs the full A→Z roster).
-function focusedSpecialists(focusClasses) { return _focusedSpecialists(focusClasses, getPentestSpecialists()) }
+const {
+  PENTEST_FOCUS_MAP,
+  focusAllows,
+  focusedSpecialists: _focusedSpecialists,
+  focusAllowsFinding,
+  focusDirective,
+} = require('./src/pipeline/focus-map')
+// Focus-only specialists run behind surface preconditions rather than in the
+// unconditional core waves. They still belong to the selectable roster, or a
+// focused XXE/CSRF/CMDi dispatch would incorrectly fail as "no specialist".
+const PENTEST_CONDITIONAL_SPECIALISTS = ['ranger', 'spectre', 'decoy']
+function pentestSelectableSpecialists() {
+  return [...new Set([...getPentestSpecialists(), ...PENTEST_CONDITIONAL_SPECIALISTS])]
+}
+// Thin wrapper: feed the pure module fn the complete selectable roster.
+// Empty focus → null (caller runs the normal full A→Z execution shape).
+function focusedSpecialists(focusClasses) {
+  return _focusedSpecialists(focusClasses, pentestSelectableSpecialists())
+}
+
+function _focusContractPath(taskId) {
+  return `${agentPaths.INTEL_ROOT}/focus-contract-${taskId}.json`
+}
+
+function _readFocusContract(taskId) {
+  try {
+    const p = _focusContractPath(taskId)
+    return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : { focusClasses: [], customFocus: '' }
+  } catch {
+    return { focusClasses: [], customFocus: '' }
+  }
+}
+
+function _focusedFindingRecords(taskId, records) {
+  const contract = _readFocusContract(taskId)
+  const focusClasses = Array.isArray(contract.focusClasses) ? contract.focusClasses : []
+  if (!focusClasses.length) return { allowed: records || [], rejected: [], contract }
+  const allowed = [], rejected = []
+  for (const record of (records || [])) {
+    if (focusAllowsFinding(focusClasses, record)) allowed.push(record)
+    else rejected.push(record)
+  }
+  return { allowed, rejected, contract }
+}
 // Re-batch an explicit specialist list into waves of PENTEST_BATCH_SIZE.
 function batchesFromList(list) {
   const b = []
@@ -2968,7 +3008,7 @@ async function runEnvFingerprint({ taskId, targetUrl, squad, projectId, wafStatu
 // ── Stage 1 — The Strategist (attack planning) ────────────────────────────────
 // ATLAS reads recon + the env fingerprint → a ranked, stack-aware attack plan
 // (attack-plan-<taskId>.json) that the specialists attack first. Fail-soft.
-async function runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerprint, endpointFile, focusClasses }) {
+async function runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerprint, endpointFile, focusClasses, customFocus }) {
   const planner = require('./src/pipeline/attack-planner')
   const outPath = `${agentPaths.INTEL_ROOT}/attack-plan-${taskId}.json`
   try {
@@ -2989,14 +3029,14 @@ async function runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerpri
       const __sg = `${agentPaths.INTEL_ROOT}/source-guidance-${taskId}.json`
       if (fs.existsSync(__sg)) __sourceGuidance = JSON.parse(fs.readFileSync(__sg, 'utf8'))
     } catch { /* fail-soft */ }
-    const prompt = planner.buildAttackPlanPrompt({ targetUrl, fingerprint, reconDump, endpointData, sourceGuidance: __sourceGuidance, focusClasses })
+    const prompt = planner.buildAttackPlanPrompt({ targetUrl, fingerprint, reconDump, endpointData, sourceGuidance: __sourceGuidance, focusClasses, customFocus })
     // ATLAS = pentest orchestrator → Opus (was modelRouter.resolve, a non-existent method → errored)
     const _atlasRoute = modelRouter.getModelForAgent('atlas', { squad })
     const { text } = await runAgent({
       agentName: 'ATLAS', taskId, model: _atlasRoute.model,
       effort: _atlasRoute.effort || 'high', userPrompt: prompt, timeoutMs: ATLAS_PLAN_TIMEOUT_MS,
     })
-    const plan = planner.normalizePlan(text)
+    const plan = planner.normalizePlan(text, { focusClasses })
     fs.writeFileSync(outPath, JSON.stringify(plan, null, 2))
     log(`🧠 Phase 1.9: Attack plan — ${planner.planSummary(plan) || '(no hypotheses)'}`)
     logActivity('ATLAS', `🧠 Phase 1.9: attack plan (${plan.length} hypotheses)`, {
@@ -3019,6 +3059,10 @@ async function runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerpri
 async function runReplanLoop({ taskId, targetUrl, squad, projectId, fingerprint, dispatch }) {
   const planner = require('./src/pipeline/attack-planner')
   try {
+    const focusClasses = Array.isArray(dispatch && dispatch.meta && dispatch.meta.focusClasses)
+      ? dispatch.meta.focusClasses
+      : []
+    const customFocus = String((dispatch && dispatch.meta && dispatch.meta.customFocus) || '').trim()
     let findingsDump = ''
     try {
       const lf = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
@@ -3031,7 +3075,7 @@ proofs. Identify what is LEFT to fully compromise this target: (a) unexplored hi
 (b) CHAINS between confirmed findings (e.g. SSRF → cloud metadata → creds → RCE). Only NEW or chaining
 hypotheses — do NOT repeat already-confirmed ones. Be stack-specific.
 
-Target: ${targetUrl} · Fingerprint: ${fpLine}
+Target: ${targetUrl} · Fingerprint: ${fpLine}${focusClasses.length || customFocus ? `\nFOCUSED ENGAGEMENT: create follow-ups ONLY for ${[focusClasses.join(', '), customFocus].filter(Boolean).join('; ')}. Do not propose unrelated classes.` : ''}
 FINDINGS + PROOFS:
 ${findingsDump || '(none)'}
 
@@ -3041,7 +3085,7 @@ Output ONE JSON array, same shape as the attack plan: {"endpoint","params","vuln
     const { text } = await runAgent({
       agentName: 'ATLAS', taskId, model: _atlasRoute.model, effort: _atlasRoute.effort || 'high', userPrompt: prompt, timeoutMs: ATLAS_PLAN_TIMEOUT_MS,
     })
-    const followup = planner.normalizePlan(text)
+    const followup = planner.normalizePlan(text, { focusClasses })
     fs.writeFileSync(`${agentPaths.INTEL_ROOT}/followup-plan-${taskId}.json`, JSON.stringify(followup, null, 2))
     log(`🔁 Phase 3.087 re-plan: ${followup.length} follow-up/chain hypotheses → followup-plan-${taskId}.json`)
     logActivity('ATLAS', `🔁 Re-plan: ${followup.length} follow-up/chain hypotheses`, {
@@ -3673,13 +3717,16 @@ function scrubBaselineFromGoal(goal) {
 }
 
 // ── Build pentest specialist prompt ──
-function buildPentestSpecialistPrompt(agentName, taskTitle, taskId, projectId, squad, goalContext, targetUrl, wafStatus, techStack, missedSignals = null) {
+function buildPentestSpecialistPrompt(agentName, taskTitle, taskId, projectId, squad, goalContext, targetUrl, wafStatus, techStack, missedSignals = null, focusConstraint = '') {
   const agentUpper = agentName.toUpperCase()
   const agentLower = agentName.toLowerCase()
   // Scrub baseline/comparison language — specialists work blind to baseline numbers.
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalLine = scrubbedGoal ? `Goal: ${scrubbedGoal}\n` : ''
   const techLine = techStack ? `Detected Tech Stack: ${techStack}. Prioritize payloads and techniques specific to this stack.\n` : ''
+  const coverageMandate = focusConstraint
+    ? `## FOCUSED COVERAGE MANDATE\nMap the application sufficiently to test the operator-selected objectives across every applicable endpoint and role. The full A-Z vulnerability mandate is disabled for this dispatch.\n`
+    : PENTEST_COVERAGE
   // White-box source guidance. Empty when no persisted source-guidance bundle exists.
   const __sgBlock = (() => {
     try {
@@ -3748,7 +3795,7 @@ function buildPentestSpecialistPrompt(agentName, taskTitle, taskId, projectId, s
       mustGates: MUST_GATES, feedbackCtx, liveFindings, graphCtx,
       projectId: projectId || '',
     })
-    if (rendered) return PENTEST_COVERAGE + '\n' + rendered
+    if (rendered) return coverageMandate + '\n' + rendered + focusConstraint
     // fall through to inline (rollback or missing template)
   }
 
@@ -3831,7 +3878,7 @@ proceed normally — assumptions stay implicit.
     }
   } catch {}
 
-  return PENTEST_COVERAGE + `\nYou are ${agentUpper}, pentest specialist in ${squad}. Target: ${targetUrl}. Task: ${taskTitle}. TaskID: ${taskId}. WAF: ${wafStatus || 'unknown'}.
+  return coverageMandate + `\nYou are ${agentUpper}, pentest specialist in ${squad}. Target: ${targetUrl}. Task: ${taskTitle}. TaskID: ${taskId}. WAF: ${wafStatus || 'unknown'}.
 ${goalLine}${techLine}${profileFragment}${MUST_GATES}${feedbackCtx}${liveFindings}${graphCtx}
 ${canonBlock}${nmapBlock}${A2A_HANDOFF_SECTION}${endpointModelBlock}${envAdaptiveBlock}
 Read your skill: cat ${agentPaths.skillsDir(agentLower)}/*/SKILL.md
@@ -3871,7 +3918,7 @@ EVIDENCE CONTRACT: only mark confirmed if you CAPTURED replayable evidence (requ
 (Skill files cover the standard payload library — focus this phase on the chains and broken-assumption ideas your skill doesn't enumerate.)
 
 Finish your job — complete your full assessment, then return. There is no time limit.
-Execute now.${missedSignalsBlock}`
+Execute now.${missedSignalsBlock}${focusConstraint}`
 }
 
 // ── Build AUDITOR validation prompt ──
@@ -3887,6 +3934,13 @@ function buildauditorValidationPrompt(taskTitle, taskId, projectId, squad, targe
       return p ? targetClassifier.buildPromptFragment(p) : ''
     } catch { return '' }
   })()
+  const focusContract = _readFocusContract(taskId)
+  const focusedAudit = (Array.isArray(focusContract.focusClasses) && focusContract.focusClasses.length > 0) ||
+    Boolean(String(focusContract.customFocus || '').trim())
+  const suspectedFallback = focusedAudit
+    ? `   This is a focused dispatch (${[...(focusContract.focusClasses || []), focusContract.customFocus || ''].filter(Boolean).join(', ')}). If the file is empty, there are no in-focus candidates: report zero and STOP. Never fall back to raw activity or validate another class.`
+    : `   If that file is empty or missing, fall back to the raw log:
+     exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'suspected\\|finding'`
   return `You are AUDITOR, the Finding Validator for the ${squad} squad.
 ${goalSection}${profileFragment}${MUST_GATES}${feedbackCtx}
 ## YOUR TASK
@@ -3904,8 +3958,7 @@ Project: ${projectId || 'none'}
    first. You MUST run the 7-Question Gate on EVERY line and emit a CONFIRMED or KILLED
    verdict for EACH — do not skip any, do not stop after a few:
      exec: cat ${agentPaths.INTEL_ROOT}/SUSPECTED-FINDINGS-${taskId}.jsonl 2>/dev/null
-   If that file is empty or missing, fall back to the raw log:
-     exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'suspected\\|finding'
+${suspectedFallback}
 5. Read your lessons: exec: cat ${agentPaths.lessonsPath('auditor')} 2>/dev/null
 
 ## MANDATORY: Run 7-Question Gate on EVERY finding. One wrong = KILL.
@@ -3945,6 +3998,39 @@ function buildscribeReportPrompt(taskTitle, taskId, projectId, squad, targetUrl,
   // summary gets sycophantically anchored to them (confirmed Apr-21 Run 1).
   const scrubbedGoal = scrubBaselineFromGoal(goalContext)
   const goalSection = scrubbedGoal ? `\nUSER GOAL: ${scrubbedGoal}\n` : ''
+  const focusContract = _readFocusContract(taskId)
+  const reportFocus = Array.isArray(focusContract.focusClasses) ? focusContract.focusClasses : []
+  const reportCustomFocus = String(focusContract.customFocus || '').trim()
+  const reportFocusText = [...reportFocus, reportCustomFocus].filter(Boolean).join(', ')
+  const isFocusedReport = reportFocus.length > 0 || Boolean(reportCustomFocus)
+  const reportLengthRule = isFocusedReport
+    ? `Required output: complete, evidence-backed coverage of the selected objectives (${reportFocusText}). Do not pad the report with unselected vulnerability categories.`
+    : `Required output: 40KB+ markdown, all 8 sections fully populated, complete reproduction curl commands per finding, full CVSS:3.1 vectors (AV:N/AC:L/...), OWASP category mapping, defensive config snippets.`
+  const reportFindingInput = isFocusedReport
+    ? `3. Read ONLY the focus-gated validated findings: exec: cat ${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl 2>/dev/null`
+    : `3. Read ONLY AUDITOR-confirmed findings: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'CONFIRMED'`
+  const reportCoverageMandate = isFocusedReport
+    ? `## FOCUSED COVERAGE — ${reportFocusText}
+This was intentionally NOT an A-Z scan. Include a coverage matrix only for the selected classes, broken down by applicable endpoint and role. Mark tested, finding, no issue, or gap honestly. Never claim that an unselected class was tested.`
+    : `## A-Z COVERAGE — report EVERYTHING (read ${agentPaths.AGENTS_ROOT}/squads/pentest/methodology/pentest-coverage.md)
+This is a comprehensive engagement. The report MUST include a **Coverage Matrix** with one row per coverage category 0–11 (Recon, Transport/TLS-SSL, Security Headers, Cookies/Session, Auth, Access Control, Injection, Client-side, Server-side/Files, API, Business Logic, Info-disclosure) and a status: Tested-no issues / Findings / Not applicable / Gap. Include ALL informational findings — TLS 1.0/1.1 or weak ciphers, missing/weak security headers, missing cookie flags, version disclosure, and recon source/secret leaks (.js.map sourcemaps, exposed .git/.env, backups) — even when no exploitable bug exists. Never omit a category.`
+  const reportCoverageIntro = isFocusedReport
+    ? `Add a focused Coverage section for the selected vulnerability classes only. Reconcile it with the deterministic selected-class coverage below and state gaps honestly.`
+    : `Add a "Coverage (WSTG)" section. Lead with the DETERMINISTIC per-area coverage scores below (reconcile your prose with these numbers — do not contradict them), then walk the A-Z checklist and state, per area, whether it was tested (with the finding/evidence) or NOT reached (and why — not applicable to this stack, or out of time). Honesty about untested areas is required:`
+  const reportActivityInput = isFocusedReport
+    ? `5. Do NOT use raw activity as a finding source. It may contain out-of-focus observations; use the focus-gated validated file above.`
+    : `5. Read full activity log for context: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl`
+  // Keep mandatory evidence contracts together and near the top of the prompt.
+  // Optional report enrichments below can grow without hiding these requirements.
+  const mandatoryEvidencePrompt = `
+## BROWSER-VERIFICATION CONTRACT
+Read BROWSER-VERIFICATION-${taskId}.jsonl when present and apply its Tier-1 verdicts exactly as specified below.
+
+## Context Inventory (required by ARCHON methodology)
+Output the six-column evidence matrix:
+| Source (where data enters) | Sink | Context | Defense in path | Verdict | Finding reference |
+Every vulnerable or partial row must cite a finding ID from the Findings section.
+`
 
   // Sprint C.2 Task 8 (2026-05-10): scan /root/intel/handoffs/done/ for
   // cross-squad verdicts matching this taskId and inject a CORROBORATION
@@ -4060,11 +4146,14 @@ Score EVERY finding with CVSS 3.1 using the guide (cat it): ${agentPaths.AGENTS_
 
 ## CRITICAL LENGTH REQUIREMENT (Opus 4.7 reminder)
 Opus 4.7 defaults to shorter responses than prior models. This report is an EXCEPTION — it must be comprehensive and detailed.
-Required output: 40KB+ markdown, all 8 sections fully populated, complete reproduction curl commands per finding, full CVSS:3.1 vectors (AV:N/AC:L/...), OWASP category mapping, defensive config snippets.
+${reportLengthRule}
 Per finding, ALWAYS include the concrete IMPACT (the finding's "impact" field — what an attacker actually gains). If a finding has a "proof_of_execution" (from the gated Exploit-Prover), show it as a PROOF OF IMPACT block: the exact benign payload/command fired and the response proving execution (nonce). Mark such findings "Impact PROVEN (live PoC)" — these are the strongest evidence in the report.
 If followup-plan-${taskId}.json exists (cat it), add a "Recommended Next Round / Attack Chains" section listing those ranked follow-up + chaining hypotheses — what a deeper engagement should chase next.
-Add a "Coverage (WSTG)" section. Lead with the DETERMINISTIC per-area coverage scores below (reconcile your prose with these numbers — do not contradict them), then walk the A-Z checklist and state, per area, whether it was tested (with the finding/evidence) or NOT reached (and why — not applicable to this stack, or out of time). Honesty about untested areas is required:
+${reportCoverageIntro}
 ${(() => {
+  if (isFocusedReport) {
+    return `### Selected vulnerability coverage\n- ${[...reportFocus, reportCustomFocus].filter(Boolean).join('\n- ')}\n\nOnly these objectives were authorized for active testing in this dispatch. Application mapping supported those tests but did not expand vulnerability scope.`
+  }
   try {
     const cm = require('./src/core/coverage-map')
     const { readFindingsFile } = require('./agents/finding-schema')
@@ -4083,7 +4172,7 @@ ${(() => {
 })()}
 Do NOT abbreviate. Do NOT summarize findings. Do NOT skip sections. The reader is a senior security engineer who needs every detail to fix the issues.
 
-${goalSection}${MUST_GATES}
+${goalSection}${mandatoryEvidencePrompt}${MUST_GATES}
 ## YOUR TASK
 Write final penetration test report for: ${taskTitle}
 Target: ${targetUrl}
@@ -4131,15 +4220,14 @@ Anti-sycophancy: a handoff verdict is ADDITIONAL evidence, never the primary evi
 ## INSTRUCTIONS — READ YOUR FILES FIRST
 1. Read your identity: exec: cat ${agentPaths.soulPath('scribe')}
 2. Read your skill (report templates + HackerOne format): exec: cat ${agentPaths.skillsDir('scribe')}/report-writing/SKILL.md
-3. Read ONLY AUDITOR-confirmed findings: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'CONFIRMED'
+${reportFindingInput}
 4. Read chain analysis results: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl | grep -i 'CHAIN'
-5. Read full activity log for context: exec: grep '${taskId}' ${agentPaths.INTEL_ROOT}/ACTIVITY-LOG.jsonl
+${reportActivityInput}
 6. Read your lessons: exec: cat ${agentPaths.lessonsPath('scribe')} 2>/dev/null
 7. Read defensive actions: exec: cat ${agentPaths.INTEL_ROOT}/defensive-actions-${taskId}.json 2>/dev/null
 ${defensiveActions || ''}
 ## MANDATORY: Only include CONFIRMED findings. Use impact-first language ("attacker CAN").
-## A→Z COVERAGE — report EVERYTHING (read ${agentPaths.AGENTS_ROOT}/squads/pentest/methodology/pentest-coverage.md)
-This is a comprehensive engagement. The report MUST include a **Coverage Matrix** with one row per coverage category 0–11 (Recon, Transport/TLS-SSL, Security Headers, Cookies/Session, Auth, Access Control, Injection, Client-side, Server-side/Files, API, Business Logic, Info-disclosure) and a status: Tested–no issues / Findings / Not applicable / Gap. Include ALL informational findings — TLS 1.0/1.1 or weak ciphers, missing/weak security headers, missing cookie flags, version disclosure, and recon source/secret leaks (.js.map sourcemaps, exposed .git/.env, backups) — even when no exploitable bug exists. Never omit a category.
+${reportCoverageMandate}
 
 ## REPORT STRUCTURE (ALL sections required — use exact heading text below, with or without numbering):
 1. Executive Summary — 1-2 paragraphs, non-technical: scope, overall risk, key stats, top 3 risks
@@ -4585,16 +4673,49 @@ async function dispatchPentestParallel(dispatch) {
   // A specialist added to agents.json is picked up here without any code change.
   // (2026-06-18) Focused scan: if the operator chose specific vuln classes, run
   // only those specialists instead of the full A→Z roster.
-  const _focus = focusedSpecialists(dispatch.meta && dispatch.meta.focusClasses)
+  const _focusClasses = Array.isArray(dispatch.meta && dispatch.meta.focusClasses) ? dispatch.meta.focusClasses : []
+  const _customFocus = String((dispatch.meta && dispatch.meta.customFocus) || '').trim()
+  // A custom-only abuse dispatch gets one general business-logic specialist,
+  // not the full A-Z roster. Standard classes retain their exact specialist map.
+  const _focus = _focusClasses.length
+    ? focusedSpecialists(_focusClasses)
+    : _customFocus
+      ? focusedSpecialists(['business-logic'])
+      : null
+  const _focusConstraint = focusDirective(_focusClasses, _customFocus)
+  try {
+    fs.writeFileSync(_focusContractPath(taskId), JSON.stringify({
+      taskId,
+      focusClasses: _focusClasses,
+      customFocus: _customFocus,
+      specialists: _focus || [],
+      createdAt: new Date().toISOString(),
+    }, null, 2))
+  } catch (e) {
+    log(`⚠️ Could not persist focus contract: ${e.message}`)
+  }
+  if (_focus && _focus.length === 0) {
+    const reason = `focused dispatch has no available specialist for: ${_focusClasses.join(', ')}`
+    log(`🚫 ${reason} — refusing to fall back to the full roster`)
+    logActivity('NEXUS', `🚫 Focused dispatch blocked`, {
+      type: 'dispatch-blocked', squad, taskId, projectId: projectId || '', details: reason,
+    })
+    return { totalCost, allCosts, error: reason, blocked: true }
+  }
   // Focus gate: on a focused scan, a specialist may run ONLY if it's in the focused set. On a
   // full scan (_focus === null) everyone is allowed. Applied to the surface-triggered conditional
   // dispatches below so "test XSS only" never spawns SPECTRE/DECOY/RANGER-CMDi. Recon + ATLAS +
   // support agents are NOT gated — you can't test a class without first mapping the app.
   const _focusAllows = (a) => focusAllows(_focus, a)
-  const _dynBatches = _focus ? batchesFromList(_focus) : buildPentestBatches()
+  // Conditional specialists are selectable, but they stay in their later
+  // evidence-triggered phases. Excluding them from the core waves prevents
+  // duplicate execution and preserves their surface preconditions.
+  const _coreSpecialistSet = new Set(getPentestSpecialists())
+  const _focusedCore = _focus ? _focus.filter(a => _coreSpecialistSet.has(a)) : null
+  const _dynBatches = _focus ? batchesFromList(_focusedCore) : buildPentestBatches()
   if (_focus) {
-    log(`🎯 Focused scan: ${_focus.map(a => a.toUpperCase()).join(', ')} (classes: ${(dispatch.meta.focusClasses || []).join(', ')})`)
-    logActivity('NEXUS', `🎯 Focused scan — ${(dispatch.meta.focusClasses || []).join(', ')}`, {
+    log(`🎯 Focused scan: ${_focus.map(a => a.toUpperCase()).join(', ')} (classes: ${_focusClasses.join(', ')})`)
+    logActivity('NEXUS', `🎯 Focused scan — ${_focusClasses.join(', ')}`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
       details: `Specialists: ${_focus.map(a => a.toUpperCase()).join(', ')} (full roster skipped)`,
     })
@@ -4840,16 +4961,40 @@ async function dispatchPentestParallel(dispatch) {
     // cases, feature-driven, or "skip initial recon") targets the given web app's logic —
     // we deliberately do NOT port-scan the host there. ──
     const _m = dispatch.meta || {}
-    const _isFullScan = _m.testType !== 'feature' && !_m.skipRecon && !_m.customFocus && !_m.featureFocus &&
-      !(Array.isArray(_m.focusClasses) && _m.focusClasses.length)
-    if (phaseEnabled('0.4', squad) && !_isFullScan) {
-      log(`⏭️ Phase 0.4 nmap skipped — abuse/focused scan (no host port discovery, testing the app directly)`)
-      logActivity('NEXUS', `⏭️ Phase 0.4: nmap skipped (abuse/focused scan)`, {
+    const _blackboxPlan = require('./src/runtime/blackbox-strategy').phasePlan(_m)
+    // Additive runtime projection: every black-box strategy is represented as one
+    // initial application workstream. Discovery may create bounded evidence-driven
+    // follow-ups later; the legacy daemon remains the execution owner until parity
+    // approval explicitly transfers ownership.
+    try {
+      const _dispatchBridge = require('./src/compatibility/dispatch-bridge')
+      const _targetHost = (() => { try { return new URL(targetUrl).hostname } catch { return targetUrl } })()
+      _dispatchBridge.onSessionPlan(taskId, {
+        mode: 'blackbox',
+        strategy: _blackboxPlan.strategy,
+        session_count: 1,
+        active_concurrency: 1,
+        features_total: 1,
+        applicable_skills: [...new Set([..._focusClasses, ...(_customFocus ? ['business-logic'] : [])])],
+        workstreams: [{
+          id: `application-${String(_targetHost).replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 80) || 'target'}`,
+          domains: [_targetHost],
+          endpoints: [targetUrl],
+          skill_families: [...new Set([..._focusClasses, ...(_customFocus ? ['business-logic'] : [])])],
+        }],
+        reason: _blackboxPlan.reason,
+      })
+    } catch (e) {
+      log(`⚠️ Adaptive runtime projection failed open: ${e.message}`)
+    }
+    if (phaseEnabled('0.4', squad) && !_blackboxPlan.runInfrastructureRecon) {
+      log(`⏭️ Phase 0.4 nmap skipped — ${_blackboxPlan.strategy} (application mapping remains required)`)
+      logActivity('NEXUS', `⏭️ Phase 0.4: nmap skipped (${_blackboxPlan.strategy})`, {
         type: 'nmap-scan', squad, taskId, projectId: projectId || '',
-        details: `Abuse/focused scan — port/service discovery is skipped by design; testing the given app surface directly.`,
+        details: `${_blackboxPlan.reason}. Scope enforcement remains active.`,
       })
     }
-    if (phaseEnabled('0.4', squad) && _isFullScan) {
+    if (phaseEnabled('0.4', squad) && _blackboxPlan.runInfrastructureRecon) {
       try {
         const { runNmapScan, nmapSummary } = require('./src/pipeline/nmap-scan')
         log(`🛰️ Phase 0.4: nmap -sV -p- full service scan (heart truth) on ${targetUrl}`)
@@ -4928,6 +5073,15 @@ async function dispatchPentestParallel(dispatch) {
     }
 
     // ── Phase 0: WAF detection — runs on the CANONICAL target (after vhost resolution) ──
+    // Direct application testing deliberately skips standalone fingerprint probes.
+    if (!_blackboxPlan.runReconAgents) {
+      wafStatus = 'not probed — direct application strategy'
+      log(`⏭️ Phase 0 WAF probe skipped — direct application strategy`)
+      logActivity('NEXUS', `⏭️ Phase 0 WAF probe skipped (direct)`, {
+        type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
+        details: 'No standalone WAF payload probe; mandatory TRACER application mapping runs next.',
+      })
+    } else {
     log(`🔍 Phase 0: WAF detection for ${targetUrl}`)
     logActivity('NEXUS', `🔍 Phase 0: WAF detection for ${targetUrl}`, {
       type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
@@ -4956,9 +5110,17 @@ async function dispatchPentestParallel(dispatch) {
       log(`⚠️ WAF detection failed: ${e.message}`)
       wafStatus = 'detection failed — assume present'
     }
+    }
 
     // ── Phase 0.1: Auth type detection — INFORM agents, don't restrict ──
     let authType = 'unknown'
+    if (!_blackboxPlan.runReconAgents) {
+      log(`⏭️ Phase 0.1 auth fingerprint skipped — direct application strategy`)
+      logActivity('NEXUS', `⏭️ Phase 0.1 auth fingerprint skipped (direct)`, {
+        type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
+        details: 'Authentication surfaces will be learned from the mandatory application map and supplied test accounts.',
+      })
+    } else {
     try {
       const safeUrl_local = safeUrl(targetUrl)
       const responseHeaders = execSync(`curl -sI -L${_resolveArgs} --max-time 10 "${safeUrl_local}" 2>/dev/null || true`, { timeout: 15000 }).toString()
@@ -4984,10 +5146,12 @@ async function dispatchPentestParallel(dispatch) {
     } catch (e) {
       log(`⚠️ Auth detection failed: ${e.message}`)
     }
+    }
 
-    // Ensure endpoint map exists (run crawl if not)
+    // Application mapping is mandatory for EVERY black-box strategy, including
+    // direct testing. "Skip recon" never means "skip website/API mapping".
     if (!fs.existsSync(endpointMapFile)) {
-      log(`⚠️ Endpoint map not found — running TRACER crawl`)
+      log(`🗺️ Application map required (${_blackboxPlan.strategy}) — running TRACER crawl`)
       try {
         await runtracerAgent(targetUrl, taskId)
       } catch (e) {
@@ -5098,14 +5262,14 @@ async function dispatchPentestParallel(dispatch) {
     // (2026-06-18) skip-recon: when the operator wants to go straight to
     // authenticated functionality / specialist testing, skip the nmap/surface
     // recon phase. Specialists still get the brief, creds, and target.
-    const _skipRecon = !!(dispatch.meta && dispatch.meta.skipRecon)
+    const _skipRecon = !_blackboxPlan.runReconAgents
     if (_skipRecon) {
-      log(`⏭️ Skip-recon ON — no nmap/surface discovery; going straight to functionality/specialist testing`)
+      log(`⏭️ Direct testing ON — Nmap and SCOUT/RANGER skipped; TRACER application map retained`)
       logActivity('NEXUS', `⏭️ Phase 1 recon skipped (operator)`, {
         type: 'dispatch-phase', squad, taskId, projectId: projectId || '',
-        details: 'SCOUT/RANGER recon skipped — direct authenticated functionality testing',
+        details: 'SCOUT/RANGER skipped after mandatory TRACER website/API mapping — direct functionality testing',
       })
-      updateProgress(15, 'Recon skipped — direct to specialists')
+      updateProgress(15, 'Application mapped — direct to specialists')
     } else {
     if (_isTaskCancelled(taskId)) { log(`🛑 Task ${taskId} cancelled — halting before Phase 1 recon`); killTaskChildren(taskId, 'cancelled'); return { totalCost, allCosts } }
     log(`🔄 Phase 1: Dispatching recon agents (${PENTEST_RECON.map(a => a.toUpperCase()).join(', ')})`)
@@ -5116,7 +5280,7 @@ async function dispatchPentestParallel(dispatch) {
     updateProgress(10, 'Phase 1: Recon running (SCOUT + RANGER)')
 
     const reconResults = await Promise.all(PENTEST_RECON.map(agent => {
-      const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId])
+      const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId], _focusConstraint)
       return spawnWithRetry(agent, prompt, undefined)
     }))
     trackCosts(reconResults)
@@ -5335,7 +5499,7 @@ async function dispatchPentestParallel(dispatch) {
       // no-surface report is still written below.
       if (_focusAllows('sentry')) {
         log(`🔄 Early exit: Running SENTRY (headers only) + SCRIBE report`)
-        const sentryPrompt = buildPentestSpecialistPrompt('sentry', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId])
+        const sentryPrompt = buildPentestSpecialistPrompt('sentry', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, undefined, _taskMissedSignals[taskId], _focusConstraint)
         const sentryResult = await spawnAgent('sentry', taskId, sentryPrompt, `task-${taskId}-sentry-earlyexit`, modelOverride)
         trackCosts([sentryResult])
       } else {
@@ -5493,7 +5657,11 @@ async function dispatchPentestParallel(dispatch) {
 
     // ── PHASE 1.9 — The Strategist: ATLAS ranks what to attack first ──
     try {
-      await runAttackPlanner({ taskId, targetUrl, squad, projectId, fingerprint: envFingerprint, endpointFile, focusClasses: dispatch.meta && dispatch.meta.focusClasses })
+      await runAttackPlanner({
+        taskId, targetUrl, squad, projectId, fingerprint: envFingerprint, endpointFile,
+        focusClasses: dispatch.meta && dispatch.meta.focusClasses,
+        customFocus: dispatch.meta && dispatch.meta.customFocus,
+      })
     } catch (planErr) { log(`⚠️ Phase 1.9 wrapper error (non-fatal): ${planErr.message}`) }
 
     // ── PHASE 2: Vulnerability specialists — 2-wave adaptive parallel ──────
@@ -5543,7 +5711,7 @@ async function dispatchPentestParallel(dispatch) {
     const _waveConc = _agentConcurrency(squad)
     log(`🎚️ Wave 1: ${wave1Agents.length} specialists, ${_waveConc} at a time (throttled — no machine bombard)`)
     const batch1Results = await runWithConcurrency(wave1Agents, _waveConc, agent => {
-      const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+      const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
       return spawnWithRetry(agent, prompt, undefined)
     })
     const batch2Results = []
@@ -5649,7 +5817,7 @@ async function dispatchPentestParallel(dispatch) {
       wave2Agents.forEach(a => { _agentWaveMap[a] = 2; _agentReflexionMap[a] = reflexionUsed })
 
       const wave2Results = await runWithConcurrency(wave2Agents, _agentConcurrency(squad), agent => {
-        const basePrompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+        const basePrompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
         const prompt = basePrompt + (_batch1Critique || '') + (_fastVerifiedContext || '')
         return spawnWithRetry(agent, prompt, undefined)
       })
@@ -5710,7 +5878,7 @@ async function dispatchPentestParallel(dispatch) {
         logActivity('NEXUS', `🎯 Conditional dispatch: SPECTRE (XXE surface detected)`, {
           type: 'conditional-dispatch', squad, taskId, projectId: projectId || ''
         })
-        const xxePrompt = buildPentestSpecialistPrompt('spectre', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+        const xxePrompt = buildPentestSpecialistPrompt('spectre', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
         conditionalPromises.push(() => spawnWithRetry('spectre', xxePrompt + _conditionalReflexion, undefined))
       }
 
@@ -5721,7 +5889,7 @@ async function dispatchPentestParallel(dispatch) {
         logActivity('NEXUS', `🎯 Conditional dispatch: DECOY (CSRF surface detected)`, {
           type: 'conditional-dispatch', squad, taskId, projectId: projectId || ''
         })
-        const csrfPrompt = buildPentestSpecialistPrompt('decoy', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+        const csrfPrompt = buildPentestSpecialistPrompt('decoy', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
         conditionalPromises.push(() => spawnWithRetry('decoy', csrfPrompt + _conditionalReflexion, undefined))
       }
 
@@ -5732,8 +5900,8 @@ async function dispatchPentestParallel(dispatch) {
         logActivity('NEXUS', `🎯 Conditional dispatch: RANGER CMDi (command-injectable surface detected)`, {
           type: 'conditional-dispatch', squad, taskId, projectId: projectId || ''
         })
-        const cmdiPrompt = buildPentestSpecialistPrompt('ranger', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
-          + `\n\nFOCUS: OS Command Injection testing ONLY (not recon). Read your CMDi skill: cat ${agentPaths.skillsDir('ranger')}/cmdi-testing/SKILL.md`
+        const cmdiPrompt = buildPentestSpecialistPrompt('ranger', taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
+          + `\n\nFOCUS: OS Command Injection testing ONLY (not recon). Read your CMDi skill: cat ${agentPaths.skillsDir('ranger')}/rce-cmdi/SKILL.md`
           + _conditionalReflexion
         conditionalPromises.push(() => spawnWithRetry('ranger', cmdiPrompt, undefined))
       }
@@ -5779,7 +5947,7 @@ async function dispatchPentestParallel(dispatch) {
       log(`⚠️ Spotcheck: ${emptySpecialists.length} specialists produced no output: ${emptySpecialists.join(', ')}`)
       for (const agent of emptySpecialists) {
         log(`♻️ Re-running ${agent.toUpperCase()} (produced no output)`)
-        const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId])
+        const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
         const retryResult = await spawnAgent(agent, taskId, prompt, `task-${taskId}-${agent}-retry`, modelOverride, { timeoutMs: SPECIALIST_TIMEOUT_MS })
         trackCosts([retryResult])
       }
@@ -5870,11 +6038,12 @@ async function dispatchPentestParallel(dispatch) {
       const { parseFindingsJsonl } = require('./src/pipeline/loose-jsonl')
       const _lfFile = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
       if (fs.existsSync(_lfFile)) {
-        const _d = dedupeSuspected(parseFindingsJsonl(fs.readFileSync(_lfFile, 'utf8')))
-        if (_d.findings.length) {
-          fs.writeFileSync(`${agentPaths.INTEL_ROOT}/SUSPECTED-FINDINGS-${taskId}.jsonl`, _d.findings.map(f => JSON.stringify(f)).join('\n') + '\n')
-          log(`🧮 Pre-AUDITOR dedup: ${_d.total} raw emits → ${_d.distinct} distinct finding(s)${_d.capped ? ` (capped ${_d.capped})` : ''} for validation`)
-        }
+        const raw = parseFindingsJsonl(fs.readFileSync(_lfFile, 'utf8'))
+        const focused = _focusedFindingRecords(taskId, raw)
+        const _d = dedupeSuspected(focused.allowed)
+        const suspectedPath = `${agentPaths.INTEL_ROOT}/SUSPECTED-FINDINGS-${taskId}.jsonl`
+        fs.writeFileSync(suspectedPath, _d.findings.map(f => JSON.stringify(f)).join('\n') + (_d.findings.length ? '\n' : ''))
+        log(`🧮 Pre-AUDITOR dedup: ${_d.total} in-focus emits → ${_d.distinct} distinct finding(s)${focused.rejected.length ? `; ${focused.rejected.length} out-of-focus record(s) excluded` : ''}${_d.capped ? ` (capped ${_d.capped})` : ''} for validation`)
       }
     } catch (e) { log(`⚠️ Pre-AUDITOR dedup failed (non-fatal; AUDITOR falls back to grep): ${e.message}`) }
 
@@ -8835,7 +9004,8 @@ function ensureValidatedFindings(taskId) {
     const { enforceContract } = require('./src/pipeline/evidence-contract')
     const { parseFindingsJsonl } = require('./src/pipeline/loose-jsonl')
     const seen = new Set(); const records = []
-    for (const f of parseFindingsJsonl(fs.readFileSync(lf, 'utf8'))) {
+    const focused = _focusedFindingRecords(taskId, parseFindingsJsonl(fs.readFileSync(lf, 'utf8')))
+    for (const f of focused.allowed) {
       const key = `${(f.url || '').toLowerCase().replace(/[?#].*$/, '').replace(/\/+$/, '')}|${(f.details || '').slice(0, 40)}`
       if (seen.has(key)) continue; seen.add(key)
       const evidenced = !!String(f.reproduction || f.details || '').trim()
@@ -9041,15 +9211,17 @@ STEP 2 — if REAL, write the complete finding. Match the gold format: cat the c
 // the confirmed count). Only started when Phase 2.7 is enabled (else the old batch flow runs).
 function startStreamingTriage(taskId, squad, projectId, targetUrl) {
   const { nextBatch, triageWorkers, triageSessions } = require('./src/pipeline/streaming-triage')
-  const { identityKey } = require('./src/pipeline/suspected-dedup')
+  const { identityKey, isCandidate } = require('./src/pipeline/suspected-dedup')
   const _isCodeReview = /code-review/.test(String(squad || ''))
   const { parseFindingsJsonl } = require('./src/pipeline/loose-jsonl')
   const liveFile = `${agentPaths.INTEL_ROOT}/live-findings-${taskId}.jsonl`
   const detailFile = `${agentPaths.INTEL_ROOT}/findings-detail-${taskId}.json`
   const valFile = `${agentPaths.INTEL_ROOT}/VALIDATED-FINDINGS-${taskId}.jsonl`
   const quarantineFile = `${agentPaths.INTEL_ROOT}/triage-quarantine-${taskId}.jsonl`
+  const focusRejectedFile = `${agentPaths.INTEL_ROOT}/focus-rejected-${taskId}.jsonl`
   const EX = `${agentPaths.AGENTS_ROOT}/common/reporting/templates/examples`
   const seen = new Set()
+  const focusRejectedSeen = new Set()
   const _triageAttempts = new Map()      // §6: canonicalKey → # batch attempts (bounded requeue, never silent drop)
   const MAX_TRIAGE_ATTEMPTS = 2
   let running = true, idn = 0, confirmed = 0
@@ -9153,7 +9325,22 @@ function startStreamingTriage(taskId, squad, projectId, targetUrl) {
   async function tick() {
     if (!fs.existsSync(liveFile)) return
     let recs = []; try { recs = parseFindingsJsonl(fs.readFileSync(liveFile, 'utf8')) } catch { return }
-    const fresh = nextBatch(recs, seen)
+    const focused = _focusedFindingRecords(taskId, recs)
+    for (const rejected of focused.rejected) {
+      if (!isCandidate(rejected)) continue
+      const key = identityKey(rejected)
+      if (focusRejectedSeen.has(key)) continue
+      focusRejectedSeen.add(key)
+      try {
+        fs.appendFileSync(focusRejectedFile, JSON.stringify({
+          rejected_at: new Date().toISOString(),
+          reason: `outside selected vulnerability focus: ${(focused.contract.focusClasses || []).join(', ')}`,
+          candidate: rejected,
+        }) + '\n')
+      } catch {}
+      flow('NEXUS', `⛔ focus gate rejected: ${_titleOf(rejected)}`, 'Candidate was outside the operator-selected vulnerability classes and cannot enter triage/report.')
+    }
+    const fresh = nextBatch(focused.allowed, seen)
     // Triager squad: each finding is already claimed+unique (nextBatch → `seen`), and
     // runWithConcurrency hands each out via a synchronous idx++ — so N workers never grab the
     // same finding, and none over-loops. Pool size scales with the backlog; caps.triageConcurrency=1
@@ -9364,6 +9551,10 @@ async function dispatchToAgent(dispatch) {
     goal: safeTitle(rawGoal),
   }
   const { taskId, taskTitle, assignee, squad, projectId, model: modelOverride, goal: taskGoal } = dispatch
+  // Direct queue/API dispatches may bypass the dashboard creation path. Pin
+  // their runtime generation at the universal daemon entry before any work so
+  // an environment change cannot switch engines mid-mission.
+  try { require('./src/runtime/runtime-generation').pin(taskId) } catch {}
 
   // Resolve goal: task-level goal → project-level goal → empty
   let resolvedGoal = taskGoal || ''
@@ -9512,6 +9703,92 @@ async function dispatchToAgent(dispatch) {
     })
   } catch { /* observability only — never block a dispatch on the mode label */ }
 
+  // Parity-gated adaptive owner. Generation is pinned when the task is created,
+  // and ownership transfers only when the operator has explicitly approved the
+  // parity gate. Otherwise execution falls through byte-for-byte to the legacy
+  // squad dispatcher below. Once this branch starts, errors fail the mission;
+  // it never launches a second pipeline after partial security actions.
+  try {
+    const adaptiveDispatch = require('./src/runtime/runtime-dispatch')
+    if (adaptiveDispatch.shouldOwn(taskId)) {
+      log(`🧠 Adaptive runtime owns ${taskId} (${dispatchType})`)
+      logActivity('NEXUS', '🧠 Adaptive mission team started', {
+        type: 'adaptive-runtime', squad, taskId, projectId: projectId || '',
+        details: 'Generation and scope were pinned before execution; legacy dispatcher will not run.',
+      })
+      const adaptive = await adaptiveDispatch.run(dispatch, {
+        isCancelled: () => _isTaskCancelled(taskId),
+        quotaState: () => {
+          try {
+            return quotaManager.summarizeHealth(['balanced', 'fast', 'powerful']
+              .map(family => `anthropic/${modelRouter.resolveFamily(family)}`).filter(Boolean))
+          } catch { return 'healthy' }
+        },
+      })
+      const result = adaptive.result || {}
+      const completion = result.completionGate || { completion_status: 'REPORT_BLOCKED', report_eligible: false }
+      try {
+        withFileLock(TASKS_FILE, () => {
+          const tasks = readJSON(TASKS_FILE) || []
+          const task = tasks.find(row => String(row.id) === String(taskId))
+          if (task && !['cancelled', 'failed'].includes(String(task.status || '').toLowerCase())) {
+            task.status = 'done'
+            task.progress = 100
+            task.completionStatus = completion.completion_status
+            task.completionGate = completion
+            task.statusMessage = completion.report_eligible
+              ? 'Adaptive mission complete'
+              : `Adaptive mission completed without report eligibility: ${completion.reason || 'validation gates remain'}`
+            task.lastUpdate = new Date().toISOString()
+            writeJSON(TASKS_FILE, tasks)
+          }
+        })
+        const queue = readJSON(DISPATCH_FILE) || []
+        const entry = queue.find(row => String(row.taskId) === String(taskId) && row.status === 'processing')
+        if (entry) {
+          entry.status = 'completed'
+          entry.processedAt = new Date().toISOString()
+          entry.runtimeGeneration = result.generation
+          writeJSON(DISPATCH_FILE, queue)
+        }
+      } catch (stateError) {
+        log(`⚠️ Adaptive completion state write failed: ${stateError.message}`)
+      }
+      runningTasks.delete(taskId)
+      runningAgents.delete(leader)
+      setAgentIdle(leader)
+      setTimeout(() => processQueue(), 1500)
+      return
+    }
+  } catch (adaptiveError) {
+    log(`❌ Adaptive runtime failed for ${taskId}: ${adaptiveError.message}`)
+    try {
+      withFileLock(TASKS_FILE, () => {
+        const tasks = readJSON(TASKS_FILE) || []
+        const task = tasks.find(row => String(row.id) === String(taskId))
+        if (task && task.status !== 'cancelled') {
+          task.status = 'failed'
+          task.statusMessage = `Adaptive runtime error: ${adaptiveError.message}`.slice(0, 300)
+          task.lastUpdate = new Date().toISOString()
+          writeJSON(TASKS_FILE, tasks)
+        }
+      })
+      const queue = readJSON(DISPATCH_FILE) || []
+      const entry = queue.find(row => String(row.taskId) === String(taskId) && row.status === 'processing')
+      if (entry) {
+        entry.status = 'failed'
+        entry.failureReason = `Adaptive runtime error: ${adaptiveError.message}`.slice(0, 300)
+        entry.processedAt = new Date().toISOString()
+        writeJSON(DISPATCH_FILE, queue)
+      }
+    } catch {}
+    runningTasks.delete(taskId)
+    runningAgents.delete(leader)
+    setAgentIdle(leader)
+    setTimeout(() => processQueue(), 1500)
+    return
+  }
+
   // (2026-04-23) code-review squad routes through code-review-dispatcher module.
   // White-box source code review — 6 framework specialists + PROBER runtime validator.
   if (dispatchType === 'code-review') {
@@ -9569,6 +9846,19 @@ async function dispatchToAgent(dispatch) {
         getQuotaHealth: () => { try { return quotaManager.summarizeHealth(['balanced', 'fast', 'powerful'].map((fam) => `anthropic/${modelRouter.resolveFamily(fam)}`).filter(Boolean)) } catch { return 'healthy' } },
         emitCandidate: (tid, rec) => {
           try {
+            const sourceFocus = Array.isArray(dispatch.meta && dispatch.meta.vulnClasses)
+              ? dispatch.meta.vulnClasses.filter(c => c !== 'all')
+              : []
+            if (sourceFocus.length && !focusAllowsFinding(sourceFocus, rec)) {
+              try {
+                fs.appendFileSync(`${agentPaths.INTEL_ROOT}/focus-rejected-${tid}.jsonl`, JSON.stringify({
+                  rejected_at: new Date().toISOString(),
+                  reason: `outside selected source-review focus: ${sourceFocus.join(', ')}`,
+                  candidate: rec,
+                }) + '\n')
+              } catch {}
+              return false
+            }
             // AGENT-INDEPENDENT dedup key so the mid-run candidate-file watcher (P2) and the post-job emit
             // collapse to ONE record even though they pass different agent labels. Prefers the candidate's
             // deterministic duplicate_key (feature:class:file:sink), else cwe|file|line|title (see dispatcher).

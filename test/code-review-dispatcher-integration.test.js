@@ -312,7 +312,7 @@ function stubDeps(spawnCalls, emitted = []) {
     ok('every selected class is a known CLASS', all.every(c => cr.CLASS[c]))
     const empty = cr.selectVulnClasses({})
     ok('empty surface still returns the baseline floor', empty.length >= 5 && empty.includes('xss'))
-    ok("CLASS covers every pattern catalog (23 classes)", Object.keys(cr.CLASS).length === 23)
+    ok("CLASS covers the complete canonical pattern catalog (26 classes)", Object.keys(cr.CLASS).length === 26)
   }
 
   // ── Test 6: every CLASS module/catalog file reference resolves on disk (no dangling refs) ──

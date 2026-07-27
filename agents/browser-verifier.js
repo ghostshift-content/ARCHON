@@ -23,6 +23,7 @@
 
 const { chromium } = require('playwright')
 const { validateRecipe } = require('./browser-recipe-validator')
+const { launchOptions } = require('./browser-launch-options')
 
 const STEP_TIMEOUT_MS = 15_000
 const FINDING_TIMEOUT_MS = 60_000
@@ -83,7 +84,7 @@ async function verifyRecipe(recipe, opts = {}) {
       async () => {
         browser = await chromium.launch({
           headless: true,
-          args: LAUNCH_ARGS,
+          ...launchOptions(chromium, LAUNCH_ARGS),
         })
 
         const contextOpts = { ignoreHTTPSErrors: true }

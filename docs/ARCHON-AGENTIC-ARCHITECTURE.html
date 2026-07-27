@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARCHON Agentic Architecture</title>
+  <style>
+    :root {
+      --bg: #101416;
+      --surface: #181d20;
+      --surface-2: #20262a;
+      --ink: #f7f1e5;
+      --muted: #aeb7ba;
+      --line: #3b454a;
+      --coral: #e66b55;
+      --teal: #52b8bd;
+      --green: #9eb66f;
+      --gold: #dfad4e;
+      --violet: #9b86c7;
+      --canvas-w: 1440px;
+      --canvas-h: 1480px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    button { font: inherit; }
+    .app { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+    header {
+      position: sticky; top: 0; z-index: 20; padding: 18px 24px 15px;
+      background: rgba(16,20,22,.97); border-bottom: 1px solid var(--line);
+    }
+    .heading { display: flex; align-items: flex-start; gap: 20px; }
+    .heading-copy { flex: 1; min-width: 0; }
+    h1 { margin: 0; font-size: 27px; line-height: 1.1; letter-spacing: 0; }
+    .lede { margin: 7px 0 0; color: var(--muted); font-size: 13px; max-width: 920px; }
+    .controls, .filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .filters { margin-top: 14px; }
+    .filter-label { margin-right: 3px; color: #7f8c91; font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; }
+    .btn, .chip {
+      min-height: 34px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink);
+      background: var(--surface); padding: 7px 11px; cursor: pointer;
+    }
+    .btn:hover, .chip:hover { border-color: #67757b; }
+    .btn.icon { width: 34px; padding: 0; font-size: 19px; }
+    .zoom { width: 50px; text-align: center; color: var(--muted); font-size: 12px; }
+    .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }
+    .chip[aria-pressed="true"] { color: #111719; border-color: transparent; }
+    .chip[data-plane="all"][aria-pressed="true"] { background: var(--ink); }
+    .chip[data-plane="control"][aria-pressed="true"] { background: var(--coral); }
+    .chip[data-plane="mode"][aria-pressed="true"] { background: var(--teal); }
+    .chip[data-plane="team"][aria-pressed="true"] { background: var(--green); }
+    .chip[data-plane="validation"][aria-pressed="true"] { background: var(--gold); }
+    .chip[data-plane="memory"][aria-pressed="true"] { background: var(--violet); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+    main { min-height: 0; overflow: auto; position: relative; }
+    #stage { width: calc(var(--canvas-w) * var(--scale)); height: calc(var(--canvas-h) * var(--scale)); margin: 24px auto 80px; position: relative; }
+    #canvas {
+      width: var(--canvas-w); height: var(--canvas-h); position: absolute; inset: 0;
+      transform: scale(var(--scale)); transform-origin: 0 0;
+    }
+    .plane-label {
+      position: absolute; color: #77858a; font-size: 11px; font-weight: 800;
+      letter-spacing: 1.8px; text-transform: uppercase;
+    }
+    svg.edges { position: absolute; inset: 0; width: var(--canvas-w); height: var(--canvas-h); overflow: visible; pointer-events: none; }
+    .edge { fill: none; stroke-linecap: round; marker-end: url(#arrow); transition: opacity .18s, stroke-width .18s; }
+    .edge.control { stroke: var(--coral); stroke-width: 2.2; }
+    .edge.data { stroke: var(--violet); stroke-width: 1.8; stroke-dasharray: 7 7; }
+    .edge.replan { stroke: var(--teal); stroke-width: 2.2; stroke-dasharray: 10 8; }
+    .node {
+      position: absolute; padding: 11px 13px; border-radius: 7px; border: 1.5px solid var(--line);
+      background: var(--surface-2); box-shadow: 0 5px 18px rgba(0,0,0,.24); cursor: pointer;
+      transition: opacity .18s, border-color .18s, transform .15s, box-shadow .18s;
+    }
+    .node:hover, .node.selected { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,.36); }
+    .node.control { background: #3b2422; border-color: var(--coral); }
+    .node.mode { background: #163137; border-color: var(--teal); }
+    .node.team { background: #263322; border-color: var(--green); }
+    .node.validation { background: #392f1d; border-color: var(--gold); }
+    .node.memory { background: #262331; border-color: var(--violet); }
+    .node.report { background: var(--coral); border-color: var(--coral); color: #111719; }
+    .node.dim, .edge.dim { opacity: .12; }
+    .node.near { opacity: 1; }
+    .kicker { font-size: 9px; line-height: 1.2; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; opacity: .65; }
+    .node-title { margin-top: 4px; font-size: 14px; line-height: 1.18; font-weight: 760; }
+    .node-detail { margin-top: 5px; color: var(--muted); font-size: 10.5px; line-height: 1.35; }
+    .report .node-detail { color: #31393c; }
+    #inspector {
+      position: fixed; top: 154px; right: 18px; z-index: 30; width: min(355px, calc(100vw - 36px));
+      max-height: calc(100vh - 176px); overflow: auto; padding: 18px; border: 1px solid #4b565b;
+      border-radius: 8px; background: #1b2124; box-shadow: 0 18px 50px rgba(0,0,0,.48);
+    }
+    #inspector[hidden] { display: none; }
+    .inspector-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .inspector-plane { color: var(--coral); font-size: 10px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; }
+    #inspector h2 { margin: 6px 0 0; font-size: 21px; letter-spacing: 0; }
+    #inspector p { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    #inspector h3 { margin: 18px 0 7px; font-size: 11px; text-transform: uppercase; letter-spacing: 1.1px; color: #89979c; }
+    #inspector ul { margin: 0; padding-left: 18px; color: #d8dedf; font-size: 12px; line-height: 1.6; }
+    .close { width: 32px; min-height: 32px; padding: 0; }
+    .legend { display: flex; gap: 16px; margin-left: 10px; color: var(--muted); font-size: 11px; }
+    .line-swatch { display: inline-block; width: 20px; border-top: 2px solid currentColor; margin-right: 6px; vertical-align: middle; }
+    .line-swatch.data { color: var(--violet); border-top-style: dashed; }
+    .line-swatch.replan { color: var(--teal); border-top-style: dashed; }
+    @media (max-width: 760px) {
+      header { padding: 14px; }
+      .heading { display: block; }
+      .controls { margin-top: 12px; }
+      .legend { width: 100%; margin: 4px 0 0; }
+      #inspector { top: auto; bottom: 12px; max-height: 48vh; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="heading">
+      <div class="heading-copy">
+        <h1>ARCHON agentic architecture</h1>
+        <p class="lede">One adaptive mission runtime for black-box, static, and white-box testing. Hover to trace a node, click to inspect its contract, and filter by responsibility.</p>
+      </div>
+      <div class="controls">
+        <button class="btn icon" id="zoomOut" title="Zoom out" aria-label="Zoom out">−</button>
+        <span class="zoom" id="zoomValue">70%</span>
+        <button class="btn icon" id="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+        <button class="btn" id="fit">Fit</button>
+        <button class="btn" id="reset">Reset</button>
+      </div>
+    </div>
+    <div class="filters" aria-label="Architecture plane filters">
+      <span class="filter-label">Planes</span>
+      <button class="chip" data-plane="all" aria-pressed="true">All</button>
+      <button class="chip" data-plane="control" aria-pressed="false"><span class="dot"></span>Control</button>
+      <button class="chip" data-plane="mode" aria-pressed="false"><span class="dot"></span>Mode adapters</button>
+      <button class="chip" data-plane="team" aria-pressed="false"><span class="dot"></span>Agent team</button>
+      <button class="chip" data-plane="validation" aria-pressed="false"><span class="dot"></span>Validation</button>
+      <button class="chip" data-plane="memory" aria-pressed="false"><span class="dot"></span>Memory</button>
+      <div class="legend">
+        <span><i class="line-swatch"></i>control</span>
+        <span><i class="line-swatch data"></i>data/evidence</span>
+        <span><i class="line-swatch replan"></i>replan</span>
+      </div>
+    </div>
+  </header>
+  <main id="viewport">
+    <div id="stage">
+      <div id="canvas">
+        <svg class="edges" viewBox="0 0 1440 1480" aria-hidden="true">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="context-stroke"></path>
+            </marker>
+          </defs>
+          <g id="edgeLayer"></g>
+        </svg>
+        <div id="nodeLayer"></div>
+      </div>
+    </div>
+    <aside id="inspector" hidden>
+      <div class="inspector-head">
+        <div><div class="inspector-plane" id="inspectorPlane"></div><h2 id="inspectorTitle"></h2></div>
+        <button class="btn close" id="closeInspector" aria-label="Close details">×</button>
+      </div>
+      <p id="inspectorDescription"></p>
+      <div id="inspectorContract"></div>
+      <div id="inspectorConnections"></div>
+    </aside>
+  </main>
+</div>
+<script>
+  const nodes = [
+    {id:'operator',x:60,y:60,w:220,h:72,p:'control',k:'Intake',t:'Operator dispatch',d:'goal · focus · target · source',desc:'The operator supplies the testing goal, engagement mode, vulnerability focus, authorized target or source roots, and strategy such as direct testing or full recon.',contract:['Creates one immutable mission identity','Never dispatches agents directly']},
+    {id:'scope',x:350,y:60,w:230,h:72,p:'control',k:'Safety',t:'Scope prevalidation',d:'authorization · target · boundaries',desc:'A universal preflight validates the target and scope before runtime ownership is selected. Live tool calls are checked again at execution time.',contract:['Fail closed before target-directed work','Static agents receive read-only repository tools','Live calls pass the tool scope gate']},
+    {id:'director',x:650,y:60,w:240,h:72,p:'control',k:'Lead',t:'Mission director',d:'goal → strategy → obligations',desc:'The single lead-level brain converts the high-level engagement goal into mode-aware obligations and a bounded mission strategy.',contract:['One lead plan per mission','Explains why work exists','Does not report findings directly']},
+    {id:'planner',x:960,y:60,w:220,h:72,p:'control',k:'Planning',t:'Adaptive planner',d:'DAG · priority · context',desc:'Builds a dependency-aware task graph. Work is grouped by coherent context rather than a feature-by-class job explosion.',contract:['Tasks have dependencies and definitions of done','Replans from new evidence','Pins a replan revision']},
+    {id:'governor',x:1250,y:60,w:150,h:72,p:'control',k:'Control',t:'Governor',d:'quota · cancel · retry',desc:'Enforces concurrency, quota backpressure, retry limits, cancellation and coverage-safe failure handling.',contract:['Cooling waits without a retry spin','Rate-limit exhaustion becomes a coverage gap','Cancellation stops the next wave']},
+
+    {id:'blackbox',x:70,y:240,w:380,h:112,p:'mode',k:'Black-box · URL',t:'Live attack surface',d:'recon or direct test → mapping → hypotheses',desc:'Maps reachable application behavior. A direct strategy can skip infrastructure recon while retaining application mapping and focused vulnerability lenses.',contract:['Runtime evidence required for confirmation','Focused selection activates only matching skills','New endpoints may create follow-up tasks']},
+    {id:'static',x:530,y:240,w:380,h:112,p:'mode',k:'Static · Source',t:'Holistic source review',d:'inventory → coherent slices → all security lenses',desc:'Reviews each context-sized source domain as a whole, combining pattern catalogs with authorization, business-logic, missing-control and freehand reasoning.',contract:['Never marks source-only evidence runtime-confirmed','One persistent researcher per coherent slice','All applicable classes reviewed as lenses']},
+    {id:'whitebox',x:990,y:240,w:380,h:112,p:'mode',k:'White-box · Source + URL',t:'Source-guided validation',d:'static candidate → linked runtime proof task',desc:'Reuses the static source path, then creates linked black-box validation work for source candidates when an authorized live target exists.',contract:['Source and runtime evidence stay distinct','No target means a preliminary source report','Runtime proof can upgrade confirmation status']},
+
+    {id:'board',x:560,y:438,w:320,h:82,p:'memory',k:'Mission state',t:'Shared task board',d:'dependencies · claims · leases · retries',desc:'The dependency-aware blackboard is the execution authority for tasks. Agents claim work atomically and expired leases can be recovered.',contract:['Append-only task history','One execution owner per mission','No duplicate plan task on resume']},
+    {id:'sessions',x:960,y:438,w:250,h:82,p:'memory',k:'Runtime state',t:'Session registry',d:'heartbeat · current task · terminal state',desc:'Tracks persistent lead, researcher, explore, triage and verifier sessions for observability and recovery.',contract:['Every session has a unique identity','Terminal history is retained','Concurrent same-persona streams never overwrite']},
+    {id:'journal',x:1250,y:438,w:150,h:82,p:'memory',k:'Audit',t:'Journal',d:'events · decisions',desc:'Records lifecycle, quota, replan and completion events as an append-only mission audit trail.',contract:['Idempotent lifecycle keys','Decision traces remain durable']},
+
+    {id:'inventory',x:60,y:625,w:200,h:76,p:'team',k:'Phase 1',t:'Inventory agent',d:'assets · files · interfaces',desc:'Builds the initial measured surface used to plan coherent research workstreams.',contract:['Inventory is evidence, not a finding','Coverage begins from assigned work']},
+    {id:'research',x:320,y:625,w:210,h:76,p:'team',k:'Persistent session',t:'Researcher',d:'holistic workstream owner',desc:'Owns one coherent context slice and applies all relevant skill and persona lenses without splitting every vulnerability class into another session.',contract:['One bounded workstream','Emits candidates and observations','Can propose at most two explore children']},
+    {id:'explore',x:590,y:625,w:190,h:76,p:'team',k:'Bounded follow-up',t:'Explore agent',d:'evidence-triggered depth',desc:'Investigates a specific lead discovered by a researcher. Explore work cannot recursively fan out.',contract:['Maximum depth is one','Interesting discoveries return to the planner','No unbounded agent tree']},
+    {id:'skills',x:840,y:625,w:220,h:76,p:'team',k:'Activation engine',t:'Skills + patterns',d:'preconditions · techniques · evidence',desc:'Eligible capabilities activate from the mission mode, operator focus and discovered evidence. Patterns guide source review; skills guide live and source techniques.',contract:['No unrelated specialist for a focused scan','Custom abuse-driven goals become explicit lenses','Technique output follows a schema']},
+    {id:'tools',x:1120,y:625,w:280,h:76,p:'control',k:'Enforcement',t:'Scoped tool gateway',d:'HTTP · browser · repo · exec',desc:'Agents can use only the tools allowed by their task, mode, scope and risk policy. The gateway captures tool evidence and rejects unsafe actions.',contract:['Every live call is scope checked','Repository tools are read-only in static mode','Evidence is tied to task and hypothesis']},
+
+    {id:'graph',x:60,y:820,w:230,h:80,p:'memory',k:'Shared intelligence',t:'Knowledge graph',d:'assets · endpoints · source · hypotheses',desc:'The shared correlation layer stores discoveries and relationships so agents do not repeat work and the planner can respond to new evidence.',contract:['Typed entities and relationships','Provenance and confidence retained','Source and runtime views can correlate']},
+    {id:'evidence',x:350,y:820,w:230,h:80,p:'memory',k:'Immutable proof',t:'Evidence store',d:'source spans · requests · responses',desc:'Stores the proof required to validate a candidate: source locations, tool output, HTTP exchanges, screenshots and correlation records.',contract:['No evidence means no confirmed finding','Source evidence cannot impersonate runtime proof','Candidate records reference evidence IDs']},
+    {id:'candidate',x:640,y:820,w:220,h:80,p:'validation',k:'Streaming',t:'Candidate index',d:'dedupe key · observation count',desc:'Receives structured candidates while research is running and collapses duplicate observations before downstream validation.',contract:['Idempotent candidate identity','No candidate silently disappears','Duplicates increase observation count']},
+    {id:'triage',x:920,y:820,w:200,h:80,p:'validation',k:'Persistent pool',t:'TRIAGER',d:'merge · classify · enrich',desc:'Consumes candidate batches, rejects malformed or duplicate claims, applies evidence status and prepares report-quality records.',contract:['Backlog controls pool size','Static evidence stays source-labelled','Clean zero-finding runs remain valid']},
+    {id:'panel',x:1180,y:790,w:220,h:140,p:'validation',k:'Independent consensus',t:'Verifier panel',d:'REACHABILITY\nIMPACT\nDEFENSES',desc:'Exactly three independent lenses challenge each candidate. Deterministic code admits a finding only after the complete panel reaches the required consensus.',contract:['Exactly three distinct lenses','At least two TRUE_POSITIVE votes','Missing or malformed votes block admission']},
+
+    {id:'audit',x:220,y:1035,w:190,h:78,p:'validation',k:'Evidence gate',t:'AUDITOR',d:'adversarial evidence review',desc:'Checks whether the candidate claim, evidence and impact satisfy the mode-specific evidence contract.',contract:['Attempts to disprove the claim','Demotes unsupported impact','No direct report publication']},
+    {id:'judge',x:500,y:1035,w:190,h:78,p:'validation',k:'Publication gate',t:'JUDGE',d:'identity · verdict · severity',desc:'Produces the final publication verdict over the validated finding identity and severity.',contract:['Exact candidate identity required','Foreign or duplicate verdicts rejected','Only approved IDs can reach reporting']},
+    {id:'scribe',x:780,y:1035,w:190,h:78,p:'report',k:'Report',t:'SCRIBE',d:'validated findings only',desc:'Writes a final, preliminary or partial-coverage report from judge-approved records and explicit coverage gaps.',contract:['Stale reports cannot satisfy verification','White-box without proof stays preliminary','Incomplete coverage is labelled']},
+    {id:'gate',x:1060,y:1017,w:340,h:114,p:'control',k:'Deterministic terminal',t:'Completion gate',d:'tasks · follow-ups · triage · audit · judge · report',desc:'Computes whether the mission is complete, complete with gaps, or report blocked from durable task and validation state.',contract:['All required workstreams accounted','Every required phase terminal','Gaps never become reviewed-no-issue']},
+
+    {id:'ui',x:430,y:1240,w:580,h:94,p:'memory',k:'Operator visibility',t:'Live mission projection',d:'plan · sessions · tasks · evidence · findings · coverage',desc:'The portal projects durable runtime state so the operator can see which team is active, why tasks exist, what is blocked and which findings passed validation.',contract:['UI is a projection, not execution authority','Board history is never truncated','Current generation and completion status are visible']},
+  ];
+
+  const edges = [
+    ['operator','scope','control'],['scope','director','control'],['director','planner','control'],['planner','governor','control'],
+    ['governor','blackbox','control'],['governor','static','control'],['governor','whitebox','control'],
+    ['blackbox','board','control'],['static','board','control'],['whitebox','board','control'],
+    ['board','inventory','control'],['board','research','control'],['research','explore','control'],['research','skills','control'],['explore','skills','control'],['skills','tools','control'],
+    ['board','sessions','data'],['board','journal','data'],['tools','graph','data'],['tools','evidence','data'],['research','candidate','data'],['explore','candidate','data'],['evidence','candidate','data'],
+    ['candidate','triage','control'],['triage','panel','control'],['panel','audit','control'],['audit','judge','control'],['judge','scribe','control'],['scribe','gate','control'],
+    ['graph','planner','replan'],['candidate','graph','data'],['gate','ui','data'],['board','ui','data'],['sessions','ui','data'],['journal','ui','data'],
+  ];
+
+  const planeNames = {control:'Control plane',mode:'Mode adapter',team:'Agent team',validation:'Validation',memory:'Shared state',report:'Reporting'};
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const layer = document.getElementById('nodeLayer');
+  const edgeLayer = document.getElementById('edgeLayer');
+  let selected = null;
+  let scale = .70;
+  let activePlane = 'all';
+
+  function center(n) { return {x:n.x+n.w/2,y:n.y+n.h/2}; }
+  function edgePath(a,b) {
+    const ca=center(a), cb=center(b), dx=cb.x-ca.x, dy=cb.y-ca.y;
+    let sx,sy,tx,ty;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      sx=dx>0?a.x+a.w:a.x; sy=ca.y; tx=dx>0?b.x:b.x+b.w; ty=cb.y;
+    } else {
+      sx=ca.x; sy=dy>0?a.y+a.h:a.y; tx=cb.x; ty=dy>0?b.y:b.y+b.h;
+    }
+    const bend=Math.max(40,Math.min(130,Math.hypot(tx-sx,ty-sy)*.35));
+    if (Math.abs(dx) > Math.abs(dy)) return `M${sx} ${sy} C${sx+(dx>0?bend:-bend)} ${sy},${tx-(dx>0?bend:-bend)} ${ty},${tx} ${ty}`;
+    return `M${sx} ${sy} C${sx} ${sy+(dy>0?bend:-bend)},${tx} ${ty-(dy>0?bend:-bend)},${tx} ${ty}`;
+  }
+  nodes.forEach(n => {
+    const el=document.createElement('button');
+    el.className=`node ${n.p}`; el.dataset.id=n.id; el.dataset.plane=n.p;
+    el.style.cssText=`left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;text-align:left;color:inherit;font:inherit`;
+    el.innerHTML=`<div class="kicker">${n.k}</div><div class="node-title">${n.t}</div><div class="node-detail">${n.d.replaceAll('\n','<br>')}</div>`;
+    el.addEventListener('mouseenter',()=>focus(n.id));
+    el.addEventListener('mouseleave',()=>focus(selected));
+    el.addEventListener('click',()=>select(n.id));
+    layer.appendChild(el);
+  });
+  edges.forEach((e,i) => {
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',edgePath(byId[e[0]],byId[e[1]]));
+    path.setAttribute('class',`edge ${e[2]}`);
+    path.dataset.from=e[0]; path.dataset.to=e[1]; path.dataset.type=e[2]; path.id=`edge-${i}`;
+    edgeLayer.appendChild(path);
+  });
+
+  function focus(id) {
+    document.querySelectorAll('.node').forEach(el => {
+      const near=!id || el.dataset.id===id || edges.some(e => (e[0]===id&&e[1]===el.dataset.id)||(e[1]===id&&e[0]===el.dataset.id));
+      el.classList.toggle('dim',!near);
+    });
+    document.querySelectorAll('.edge').forEach(el => {
+      const near=!id || el.dataset.from===id || el.dataset.to===id;
+      el.classList.toggle('dim',!near);
+    });
+  }
+  function select(id) {
+    selected=selected===id?null:id;
+    document.querySelectorAll('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===selected));
+    focus(selected);
+    if (!selected) return closeInspector();
+    const n=byId[selected];
+    document.getElementById('inspectorPlane').textContent=planeNames[n.p]||n.p;
+    document.getElementById('inspectorTitle').textContent=n.t;
+    document.getElementById('inspectorDescription').textContent=n.desc;
+    document.getElementById('inspectorContract').innerHTML=`<h3>Enforced contract</h3><ul>${n.contract.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+    const incoming=edges.filter(e=>e[1]===id).map(e=>byId[e[0]].t);
+    const outgoing=edges.filter(e=>e[0]===id).map(e=>byId[e[1]].t);
+    document.getElementById('inspectorConnections').innerHTML=
+      `${incoming.length?`<h3>Receives from</h3><ul>${incoming.map(x=>`<li>${x}</li>`).join('')}</ul>`:''}`+
+      `${outgoing.length?`<h3>Sends to</h3><ul>${outgoing.map(x=>`<li>${x}</li>`).join('')}</ul>`:''}`;
+    document.getElementById('inspector').hidden=false;
+  }
+  function closeInspector(){document.getElementById('inspector').hidden=true;}
+  function setScale(next) {
+    scale=Math.max(.42,Math.min(1.15,next));
+    document.documentElement.style.setProperty('--scale',scale);
+    document.getElementById('zoomValue').textContent=`${Math.round(scale*100)}%`;
+  }
+  function fit() {
+    const view=document.getElementById('viewport');
+    setScale(Math.min((view.clientWidth-40)/1440,(view.clientHeight-40)/1480,.9));
+    view.scrollTo({top:0,left:0});
+  }
+  function filter(plane) {
+    activePlane=plane;
+    document.querySelectorAll('.chip').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.plane===plane)));
+    document.querySelectorAll('.node').forEach(el=>el.classList.toggle('dim',plane!=='all'&&el.dataset.plane!==plane));
+    document.querySelectorAll('.edge').forEach(el=>{
+      const a=byId[el.dataset.from], b=byId[el.dataset.to];
+      el.classList.toggle('dim',plane!=='all'&&a.p!==plane&&b.p!==plane);
+    });
+  }
+  document.querySelectorAll('.chip').forEach(el=>el.addEventListener('click',()=>{selected=null;closeInspector();filter(el.dataset.plane)}));
+  document.getElementById('zoomIn').onclick=()=>setScale(scale+.08);
+  document.getElementById('zoomOut').onclick=()=>setScale(scale-.08);
+  document.getElementById('fit').onclick=fit;
+  document.getElementById('reset').onclick=()=>{selected=null;closeInspector();filter('all');setScale(.70);document.getElementById('viewport').scrollTo({top:0,left:0})};
+  document.getElementById('closeInspector').onclick=()=>{selected=null;document.querySelectorAll('.node').forEach(el=>el.classList.remove('selected'));focus(null);closeInspector()};
+  setScale(scale);
+</script>
+</body>
+</html>
