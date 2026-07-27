@@ -2507,17 +2507,20 @@ async function _runtracerAgentInner(target, taskId) {
       sock.once('connect', () => done(true)).once('timeout', () => done(false)).once('error', () => done(false))
     })
     const _cdpPrefix = _cdpUp ? 'CRAWL4AI_CDP_URL=http://localhost:18800 ' : '' // else self-spawn
-    const crawlCmd = `${_cdpPrefix}timeout 300 python3 ${agentPaths.skillsDir('tracer')}/web-crawling/scripts/crawl4ai_crawler.py -u "${sTarget}" -d 4 --max-pages 200 -o "${outDir}" 2>&1`
+    // runWithHeartbeat owns the portable wall-clock timeout and kills the whole
+    // process group. Do not wrap this in GNU `timeout`: macOS does not ship it,
+    // which previously reduced mandatory application mapping to zero endpoints.
+    const crawlCmd = `${_cdpPrefix}python3 ${agentPaths.skillsDir('tracer')}/web-crawling/scripts/crawl4ai_crawler.py -u "${sTarget}" -d 4 --max-pages 200 -o "${outDir}" 2>&1`
     log(`   Phase A3: crawl4ai browser crawl (depth 4, max 200, CDP reuse, 5min timeout, heartbeat 30s)...`)
     const crawlResult = await runWithHeartbeat(crawlCmd, {
-      timeout: 200000,
+      timeout: 300000,
       heartbeatMs: 30000,
       onHeartbeat: persistCheckpointNow,
     })
     const crawlOut = crawlResult.stdout
     log(`   crawl4ai output: ${crawlOut.slice(0, 300)}`)
     if (crawlResult.timedOut) {
-      log(`⚠️  crawl4ai error: timed out after 200s — continuing with light crawl data (katana+gau still available)`)
+      log(`⚠️  crawl4ai error: timed out after 300s — continuing with light crawl data (katana+gau still available)`)
     } else if (crawlResult.code !== 0) {
       log(`⚠️  crawl4ai error: exit ${crawlResult.code} — continuing with light crawl data (katana+gau still available)`)
     } else {
@@ -2586,6 +2589,21 @@ async function _runtracerAgentInner(target, taskId) {
   // ── Phase D: Fallback crawl tools if crawl4ai failed ──
   if (!crawl4aiSuccess) {
     log(`🔄 Running fallback crawl tools (katana + ffuf)...`)
+    try {
+      const builtin = await require('./agents/http-fallback-crawler').crawl(sTarget, {
+        maxPages: 100,
+        timeoutMs: 8000,
+      })
+      builtin.urls.forEach(url => discovered.add(url))
+      endpoints.push(...builtin.endpoints)
+      forms.push(...builtin.forms)
+      log(`   Built-in HTTP mapper: ${builtin.pagesFetched} page(s), ${builtin.urls.length} URL(s), ${builtin.endpoints.length} endpoint(s), ${builtin.errors.length} error(s)`)
+    } catch (e) {
+      log(`⚠️  Built-in HTTP mapper error: ${e.message.slice(0, 200)}`)
+      // The root remains a known reachable application URL even if parsing fails.
+      discovered.add(sTarget)
+    }
+
     try {
       const tmpKatana = `/tmp/ek-${sTaskId}-katana.txt`
       run(`katana -u "${_crawlTarget}"${_hHdr} -d 4 -jc -aff -silent -o ${tmpKatana} 2>/dev/null`)
@@ -5705,17 +5723,39 @@ async function dispatchPentestParallel(dispatch) {
       log(`📥 Phase 2.7: Streaming triage ONLINE — findings triaged live as agents report them`)
       logActivity('TRIAGER', `📥 Streaming triage ONLINE — validating findings live`, { type: 'triage-flow', squad, taskId, projectId: projectId || '', details: 'Every specialist now streams findings to the triager one-by-one; confirmed findings appear on the Findings tab during the scan.' })
     }
+    const _haltCancelledPentest = async (where) => {
+      if (!_isTaskCancelled(taskId)) return false
+      killTaskChildren(taskId, 'cancelled')
+      if (_streamer) {
+        try { _streamedConfirmed = await _streamer.stop() } catch {}
+        _streamer = null
+      }
+      log(`🛑 Task ${taskId} cancelled — halted ${where}; no later validation, judge, or report phases will start`)
+      return true
+    }
+    const _runWaveWithHeartbeat = async (agents, concurrency, progress, label, worker) => {
+      const started = Date.now()
+      const heartbeat = setInterval(() => {
+        if (_isTaskCancelled(taskId)) return
+        const elapsed = Math.max(1, Math.floor((Date.now() - started) / 60000))
+        updateProgress(progress, `${label}: ${agents.map(a => String(a).toUpperCase()).join(', ')} running · ${elapsed}m elapsed`)
+      }, 30000)
+      if (heartbeat.unref) heartbeat.unref()
+      try { return await runWithConcurrency(agents, concurrency, worker) }
+      finally { clearInterval(heartbeat) }
+    }
 
     wave1Agents.forEach(a => { _agentWaveMap[a] = 1; _agentReflexionMap[a] = false })
 
     const _waveConc = _agentConcurrency(squad)
     log(`🎚️ Wave 1: ${wave1Agents.length} specialists, ${_waveConc} at a time (throttled — no machine bombard)`)
-    const batch1Results = await runWithConcurrency(wave1Agents, _waveConc, agent => {
+    const batch1Results = await _runWaveWithHeartbeat(wave1Agents, _waveConc, 25, 'Phase 2 Wave 1', agent => {
       const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
       return spawnWithRetry(agent, prompt, undefined)
     })
     const batch2Results = []
     trackCosts(batch1Results)
+    if (await _haltCancelledPentest('after specialist wave 1')) return { totalCost, allCosts, cancelled: true }
 
     // ── Reflexion: critique from wave 1 → injected into wave 2 ───────────
     let _batch1Critique = ''
@@ -5800,6 +5840,7 @@ async function dispatchPentestParallel(dispatch) {
         log(`⚠️ Phase 2.5 fast-verify error (non-fatal): ${e.message}`)
       }
     }
+    if (await _haltCancelledPentest('after fast verification')) return { totalCost, allCosts, cancelled: true }
 
     // Wave 2: second-half specialists in parallel with reflexion critique injected
     let batch3Results = []
@@ -5816,13 +5857,14 @@ async function dispatchPentestParallel(dispatch) {
       const reflexionUsed = !!_batch1Critique
       wave2Agents.forEach(a => { _agentWaveMap[a] = 2; _agentReflexionMap[a] = reflexionUsed })
 
-      const wave2Results = await runWithConcurrency(wave2Agents, _agentConcurrency(squad), agent => {
+      const wave2Results = await _runWaveWithHeartbeat(wave2Agents, _agentConcurrency(squad), 45, 'Phase 2 Wave 2', agent => {
         const basePrompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
         const prompt = basePrompt + (_batch1Critique || '') + (_fastVerifiedContext || '')
         return spawnWithRetry(agent, prompt, undefined)
       })
       batch3Results = wave2Results
       trackCosts(wave2Results)
+      if (await _haltCancelledPentest('after specialist wave 2')) return { totalCost, allCosts, cancelled: true }
 
       // Budget check after wave 2
       const budget = getCostBudget(squad)
@@ -5922,6 +5964,7 @@ async function dispatchPentestParallel(dispatch) {
     } catch (condErr) {
       log(`⚠️ Conditional dispatch error (non-fatal): ${condErr.message}`)
     }
+    if (await _haltCancelledPentest('after conditional specialists')) return { totalCost, allCosts, cancelled: true }
 
     const allVulnResults = [...batch1Results, ...batch2Results, ...batch3Results, ...conditionalResults]
     const vulnSuccess = allVulnResults.filter(r => (r.code === 0 || r.code === 1)).length
@@ -5934,6 +5977,7 @@ async function dispatchPentestParallel(dispatch) {
       details: allVulnResults.map(r => `${r.agentName.toUpperCase()}: ${(r.code === 0 || r.code === 1) ? '✅' : '❌'}`).join(', ')
     })
     updateProgress(65, 'Phase 2 complete — all vuln specialists done')
+    if (await _haltCancelledPentest('before specialist output checks')) return { totalCost, allCosts, cancelled: true }
 
     // Spotcheck: verify all specialists produced output
     const specialistOutput = {}
@@ -5946,12 +5990,14 @@ async function dispatchPentestParallel(dispatch) {
     if (emptySpecialists.length > 0) {
       log(`⚠️ Spotcheck: ${emptySpecialists.length} specialists produced no output: ${emptySpecialists.join(', ')}`)
       for (const agent of emptySpecialists) {
+        if (_isTaskCancelled(taskId)) break
         log(`♻️ Re-running ${agent.toUpperCase()} (produced no output)`)
         const prompt = buildPentestSpecialistPrompt(agent, taskTitle, taskId, projectId || '', squad, taskGoal || '', targetUrl, wafStatus, techContext, _taskMissedSignals[taskId], _focusConstraint)
         const retryResult = await spawnAgent(agent, taskId, prompt, `task-${taskId}-${agent}-retry`, modelOverride, { timeoutMs: SPECIALIST_TIMEOUT_MS })
         trackCosts([retryResult])
       }
     }
+    if (await _haltCancelledPentest('after specialist output checks')) return { totalCost, allCosts, cancelled: true }
 
     // ── PHASE 2.9: Cross-agent contradiction detector ──
     // Scans live-findings for agents that contradict each other about the same URL.
@@ -6014,9 +6060,11 @@ async function dispatchPentestParallel(dispatch) {
     // with zero findings because of the streamer.
     if (_streamer) {
       try { _streamedConfirmed = await _streamer.stop() } catch (e) { log(`⚠️ streaming-triage drain (non-fatal): ${e.message}`) }
+      _streamer = null
       log(`📥 Phase 2.7 complete: streaming triage validated ${_streamedConfirmed} finding(s) live`)
       logActivity('TRIAGER', `📥 Streaming triage complete — ${_streamedConfirmed} finding(s) on the board`, { type: 'triage-flow', squad, taskId, projectId: projectId || '', details: _streamedConfirmed > 0 ? 'Validated + written live during the scan.' : 'Nothing confirmed live — falling back to batch validation.' })
     }
+    if (await _haltCancelledPentest('before AUDITOR validation')) return { totalCost, allCosts, cancelled: true }
 
     // ── PHASE 3: Validation (AUDITOR) ──
     log(`🔄 Phase 3: AUDITOR validating all suspected findings`)
@@ -6058,6 +6106,7 @@ async function dispatchPentestParallel(dispatch) {
       auditorResult = await spawnAgent(PENTEST_VALIDATOR, taskId, auditorPrompt, `task-${taskId}-auditor-validate`, modelOverride, { timeoutMs: REPORT_AUDITOR_TIMEOUT_MS })
       trackCosts([auditorResult])
     }
+    if (await _haltCancelledPentest('after AUDITOR validation')) return { totalCost, allCosts, cancelled: true }
 
     log(`✅ Phase 3 complete: AUDITOR validation done`)
     logEvent('PHASE_DONE', { taskId, phase: 'validation' })

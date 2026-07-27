@@ -8,6 +8,7 @@ const fs = require('fs')
 const path = require('path')
 const profiler = require('./profiler')
 const workstreamPlanner = require('./workstream-planner')
+const { focusAllowsFinding } = require('../pipeline/focus-map')
 
 // The full class list the single session reviews as lenses (superset; adapter/meta can override).
 const DEFAULT_LENSES = [
@@ -21,6 +22,10 @@ const DEFAULT_LENSES = [
 function buildHolisticPrompt(ws, opts = {}) {
   const files = (opts.files || []).map((f) => `  - ${f}`).join('\n')
   const lenses = (opts.lenses || DEFAULT_LENSES).map((c) => `  - ${c}`).join('\n')
+  const focused = Array.isArray(opts.lenses) && opts.lenses.length > 0
+  const reviewBoundary = focused
+    ? `Review ONLY the vulnerability lenses listed below. Do not emit candidates for unrelated classes; record them only as non-finding context.`
+    : `Review every vulnerability lens listed below.`
   const slugs = (opts.featureSlugs || []).join(', ')
   const slugLine = slugs ? `\nFor the "feature" field, use EXACTLY one of these discovered feature slugs (pick the closest): ${slugs}. Do NOT invent a different feature name.\n` : ''
   return `You are a senior application security reviewer.${slugLine} Perform a COMPLETE static security review of this source workstream AS ONE COHERENT UNIT — map and review it together in a single pass, the way one expert reads a whole small project.
@@ -32,7 +37,7 @@ ${files || '  (all source files under the source root)'}
 
 Do ALL of the following in one pass:
 1. MAP every feature: route/endpoint, controller/action, inputs/params, auth/authz checks, models/services, dangerous sinks, trust boundaries.
-2. REVIEW every feature against ALL these vulnerability lenses:
+2. ${reviewBoundary}
 ${lenses}
    AND reason BEYOND pattern-matching — this is where signature scanners fail:
    - Authorization: who is allowed here? Is ownership/role actually checked? (IDOR / BOLA / privilege escalation)
@@ -165,6 +170,9 @@ async function runHolistic(deps, opts) {
   const candByFeature = {}                                  // canonical slug → { count, classes:Set, files:Set }
   const anomalies = []                                     // §4: unmatched candidates — never folded to a feature
   const featureIndex = _featureIndex(opts.features)         // F2-robust: candidate feature name → discovered slug
+  const selectedLenses = Array.isArray(opts.lenses) && opts.lenses.length
+    ? opts.lenses
+    : (Array.isArray(opts.vulnClasses) && opts.vulnClasses.length ? opts.vulnClasses : DEFAULT_LENSES)
 
   const results = await runWaves(plan.workstreams, plan.active_concurrency || 1, async (ws, i) => {
     if (cancelled()) return null
@@ -177,13 +185,16 @@ async function runHolistic(deps, opts) {
     const outFile = path.join(opts.outDir, 'holistic', `${ws.id}.candidates.jsonl`)
     // F4: each workstream reviews ITS OWN files when the planner assigned them; a single-session project = all files.
     const files = (ws.files && ws.files.length) ? ws.files : allFiles
-    const prompt = buildHolisticPrompt(ws, { sourceDir: opts.sourceDir, files, outFile, lenses: opts.lenses, featureSlugs: (opts.features || []).map(_slug).filter(Boolean) })
+    const prompt = buildHolisticPrompt(ws, { sourceDir: opts.sourceDir, files, outFile, lenses: selectedLenses, featureSlugs: (opts.features || []).map(_slug).filter(Boolean) })
     let r
     try { r = await spawnAgent(agent, opts.taskId, prompt, `task-${opts.taskId}-holistic-${ws.id}`, null) }
     catch (e) { errors.push({ workstream: ws.id, error: e.message }); return { workstream: ws.id, agent, candidates: 0, error: e.message, started_at, finished_at: _now() } }
     trackCosts([r].filter(Boolean))
     // F2: read candidates for per-feature coverage, THEN emit through the dispatcher's robust emitter
     for (const rec of _readCandidates(outFile)) {
+      // Prompt enforcement is advisory; this deterministic gate keeps
+      // focused static/white-box runs from counting unrelated model output.
+      if (!focusAllowsFinding(selectedLenses, rec)) continue
       // §4: fold the free-form candidate feature name onto a discovered slug so per-feature coverage lines up.
       // No match → a COVERAGE_ANOMALY (surfaced separately); NEVER silently reclassified as reviewed_no_issue.
       const matched = _matchFeature(rec.feature, featureIndex)
@@ -217,7 +228,7 @@ async function runHolistic(deps, opts) {
   // gap (its session never produced a verdict). Evidence of review = the ASSIGNED file manifest + the FULL lens list
   // the session was tasked with (recorded when the session ran), NOT just the files/classes that produced candidates.
   const failedWs = new Set(workstream_coverage.filter((w) => !w.terminal).map((w) => w.workstream))
-  const lensList = (opts.lenses || DEFAULT_LENSES).map((c) => String(c).split(' ')[0])   // the classes every session reviews
+  const lensList = selectedLenses.map((c) => String(c).split(' ')[0])   // the classes every session reviews
   const coverage = (opts.features || []).map((f) => {
     const slug = _slug(f); const c = candByFeature[slug]
     const ws = wsOfFeature[slug]

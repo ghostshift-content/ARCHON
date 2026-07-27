@@ -70,6 +70,8 @@ test('source-review focus families retain their expected subtypes', () => {
   assert.equal(focusAllowsFinding(['access-control'], { vulnerability_class: 'idor' }), true)
   assert.equal(focusAllowsFinding(['authentication-session'], { vulnerability_class: 'auth', title: 'Authentication bypass' }), true)
   assert.equal(focusAllowsFinding(['api-security'], { vulnerability_class: 'graphql' }), true)
+  assert.equal(focusAllowsFinding(['sqli'], { vulnerability_class: 'sql-injection' }), true)
+  assert.equal(focusAllowsFinding(['sql-injection'], { vulnerability_class: 'sqli' }), true)
   assert.equal(focusAllowsFinding(['xss'], { vulnerability_class: 'sqli' }), false)
 })
 

@@ -1,0 +1,1 @@
+INTERNAL-LAB-NOTE: synthetic evidence for the path traversal exercise.

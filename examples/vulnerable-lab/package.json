@@ -1,0 +1,13 @@
+{
+  "name": "archon-vulnerable-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Intentionally vulnerable localhost-only application for ARCHON validation",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/app.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

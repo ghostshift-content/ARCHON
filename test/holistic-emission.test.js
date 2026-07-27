@@ -4,6 +4,12 @@ const { test } = require('node:test'); const assert = require('node:assert/stric
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path')
 const cr = require('../src/dispatch/code-review-dispatcher')
 
+test('source dispatcher canonicalizes UI/model vulnerability-class aliases', () => {
+  assert.equal(cr.normalizeVulnClass('sql-injection'), 'sqli')
+  assert.equal(cr.normalizeVulnClass('SQL Injection'), 'sqli')
+  assert.equal(cr.normalizeVulnClass('webhook/callback'), 'webhook-security')
+})
+
 test('F5: parseCandidateLine repairs lone backslashes (\\A \\z \\d) that broke the path-traversal candidate', () => {
   const bad = '{"feature":"upload","vuln_class":"path-traversal","code_block":"filename =~ /\\A\\.\\./","file":"u.rb"}'
   assert.throws(() => JSON.parse(bad), 'raw is invalid JSON')
@@ -32,4 +38,25 @@ test('F5: emitCandidatesFromFile emits repaired + quarantines unrepairable (no s
   const rej = path.join(INTEL, 'rejected-candidates-t-f5.jsonl')
   assert.ok(fs.existsSync(rej) && fs.readFileSync(rej, 'utf8').includes('totally broken'), 'the unrepairable line was quarantined, not dropped')
   fs.rmSync(f, { force: true }); fs.rmSync(rej, { force: true })
+})
+
+test('focused sink rejection is not counted as a successful candidate emission', () => {
+  const f = path.join(os.tmpdir(), `cand-focus-${Date.now()}.jsonl`)
+  fs.writeFileSync(f, [
+    '{"feature":"q","vuln_class":"sql-injection","file":"q.rb","status":"SOURCE_CONFIRMED"}',
+    '{"feature":"profile","vuln_class":"xss","file":"p.rb","status":"SOURCE_CONFIRMED"}',
+  ].join('\n'))
+  const accepted = []
+  const n = cr.emitCandidatesFromFile(
+    f, 'holistic', { slug: 'ws1' }, 'MARSHAL', 't-focus',
+    (tid, rec) => {
+      if (rec.vulnerability_class !== 'sql-injection') return false
+      accepted.push(rec)
+      return true
+    },
+    () => {}, '/src', 'static',
+  )
+  assert.equal(n, 1)
+  assert.equal(accepted.length, 1)
+  fs.rmSync(f, { force: true })
 })

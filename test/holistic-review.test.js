@@ -40,3 +40,33 @@ test('holistic prompt covers all lenses + authz/logic reasoning', () => {
   assert.match(p, /access-control/); assert.match(p, /business logic/i); assert.match(p, /CSRF/); assert.match(p, /mass-assignment/)
   assert.match(p, /who is allowed/i); assert.match(p, /SOURCE_CONFIRMED/)
 })
+
+test('focused holistic review instructs and accounts for only selected classes', async () => {
+  const sd = srcDir(); const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'holo-focus-'))
+  let promptSeen = ''
+  const deps = {
+    spawnAgent: async (agent, taskId, prompt) => {
+      promptSeen = prompt
+      const m = prompt.match(/one per line\) to: (\S+)/)
+      fs.mkdirSync(path.dirname(m[1]), { recursive: true })
+      fs.writeFileSync(m[1],
+        JSON.stringify({ feature: 'search-query', vuln_class: 'sql-injection', file: 'app/b.rb', line: 1, status: 'SOURCE_CONFIRMED' }) + '\n' +
+        JSON.stringify({ feature: 'show', vuln_class: 'access-control', file: 'app/a.rb', line: 1, status: 'SOURCE_CONFIRMED' }) + '\n')
+      return { code: 0, cost: { totalCost: 0, tokens: { total: 1 } } }
+    },
+    log: () => {}, trackCosts: () => {},
+    emitFromFile: () => 1,
+  }
+  const res = await H.runHolistic(deps, {
+    taskId: 't-focus', sourceDir: sd,
+    features: [{ slug: 'show', domain: 'app' }, { slug: 'search-query', domain: 'app' }],
+    vulnClasses: ['sqli'], outDir,
+  })
+  assert.match(promptSeen, /Review ONLY the vulnerability lenses/)
+  assert.match(promptSeen, /\n  - sqli\n/)
+  assert.doesNotMatch(promptSeen, /\n  - access-control \(IDOR\/BOLA\)\n/)
+  assert.equal(res.coverage.find((c) => c.feature === 'search-query').candidate_count, 1)
+  assert.equal(res.coverage.find((c) => c.feature === 'show').candidate_count, 0)
+  assert.deepEqual(res.coverage[0].classes_reviewed, ['sqli'])
+  fs.rmSync(sd, { recursive: true, force: true }); fs.rmSync(outDir, { recursive: true, force: true })
+})

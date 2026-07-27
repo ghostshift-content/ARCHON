@@ -76,9 +76,38 @@ const AGENT_CLASSES = {
   keyring: ['auth', 'session'],
 }
 
+// Models, pattern catalogs, and UI controls do not always use the same label
+// for a vulnerability family. Canonicalize at the shared focus boundary so a
+// source candidate such as "sql-injection" is not rejected by a "sqli" scan.
+const CLASS_ALIASES = Object.freeze({
+  'sql-injection': 'sqli',
+  'sql injection': 'sqli',
+  'cross-site-scripting': 'xss',
+  'cross site scripting': 'xss',
+  'broken-access-control': 'access-control',
+  'broken access control': 'access-control',
+  'command injection': 'command-injection',
+  'os-command-injection': 'command-injection',
+  'server-side-request-forgery': 'ssrf',
+  'server side request forgery': 'ssrf',
+  'server-side-template-injection': 'ssti',
+  'xml-external-entity': 'xxe',
+  'directory-traversal': 'path-traversal',
+  'file-upload': 'file-handling',
+  'graphql/api-security': 'api-security',
+  'webhook/callback': 'webhook-security',
+  'secrets/cryptography': 'secrets-cryptography',
+  'logging/audit': 'logging-audit',
+})
+
+function canonicalFocusClass(value) {
+  const cls = String(value || '').toLowerCase().trim()
+  return CLASS_ALIASES[cls] || cls
+}
+
 function normalizeFocusClasses(focusClasses) {
   return Array.isArray(focusClasses)
-    ? [...new Set(focusClasses.map(c => String(c || '').toLowerCase().trim()).filter(Boolean))]
+    ? [...new Set(focusClasses.map(canonicalFocusClass).filter(Boolean))]
     : []
 }
 
@@ -122,7 +151,7 @@ function detectedFindingClasses(finding) {
   const f = finding || {}
   const explicit = [
     f.vulnerability_class, f.vuln_class, f.class, f.category,
-  ].map(v => String(v || '').toLowerCase().trim()).filter(Boolean)
+  ].map(canonicalFocusClass).filter(Boolean)
   const detected = new Set()
   for (const cls of explicit) {
     if (PENTEST_FOCUS_MAP[cls] || FOCUS_FAMILIES[cls]) detected.add(cls)
@@ -164,7 +193,7 @@ function focusDirective(focusClasses, customFocus) {
 module.exports = {
   PENTEST_FOCUS_MAP, focusedSpecialists, focusAllows, specialistForClass,
   normalizeFocusClasses, expandedFocusClasses, detectedFindingClasses,
-  focusAllowsFinding, focusDirective,
+  focusAllowsFinding, focusDirective, canonicalFocusClass,
 }
 
 // self-check: filtering, gating (incl. the reported bug scenario), and class→specialist mapping.

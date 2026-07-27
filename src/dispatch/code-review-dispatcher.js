@@ -232,6 +232,15 @@ const CLASS = {
   'supply-chain':          { agent: 'breaker', module: null, catalog: null },
 }
 const CLASS_ALIASES = Object.freeze({
+  'sql-injection': 'sqli',
+  'sql injection': 'sqli',
+  'cross-site-scripting': 'xss',
+  'broken-access-control': 'access-control',
+  'file-upload': 'file-handling',
+  'graphql/api-security': 'api-security',
+  'webhook/callback': 'webhook-security',
+  'secrets/cryptography': 'secrets-cryptography',
+  'logging/audit': 'logging-audit',
   'multi-tenant': 'multi-tenant-isolation',
   'cryptography-secrets': 'secrets-cryptography',
   webhooks: 'webhook-security',
@@ -649,7 +658,13 @@ function emitCandidatesFromFile(candFile, cls, feature, agent, taskId, emitCandi
     if (!p.ok) { rejected++; try { fs.appendFileSync(rejectFile, JSON.stringify({ ts: new Date().toISOString(), taskId, agent: String(agent), cls, reason: 'invalid JSON (unrepairable)', raw: s.slice(0, 4000) }) + '\n') } catch {}; continue }
     if (p.repaired) repaired++
     const rec = toLiveCandidate(p.c, cls, feature, agent, sourceDir, mode)
-    if (rec) { try { emitCandidate(taskId, rec); n++ } catch {} }
+    if (rec) {
+      try {
+        // The sink returns false when focus-gating or in-run dedupe rejects a
+        // record. Count only records that actually entered live-findings.
+        if (emitCandidate(taskId, rec) !== false) n++
+      } catch {}
+    }
   }
   if ((n || rejected) && typeof log === 'function') log(`  📡 ${String(agent).toUpperCase()} → ${n} candidate(s)${repaired ? ` (${repaired} repaired)` : ''}${rejected ? `, ⚠️ ${rejected} QUARANTINED → rejected-candidates` : ''} [${cls}/${feature.slug}]`)
   return n
