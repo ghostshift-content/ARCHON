@@ -744,3 +744,74 @@ ol.fsteps li { font-size: 13px; line-height: 1.5; }
 .studio-form label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--fg-dim); }
 .studio-form input, .studio-form select, .studio-form textarea { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,.12)); background: var(--bg, #0e0f13); color: var(--fg, #e6e6e6); font: inherit; }
 .mission-card .src-feed { max-height: 180px; overflow-y: auto; }
+
+/* ── Findings board (cross-engagement) ─────────────────────────────────── */
+.fb-summary { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px }
+.fb-stat { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+  padding:10px 16px; min-width:86px; display:flex; flex-direction:column; gap:2px }
+.fb-stat b { font-size:22px; line-height:1.1 }
+.fb-stat span { font-size:11px; color:var(--muted,#8b93a7); text-transform:uppercase; letter-spacing:.4px }
+.fb-stat.sev-critical b { color:var(--sev-critical) }
+.fb-stat.sev-high b     { color:var(--sev-high) }
+.fb-stat.sev-medium b   { color:var(--sev-medium) }
+.fb-stat.sev-low b      { color:var(--sev-low) }
+.fb-stat.sev-info b     { color:var(--sev-info) }
+/* the stat tiles reuse .sev-* which set a background elsewhere — keep these flat */
+.fb-stat.sev-critical, .fb-stat.sev-high, .fb-stat.sev-medium,
+.fb-stat.sev-low, .fb-stat.sev-info { background:var(--panel); }
+
+.fb-controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 12px }
+.fb-input { background:var(--bg-2); color:inherit; border:1px solid var(--line);
+  border-radius:8px; padding:7px 10px; font:inherit; font-size:13px; min-width:150px }
+#fbSearch { min-width:260px; flex:1 1 260px }
+.fb-input:focus { outline:none; border-color:var(--accent); }
+
+.fb-targets { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px }
+.fb-target { display:flex; align-items:center; gap:8px; cursor:pointer;
+  background:var(--panel); border:1px solid var(--line); border-radius:999px;
+  padding:6px 12px; color:inherit; font:inherit; font-size:12.5px }
+.fb-target:hover { border-color:var(--line-2); background:var(--panel-2) }
+.fb-target b { font-weight:600 }
+.fb-tcount { color:var(--muted,#8b93a7) }
+.fb-target i { font-style:normal; font-size:11px; padding:1px 6px; border-radius:999px; font-weight:700 }
+.fb-target i.sev-critical { background:var(--sev-critical); color:#fff }
+.fb-target i.sev-high     { background:var(--sev-high); color:#1b1205 }
+.fb-target i.sev-medium   { background:var(--sev-medium); color:#1b1205 }
+.fb-target i.sev-low      { background:var(--sev-low); color:#04202b }
+.fb-target i.sev-info     { background:var(--sev-info); color:#0b0f16 }
+
+.fb-table-wrap { border:1px solid var(--line); border-radius:12px; overflow-x:auto; background:var(--panel) }
+.fb-table { width:100%; border-collapse:collapse; font-size:13px; min-width:900px }
+.fb-table thead th { text-align:left; padding:10px 12px; background:var(--bg-2);
+  border-bottom:1px solid var(--line); font-size:11px; text-transform:uppercase;
+  letter-spacing:.4px; color:var(--muted,#8b93a7); white-space:nowrap }
+.fb-table thead th[data-sort] { cursor:pointer; user-select:none }
+.fb-table thead th[data-sort]:hover { color:var(--accent-2) }
+.fb-table td { padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top }
+.fb-table tbody tr { cursor:pointer }
+.fb-table tbody tr:hover { background:var(--panel-2) }
+.fb-table tbody tr:last-child td { border-bottom:none }
+.sev-badge { display:inline-block; padding:2px 8px; border-radius:999px;
+  font-size:11px; font-weight:700; white-space:nowrap }
+.fb-title b { font-weight:600 }
+.fb-url { color:var(--muted,#8b93a7); font-size:11.5px; margin-top:3px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; word-break:break-all; max-width:520px }
+/* linkable finding URL — muted until hovered so it doesn't fight the title for attention */
+.fb-link { color:inherit; text-decoration:none; border-bottom:1px dotted currentColor }
+.fb-link:hover, .fb-link:focus-visible {
+  color:var(--accent,#6ea8fe); border-bottom-style:solid; outline:none }
+.fb-link:focus-visible { outline:2px solid var(--accent,#6ea8fe); outline-offset:2px }
+.fb-tgt { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; white-space:nowrap }
+.fb-task { color:var(--muted,#8b93a7); font-size:12px; max-width:220px }
+.fb-empty { padding:26px; text-align:center; color:var(--muted,#8b93a7) }
+.fb-facet-head { font-size:11px; text-transform:uppercase; letter-spacing:.5px;
+  color:var(--muted,#8b93a7); margin:4px 0 7px; display:flex; gap:8px; align-items:baseline }
+.fb-facet-head .hint { text-transform:none; letter-spacing:0; font-size:11px; opacity:.7 }
+.fb-toggle { display:flex; align-items:center; gap:6px; font-size:12.5px;
+  color:var(--muted,#8b93a7); cursor:pointer; user-select:none; white-space:nowrap }
+.fb-toggle input { accent-color:var(--accent); cursor:pointer }
+.fb-stage { display:inline-block; padding:2px 8px; border-radius:999px;
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap }
+.fb-stage-validated { background:rgba(52,211,153,.16); color:#34d399; border:1px solid rgba(52,211,153,.3) }
+.fb-stage-raw { background:rgba(148,163,184,.14); color:#94a3b8; border:1px solid rgba(148,163,184,.28) }
+.fb-table tbody tr:has(.fb-stage-raw) { opacity:.82 }

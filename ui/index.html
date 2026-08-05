@@ -45,6 +45,9 @@
       <button data-view="squads">
         <svg viewBox="0 0 24 24"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 8l4 2.2v4.4L12 17l-4-2.4v-4.4L12 8z"/></svg>
         Squads <span class="count" id="cSquads">0</span></button>
+      <button data-view="findings">
+        <svg viewBox="0 0 24 24"><path d="M12 2l9 4v6c0 5-3.8 9.2-9 10-5.2-.8-9-5-9-10V6l9-4z"/><path d="M12 8v4M12 16h.01"/></svg>
+        Findings <span class="count" id="cFindings">0</span></button>
       <button data-view="reports">
         <svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5M9 13h7M9 17h7"/></svg>
         Reports <span class="count" id="cReports">0</span></button>
@@ -183,6 +186,57 @@
       <section class="view" id="view-squads">
         <div class="view-head"><h1>Squads &amp; personas</h1><span class="sub">offensive security squads · leaders, phases, rosters</span></div>
         <div class="grid cols-3" id="squadList"></div>
+      </section>
+
+      <section class="view" id="view-findings">
+        <div class="view-head"><h1>Findings</h1><span class="sub">every validated finding across all engagements &middot; grouped by target</span></div>
+
+        <div class="fb-summary" id="fbSummary"></div>
+
+        <div class="fb-controls">
+          <input type="search" id="fbSearch" class="fb-input" placeholder="Search title, URL, CWE, agent&hellip;" autocomplete="off">
+          <select id="fbScope" class="fb-input"><option value="">All scope items</option></select>
+          <select id="fbTarget" class="fb-input"><option value="">All targets</option></select>
+          <select id="fbScan" class="fb-input"><option value="">All scans</option></select>
+          <select id="fbSeverity" class="fb-input"><option value="">All severities</option></select>
+          <select id="fbAgent" class="fb-input"><option value="">All agents</option></select>
+          <select id="fbStage" class="fb-input">
+            <option value="">Validated + raw</option>
+            <option value="validated">Validated only</option>
+            <option value="raw">Raw claims only</option>
+          </select>
+          <select id="fbSort" class="fb-input">
+            <option value="severity">Sort: severity</option>
+            <option value="cvss">Sort: CVSS</option>
+            <option value="scope">Sort: scope item</option>
+            <option value="target">Sort: target</option>
+            <option value="scan">Sort: scan</option>
+            <option value="title">Sort: title</option>
+            <option value="date">Sort: newest task</option>
+          </select>
+          <label class="fb-toggle"><input type="checkbox" id="fbRaw"> include raw agent claims</label>
+          <button class="btn sm" id="fbRefresh">Refresh</button>
+          <button class="btn sm" id="fbCsv">Export CSV</button>
+          <span class="meta" id="fbCount"></span>
+        </div>
+
+        <div class="fb-facet-head">Program scope items <span class="hint">click to filter</span></div>
+        <div class="fb-targets" id="fbScopes"></div>
+        <div class="fb-facet-head">Targets</div>
+        <div class="fb-targets" id="fbTargets"></div>
+
+        <div class="fb-table-wrap">
+          <table class="fb-table">
+            <thead><tr>
+              <th data-sort="severity">Sev</th><th data-sort="cvss">CVSS</th>
+              <th data-sort="scope">Scope</th><th data-sort="target">Target</th>
+              <th data-sort="title">Finding</th>
+              <th>CWE</th><th>Agent</th><th>Stage</th><th data-sort="scan">Scan</th>
+            </tr></thead>
+            <tbody id="fbRows"></tbody>
+          </table>
+        </div>
+        <div class="fb-empty" id="fbEmpty" style="display:none">No findings match the current filters.</div>
       </section>
 
       <section class="view" id="view-reports">

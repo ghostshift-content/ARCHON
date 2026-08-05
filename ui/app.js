@@ -5,6 +5,21 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)]
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const fmtTime = ts => { try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) } catch { return '' } }
 
+// Finding URLs come from agent output, i.e. untrusted text that may quote the target's own
+// content. Never put one in an href without checking the scheme first — `javascript:` or
+// `data:` there would be self-XSS in the operator console. Returns an absolute http(s) URL,
+// or null when the value is not safely linkable (caller then renders it as plain text).
+function safeUrl(u) {
+  const raw = String(u == null ? '' : u).trim()
+  if (!raw) return null
+  try {
+    // resolve relatives (findings often carry a bare path) against the page origin
+    const parsed = new URL(raw, window.location.origin)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+    return parsed.href
+  } catch { return null }
+}
+
 let SQUADS = [], SQUAD_BY = {}
 let REPORTS = [], lastState = null
 const reportCache = {}          // rel → raw markdown (fetched once)
@@ -66,6 +81,7 @@ function show(view) {
   currentView = view
   const main = document.querySelector('.main'); if (main) main.scrollTop = 0
   if (view === 'studio') renderStudio()
+  if (view === 'findings' && typeof fbLoad === 'function') fbLoad()
 }
 
 // M12: Studio — create/list custom personas & patterns (no code edit). All rendered values esc()'d.
@@ -1298,3 +1314,184 @@ async function boot() {
   renderSquads(); await tick(); setInterval(tick, 2500)
 }
 boot()
+
+/* ── Findings board (cross-engagement) ──────────────────────────────────────
+   Every validated finding from every task, grouped and sortable by target.
+   Self-contained: all state lives under fb* so it cannot collide with the
+   per-task findings view (fnFindings / loadFindings).                        */
+let fbAll = [], fbMeta = null, fbLoaded = false
+const FB_SEV = ['Critical', 'High', 'Medium', 'Low', 'Info']
+
+async function fbLoad(force) {
+  if (fbLoaded && !force) return fbRender()
+  const rows = $('#fbRows'); if (rows) rows.innerHTML = '<tr><td colspan="9" class="hint">loading…</td></tr>'
+  const wantRaw = !!(($('#fbRaw') || {}).checked)
+  try { fbMeta = await api('GET', '/api/findings/all' + (wantRaw ? '?raw=1' : '')) } catch { fbMeta = null }
+  fbAll = (fbMeta && fbMeta.findings) || []
+  fbLoaded = true
+
+  const tSel = $('#fbTarget')
+  if (tSel) tSel.innerHTML = '<option value="">All targets</option>' +
+    ((fbMeta && fbMeta.targets) || []).map(t =>
+      `<option value="${esc(t.target)}">${esc(t.target)} (${t.total})</option>`).join('')
+  const sSel = $('#fbSeverity')
+  if (sSel) sSel.innerHTML = '<option value="">All severities</option>' +
+    FB_SEV.filter(s => (fbMeta && fbMeta.counts && fbMeta.counts[s]) > 0)
+      .map(s => `<option value="${s}">${s} (${fbMeta.counts[s]})</option>`).join('')
+  const aSel = $('#fbAgent')
+  if (aSel) aSel.innerHTML = '<option value="">All agents</option>' +
+    ((fbMeta && fbMeta.agents) || []).map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')
+  const scSel = $('#fbScope')
+  if (scSel) scSel.innerHTML = '<option value="">All scope items</option>' +
+    ((fbMeta && fbMeta.scopes) || []).map(x =>
+      `<option value="${esc(x.scope)}">${esc(x.scope)} (${x.total})</option>`).join('')
+  const snSel = $('#fbScan')
+  if (snSel) snSel.innerHTML = '<option value="">All scans</option>' +
+    ((fbMeta && fbMeta.scans) || []).map(x =>
+      `<option value="${esc(x.scan)}">${esc(String(x.scan).slice(0, 46))} (${x.total})</option>`).join('')
+
+  const cnt = $('#cFindings'); if (cnt) cnt.textContent = String((fbMeta && fbMeta.total) || 0)
+  fbRenderSummary(); fbRenderScopes(); fbRenderTargets(); fbRender()
+}
+
+function fbRenderSummary() {
+  const el = $('#fbSummary'); if (!el || !fbMeta) return
+  const c = fbMeta.counts || {}
+  el.innerHTML = FB_SEV.map(s =>
+    `<div class="fb-stat sev-${s.toLowerCase()}"><b>${c[s] || 0}</b><span>${s}</span></div>`).join('') +
+    `<div class="fb-stat"><b>${fbMeta.total || 0}</b><span>Total</span></div>` +
+    `<div class="fb-stat"><b>${fbMeta.validated || 0}</b><span>Validated</span></div>` +
+    `<div class="fb-stat"><b>${fbMeta.raw || 0}</b><span>Raw claims</span></div>` +
+    `<div class="fb-stat"><b>${(fbMeta.scopes || []).length}</b><span>Scope items</span></div>` +
+    `<div class="fb-stat"><b>${(fbMeta.scans || []).length}</b><span>Scans</span></div>`
+}
+
+function fbRenderScopes() {
+  const el = $('#fbScopes'); if (!el || !fbMeta) return
+  el.innerHTML = (fbMeta.scopes || []).map(t => {
+    const chips = FB_SEV.filter(s => t[s] > 0)
+      .map(s => `<i class="sev-${s.toLowerCase()}">${t[s]}</i>`).join('')
+    return `<button class="fb-target" data-scope="${esc(t.scope)}">
+      <b>${esc(t.scope)}</b><span class="fb-tcount">${t.total}</span>${chips}</button>`
+  }).join('') || '<div class="hint">no scope data</div>'
+  $$('#fbScopes .fb-target').forEach(b => b.onclick = () => {
+    const sel = $('#fbScope'); if (sel) sel.value = b.dataset.scope; fbRender()
+  })
+}
+
+function fbRenderTargets() {
+  const el = $('#fbTargets'); if (!el || !fbMeta) return
+  el.innerHTML = (fbMeta.targets || []).map(t => {
+    const chips = FB_SEV.filter(s => t[s] > 0)
+      .map(s => `<i class="sev-${s.toLowerCase()}">${t[s]}</i>`).join('')
+    return `<button class="fb-target" data-target="${esc(t.target)}">
+      <b>${esc(t.target)}</b><span class="fb-tcount">${t.total}</span>${chips}</button>`
+  }).join('') || '<div class="hint">no targets yet</div>'
+  $$('#fbTargets .fb-target').forEach(b => b.onclick = () => {
+    const sel = $('#fbTarget'); if (sel) sel.value = b.dataset.target; fbRender()
+  })
+}
+
+function fbFiltered() {
+  const q = (($('#fbSearch') || {}).value || '').toLowerCase().trim()
+  const tgt = (($('#fbTarget') || {}).value || '')
+  const sev = (($('#fbSeverity') || {}).value || '')
+  const agent = (($('#fbAgent') || {}).value || '')
+  const scope = (($('#fbScope') || {}).value || '')
+  const scan = (($('#fbScan') || {}).value || '')
+  const stage = (($('#fbStage') || {}).value || '')
+  const sort = (($('#fbSort') || {}).value || 'severity')
+  let out = fbAll.filter(f =>
+    (!tgt || f.target === tgt) && (!sev || f.severity === sev) && (!agent || f.agent === agent) &&
+    (!scope || f.scope === scope) && (!scan || f.scan === scan) && (!stage || f.stage === stage) &&
+    (!q || [f.title, f.url, f.cwe, f.agent, f.target, f.taskTitle, f.id]
+      .some(v => String(v || '').toLowerCase().includes(q))))
+  const cmp = {
+    severity: (a, b) => FB_SEV.indexOf(a.severity) - FB_SEV.indexOf(b.severity) || (b.cvss || 0) - (a.cvss || 0),
+    cvss:     (a, b) => (b.cvss || 0) - (a.cvss || 0),
+    target:   (a, b) => String(a.target).localeCompare(String(b.target)) || FB_SEV.indexOf(a.severity) - FB_SEV.indexOf(b.severity),
+    scope:    (a, b) => String(a.scope).localeCompare(String(b.scope)) || FB_SEV.indexOf(a.severity) - FB_SEV.indexOf(b.severity),
+    scan:     (a, b) => String(a.scan).localeCompare(String(b.scan)) || FB_SEV.indexOf(a.severity) - FB_SEV.indexOf(b.severity),
+    title:    (a, b) => String(a.title).localeCompare(String(b.title)),
+    date:     (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
+  }[sort]
+  return out.sort(cmp)
+}
+
+// Open a board row straight through to that finding's detail page (description, reproduction
+// steps, POC, impact, remediation) rather than dumping the operator on the run overview.
+//
+// The per-task findings API returns ONLY validated/triaged findings — raw agent claims are
+// deliberately excluded from it (see dashboard.js). A raw row therefore has no detail page,
+// so say that plainly instead of leaving the click dead.
+async function fbOpenFinding(taskId, key, stage) {
+  if (!taskId) return
+  await openTaskPage(taskId)
+  setTdSub('findings')
+  try { await loadFindings() } catch {}          // setTdSub fires this too, but does not await it
+  if (key && fnFindings.some(f => f.key === key)) { openFindingPage(key); return }
+  toast('No detail page for this row',
+    stage === 'raw'
+      ? 'Raw agent claims are not triaged into full findings — open the live-findings JSONL artifact for the original text.'
+      : 'This finding is not in the run’s validated set. Showing the run’s findings instead.',
+    'warn')
+}
+
+// The URL line under a finding title. Linkable http(s) URLs become real anchors so an
+// operator can jump straight to the affected endpoint; anything else stays plain text.
+function fbUrlCell(f) {
+  if (!f.url) return ''
+  const method = esc(f.method || '')
+  const href = safeUrl(f.url)
+  const shown = esc(f.url)
+  if (!href) return `<div class="fb-url">${method} ${shown}</div>`
+  return `<div class="fb-url">${method} <a class="fb-link" href="${esc(href)}"` +
+         ` target="_blank" rel="noopener noreferrer"` +
+         ` title="open ${esc(href)} in a new tab">${shown}</a></div>`
+}
+
+function fbRender() {
+  const rows = $('#fbRows'); if (!rows) return
+  const list = fbFiltered()
+  const cnt = $('#fbCount'); if (cnt) cnt.textContent = `${list.length} of ${fbAll.length}`
+  const empty = $('#fbEmpty'); if (empty) empty.style.display = list.length ? 'none' : 'block'
+  rows.innerHTML = list.map(f => `
+    <tr data-key="${esc(f.key)}" data-task="${esc(f.taskId)}" data-stage="${esc(f.stage || '')}" title="Open finding details">
+      <td><span class="sev-badge sev-${String(f.severity).toLowerCase()}">${esc(f.severity)}</span></td>
+      <td>${f.cvss != null ? esc(String(f.cvss)) : '—'}</td>
+      <td class="fb-tgt">${esc(f.scope || '—')}</td>
+      <td class="fb-tgt">${esc(f.target)}</td>
+      <td class="fb-title"><b>${esc(f.title)}</b>${fbUrlCell(f)}</td>
+      <td>${esc(f.cwe || '—')}</td>
+      <td>${esc(f.agent || '—')}</td>
+      <td><span class="fb-stage fb-stage-${esc(f.stage)}">${f.stage === 'raw' ? 'raw claim' : 'validated'}</span></td>
+      <td class="fb-task" title="${esc(f.taskTitle)}">${esc(String(f.scan || f.taskId).slice(0, 34))}</td>
+    </tr>`).join('')
+  // clicking a row opens THAT finding's detail page (description / repro / impact / remediation)
+  $$('#fbRows tr').forEach(tr => tr.onclick = ev => {
+    // ...but a click on the finding's URL is a navigation, not a row selection
+    if (ev && ev.target && ev.target.closest && ev.target.closest('a.fb-link')) return
+    fbOpenFinding(tr.dataset.task, tr.dataset.key, tr.dataset.stage)
+  })
+}
+
+function fbCsv() {
+  const list = fbFiltered()
+  const cols = ['severity', 'cvss', 'stage', 'scope', 'target', 'title', 'cwe', 'agent', 'confirmation_status', 'url', 'method', 'scan', 'taskId', 'createdAt']
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'
+  const csv = [cols.join(',')].concat(list.map(f => cols.map(c => q(f[c])).join(','))).join('\n')
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+  a.download = 'archon-findings.csv'; a.click(); URL.revokeObjectURL(a.href)
+}
+
+;['#fbSearch', '#fbTarget', '#fbSeverity', '#fbAgent', '#fbSort', '#fbScope', '#fbScan', '#fbStage'].forEach(sel => {
+  const el = $(sel); if (!el) return
+  el.addEventListener(sel === '#fbSearch' ? 'input' : 'change', fbRender)
+})
+{ const r = $('#fbRefresh'); if (r) r.onclick = () => fbLoad(true) }
+{ const rw = $('#fbRaw'); if (rw) rw.addEventListener('change', () => fbLoad(true)) }
+{ const c = $('#fbCsv'); if (c) c.onclick = fbCsv }
+$$('.fb-table thead th[data-sort]').forEach(th => th.onclick = () => {
+  const sel = $('#fbSort'); if (sel) { sel.value = th.dataset.sort; fbRender() }
+})

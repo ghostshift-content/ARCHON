@@ -788,6 +788,131 @@ function findingsForTask(taskId) {
     findings: items, counts, total: items.length, triaged: items.filter(i => i.triage).length,
   }
 }
+// ── Cross-task findings board ────────────────────────────────────────────────
+// Aggregates every validated finding across every task the data layer knows about and
+// annotates each with the TARGET it came from, so findings can be grouped/sorted by
+// target rather than only per-task. Source of truth is the same findingsForSingleTask()
+// the per-task board uses, so a finding can never appear here in a different state.
+// Scope matcher mirroring agents/scope-validator: "*.x.com" matches any sub of x.com.
+function _scopeMatch(host, pattern) {
+  const h = String(host || '').toLowerCase(), p = String(pattern || '').toLowerCase()
+  if (!h || !p) return false
+  if (p === h) return true
+  if (p.startsWith('*.')) { const s = p.slice(1); return h.endsWith(s) && h.length > s.length }
+  return false
+}
+
+function findingsAcrossAllTasks(includeRaw) {
+  let taskIds = []
+  try {
+    // Union of every task that produced EITHER validated findings OR raw agent claims,
+    // so scans that never reached validation still appear (behind the raw toggle).
+    const files = fs.readdirSync(INTEL)
+    const v = files.filter(f => f.startsWith('VALIDATED-FINDINGS-') && f.endsWith('.jsonl'))
+      .map(f => f.slice('VALIDATED-FINDINGS-'.length, -'.jsonl'.length))
+    const r = files.filter(f => f.startsWith('live-findings-') && f.endsWith('.jsonl'))
+      .map(f => f.slice('live-findings-'.length, -'.jsonl'.length))
+    taskIds = [...new Set([...v, ...(includeRaw ? r : [])])]
+  } catch { return { findings: [], targets: [], counts: {}, total: 0, tasks: 0 } }
+
+  // taskId -> {title, createdAt} from tasks.json (single read, not per-finding)
+  const taskMeta = {}
+  try {
+    for (const t of JSON.parse(fs.readFileSync(path.join(INTEL, 'tasks.json'), 'utf8')) || []) {
+      taskMeta[String(t.id)] = { title: t.title || '', createdAt: t.createdAt || '', status: t.status || '' }
+    }
+  } catch {}
+
+  // taskId -> {targetUrl, inScope[]} resolved via the engagement sidecar
+  const engCache = {}
+  const engFor = (id) => {
+    if (engCache[id] !== undefined) return engCache[id]
+    let t = '', scope = []
+    try {
+      const E = resolveEngagementId(id)
+      const eng = E ? readEngagement(E) : null
+      if (eng) { t = eng.targetUrl || ''; scope = Array.isArray(eng.inScope) ? eng.inScope : [] }
+    } catch {}
+    if (!t) { const m = /https?:\/\/[^\s"']+/.exec((taskMeta[id] && taskMeta[id].title) || ''); if (m) t = m[0] }
+    return (engCache[id] = { targetUrl: t, inScope: scope })
+  }
+
+  const all = []
+  for (const id of taskIds) {
+    const { targetUrl: tUrl, inScope } = engFor(id)
+    const meta = taskMeta[id] || {}
+    // Drop a leading "<Program> VDP/BBP —" engagement prefix so the scan label reads cleanly.
+    const scanLabel = (meta.title || '').replace(/^[\w .&-]{1,40}?\b(?:VDP|BBP)\s*[—:-]\s*/i, '').slice(0, 60) || id
+
+    const annotate = (f, stage) => {
+      const target = hostOf(f.url || tUrl) || hostOf(tUrl) || '(unknown)'
+      // which in-scope pattern does this finding's host fall under?
+      const scope = inScope.find(pat => _scopeMatch(target, pat)) ||
+                    inScope.find(pat => _scopeMatch(hostOf(tUrl), pat)) || '(unscoped)'
+      return {
+        ...f, taskId: id, taskTitle: meta.title || '', scan: scanLabel,
+        taskStatus: meta.status || '', createdAt: meta.createdAt || '',
+        targetUrl: tUrl, target, scope, stage,
+      }
+    }
+
+    let items = []
+    try { items = findingsForSingleTask(id, '') } catch { items = [] }
+    for (const f of items) all.push(annotate(f, 'validated'))
+
+    // Raw agent claims: never mixed in by default. When requested they are clearly
+    // marked stage:'raw' so the operator can tell a triaged finding from a claim.
+    if (includeRaw) {
+      const seen = new Set(items.map(i => String(i.title || '').toLowerCase()))
+      let n = 0
+      for (const c of readJsonl(path.join(INTEL, `live-findings-${id}.jsonl`))) {
+        const title = String(c.title || c.details || c.summary || '').replace(/\s+/g, ' ').trim()
+        if (!title) continue
+        if (seen.has(title.toLowerCase())) continue
+        const sev = titleSev(c.severity)
+        all.push(annotate({
+          key: id + '::raw::' + (n++), id: c.id || `raw-${n}`,
+          severity: sev, title: title.slice(0, 180), cvss: null, cvssVector: '',
+          cwe: c.cwe || '', agent: c.agent || '', status: c.type || 'unvalidated',
+          confirmation_status: c.confirmation_status || c.type || '',
+          url: c.url || '', method: c.method || '',
+          description: c.details || c.description || '', poc: c.reproduction || '',
+          impact: '', remediation: '', srcTask: id,
+        }, 'raw'))
+      }
+    }
+  }
+
+  all.sort((a, b) =>
+    SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity) ||
+    (b.cvss || 0) - (a.cvss || 0) ||
+    String(a.target).localeCompare(String(b.target)))
+
+  const counts = {}; for (const s of SEV_ORDER) counts[s] = all.filter(i => i.severity === s).length
+  const facet = (keyFn, label) => {
+    const m = {}
+    for (const f of all) {
+      const k = keyFn(f) || '(unknown)'
+      m[k] = m[k] || { [label]: k, total: 0, Critical: 0, High: 0, Medium: 0, Low: 0, Info: 0 }
+      m[k].total++; m[k][f.severity] = (m[k][f.severity] || 0) + 1
+    }
+    return Object.values(m).sort((a, b) => b.total - a.total)
+  }
+  return {
+    findings: all,
+    counts,
+    total: all.length,
+    tasks: taskIds.length,
+    validated: all.filter(f => f.stage === 'validated').length,
+    raw: all.filter(f => f.stage === 'raw').length,
+    targets: facet(f => f.target, 'target'),
+    scopes:  facet(f => f.scope, 'scope'),
+    scans:   facet(f => f.scan, 'scan'),
+    agents: [...new Set(all.map(f => f.agent).filter(Boolean))].sort(),
+    severities: SEV_ORDER,
+  }
+}
+
 // ── Export findings as Markdown (one combined file) or Zip (per-finding .md + combined) ──
 function _slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'finding' }
 function findingToMarkdown(f) {
@@ -1128,6 +1253,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && p === '/api/findings') {
       return json(res, 200, findingsForTask(url.searchParams.get('taskId') || ''))
+    }
+    // Cross-engagement findings board: every finding from every task, annotated with the
+    // target it came from, so an operator can review/sort the whole estate in one place.
+    if (req.method === 'GET' && p === '/api/findings/all') {
+      return json(res, 200, findingsAcrossAllTasks(url.searchParams.get('raw') === '1'))
     }
     if (req.method === 'GET' && p === '/api/iterations') {
       return json(res, 200, iterationsForTask(url.searchParams.get('taskId') || ''))
